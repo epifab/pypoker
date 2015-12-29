@@ -1,6 +1,7 @@
 import random
 import collections
 
+
 class Card:
     RANKS = {
         2: "2",
@@ -12,15 +13,15 @@ class Card:
         8: "8",
         9: "9",
         10: "10",
-        11: "Jack",
-        12: "Queen",
-        13: "King",
-        14: "Ace"}
+        11: "J",
+        12: "Q",
+        13: "K",
+        14: "A"}
     SUITS = {
-        3: "Hearts",
-        2: "Diamonds",
-        1: "Clubs",
-        0: "Spades"}
+        3: chr(3), # "Hearts",
+        2: chr(4), # "Diamonds",
+        1: chr(5), # "Clubs",
+        0: chr(6)} # "Spades"}
 
     def __init__(self, rank, suit):
         if rank not in Card.RANKS:
@@ -64,50 +65,55 @@ class Score:
         8: "Straight Flush"}
 
 
-class CardSet:
-    def __init__(self, cards, lowest_rank=2):
-        if len(cards) != 5:
-            raise ValueError("Expected set of 5 cards, .")
+class Cards:
+    def __init__(self, cards, lowest_rank):
         self._cards = sorted(cards, key=int, reverse=True)
-        self._suits = collections.defaultdict(list)
         self._ranks = collections.defaultdict(list)
+        self._suits = collections.defaultdict(list)
         for card in self._cards:
-            self._suits[card.get_suit()].append(card)
             self._ranks[card.get_rank()].append(card)
-        self._unpaired = [cards for cards in self._ranks if len(cards) == 1]
-        self._pairs = [cards for cards in self._ranks if len(cards) == 2]
-        self._three_oak = [cards for cards in self._ranks if len(cards) == 2]
-        self._four_oak = [cards for cards in self._ranks if len(cards) == 4]
-        self._unpaired = sorted([rank for rank in self._ranks if self._ranks[rank] == 1], reverse=True)
-        self._pairs = sorted([rank for rank in self._ranks if self._ranks[rank] == 2], reverse=True)
-        self._three_oak = [rank for rank in self._ranks if self._ranks[rank] == 3]
-        self._four_oak = [rank for rank in self._ranks if self._ranks[rank] == 4]
-        # ~~~~~~~~~~~~~~~~~~~
-        # Straights detection
-        # ~~~~~~~~~~~~~~~~~~~
-        self._is_straight = True
-        # Note: in a straight the Ace can either go after the King or before the lowest rank card
-        straight_start = 2 if self._cards[0].get_rank() == 14 and self._cards[-1].get_rank() == lowest_rank else 1
-        for i in range(straight_start, len(self._cards)):
-            if self._cards[i].get_rank() != self._cards[i - 1].get_rank() - 1:
-                self._is_straight = False
-                break
-        if self._is_straight and straight_start == 2:
-            # Minimum straight detected: move the ace at the end of the sequence
-            self._cards.append(self._cards[0])
-            del self._cards[0]
+            self._suits[card.get_suit()].append(card)
+        self._unpaired = sorted([rank for (rank, cards) in self._ranks.items() if len(cards) == 1], reverse=True)
+        self._pairs = sorted([rank for (rank, cards) in self._ranks.items() if len(cards) == 2], reverse=True)
+        self._three_oak = sorted([rank for (rank, cards) in self._ranks.items() if len(cards) == 3], reverse=True)
+        self._four_oak = sorted([rank for (rank, cards) in self._ranks.items() if len(cards) == 4], reverse=True)
+        self._straight = Cards._get_straight(self._cards, lowest_rank)
+        self._flush = Cards._get_flush(self._cards)
+        self._straight_flush = Cards._get_straight_flush(self._cards, lowest_rank)
+        self._sort_cards()
 
-    def get_cards(self):
-        return self._cards
+    def _sort_cards(self):
+        score = self.get_score()
+        best_sequence = []
+        if score == Score.STRAIGHT_FLUSH:
+            best_sequence = self.get_straight_flush()
+        elif score == Score.FOUR_OF_A_KIND:
+            best_sequence = self._ranks[self.get_four_oak_rank()]
+        elif score == Score.FLUSH:
+            best_sequence = self.get_flush()
+        elif score == Score.FULL_HOUSE:
+            best_sequence = self._ranks[self.get_three_oak_rank()] + self._ranks[self.get_pair1_rank()]
+        elif score == Score.STRAIGHT:
+            best_sequence = self.get_straight()
+        elif score == Score.THREE_OF_A_KIND:
+            best_sequence = self._ranks[self.get_three_oak_rank()]
+        elif score == Score.DOUBLE_PAIR:
+            best_sequence = self._ranks[self.get_pair1_rank()] + self._ranks[self.get_pair2_rank()]
+        elif score == Score.PAIR:
+            best_sequence = self._ranks[self.get_pair1_rank()]
+        self._cards = best_sequence + [card for card in self._cards if card not in best_sequence]
 
-    def is_straight(self):
-        return self._is_straight
+    def get_card_list(self, best_five_only=False):
+        return self._cards if not best_five_only or len(self._cards) < 5 else self._cards[0:5]
 
-    def straight_is_min(self):
-        return self._is_straight and self._cards[-1] == 15
+    def get_straight_flush(self):
+        return self._straight_flush
 
-    def straight_is_max(self):
-        return self._is_straight and self._cards[0] == 15
+    def get_flush(self):
+        return self._flush
+
+    def get_straight(self):
+        return self._straight
 
     def get_unpaired(self):
         return self._unpaired
@@ -124,19 +130,16 @@ class CardSet:
     def get_four_oak_rank(self):
         return None if not self._four_oak else self._four_oak[0]
 
-    def is_flush(self):
-        return len(self._suits) == 1
-
     def get_score(self):
-        if self.is_flush() and self.is_straight():
+        if self.get_straight_flush():
             return Score.STRAIGHT_FLUSH
         elif self.get_four_oak_rank():
             return Score.FOUR_OF_A_KIND
-        elif self.is_flush():
+        elif self.get_flush():
             return Score.FLUSH
         elif self.get_three_oak_rank() and self.get_pair1_rank():
             return Score.FULL_HOUSE
-        elif self.is_straight():
+        elif self.get_straight():
             return Score.STRAIGHT
         elif self.get_three_oak_rank():
             return Score.THREE_OF_A_KIND
@@ -147,37 +150,8 @@ class CardSet:
         else:
             return Score.HIGHEST_CARD
 
-    def __lt__(self, other):
-        return self._cmp(other) < 0
-
-    def __eq__(self, other):
-        return self._cmp(other) == 0
-
     def __str__(self):
-        return str(self.get_cards()) + "\n" + Score.CATEGORIES[self.get_score()]
-
-    @staticmethod
-    def _cmp_cards_ranks(cards1, cards2):
-        for i in range(len(cards1)):
-            rank_diff = cards1[i].get_rank() - cards2[i].get_rank()
-            if rank_diff:
-                return rank_diff
-        return 0
-
-    @staticmethod
-    def _cmp_cards_suits(cards1, cards2):
-        for i in range(len(cards1)):
-            suit_diff = cards1[i].get_suit() - cards2[i].get_suit()
-            if suit_diff:
-                return suit_diff
-        return 0
-
-    @staticmethod
-    def _cmp_cards(cards1, cards2):
-        rank_diff = CardSet._cmp_cards_ranks(cards1, cards2)
-        if rank_diff != 0:
-            return rank_diff
-        return CardSet._cmp_cards_suits(cards1, cards2)
+        return ', '.join(self.get_card_list()) + '\n' + Score.CATEGORIES[self.get_score()]
 
     def _cmp(self, other):
         score_diff = self.get_score() - other.get_score()
@@ -185,122 +159,205 @@ class CardSet:
             return score_diff
         cmp_methods = {
             Score.HIGHEST_CARD: self._cmp_highest_card,
-            Score.PAIR: self._cmp_pair,
-            Score.DOUBLE_PAIR: self._cmp_double_pair,
-            Score.THREE_OF_A_KIND: self._cmp_three_oak,
-            Score.STRAIGHT: self._cmp_straight,
-            Score.FULL_HOUSE: self._cmp_full_house,
-            Score.FLUSH: self._cmp_flush,
-            Score.FOUR_OF_A_KIND: self._cmp_four_oak,
+            Score.PAIR: self._cmp_highest_card,
+            Score.DOUBLE_PAIR: self._cmp_highest_card,
+            Score.THREE_OF_A_KIND: self._cmp_highest_card,
+            Score.STRAIGHT: self._cmp_highest_card,
+            Score.FULL_HOUSE: self._cmp_highest_card,
+            Score.FLUSH: self._cmp_highest_card,
+            Score.FOUR_OF_A_KIND: self._cmp_highest_card,
             Score.STRAIGHT_FLUSH: self._cmp_straight_flush}
         return cmp_methods[self.get_score()](other)
 
     def _cmp_highest_card(self, other):
-        return CardSet._cmp_cards(self.get_cards(), other.get_cards())
-
-    def _cmp_pair(self, other):
-        rank_diff = self.get_pair1_rank() - other.get_pair1_rank()
-        if rank_diff:
-            return rank_diff
-        return CardSet._cmp_cards(self.get_unpaired(), other.get_unpaired())
-
-    def _cmp_double_pair(self, other):
-        rank_diff = self.get_pair1_rank() - other.get_pair1_rank()
-        if rank_diff:
-            return rank_diff
-        rank_diff = self.get_pair2_rank() - other.get_pair2_rank()
-        if rank_diff:
-            return rank_diff
-        return CardSet._cmp_cards(self.get_unpaired(), other.get_unpaired())
-
-    def _cmp_three_oak(self, other):
-        return self.get_three_oak_rank() - other.get_three_oak_rank()
-
-    def _cmp_straight(self, other):
-        return CardSet._cmp_cards([self.get_cards()[0]], [other.get_cards()[0]])
-
-    def _cmp_full_house(self, other):
-        return self._cmp_three_oak(other)
-
-    def _cmp_flush(self, other):
-        return self._cmp_highest_card(other)
-
-    def _cmp_four_oak(self, other):
-        return self.get_four_oak_rank() - other.get_four_oak_rank()
+        return Cards._cmp_cards(self.get_card_list(best_five_only=True), other.get_card_list(best_five_only=True))
 
     def _cmp_straight_flush(self, other):
         # Min straight flush is stronger than royal flush
-        if self.straight_is_max() and other.straight_is_min():
+        if Cards._straight_is_max(self.get_straight_flush()) and Cards._straight_is_min(other.get_straight_flush()):
             return -1
-        elif self.straight_is_min() and other.straight_is_max():
+        elif Cards._straight_is_min(self.get_straight_flush()) and Cards._straight_is_max(other.get_straight_flush()):
             return 1
-        return self._cmp_straight(other)
+        return self._cmp_cards(self.get_card_list(), other.get_card_list())
+
+    def __lt__(self, other):
+        return self._cmp(other) < 0
+
+    def __eq__(self, other):
+        return self._cmp(other) == 0
+
+    def __str__(self):
+        return str(self.get_card_list()) + "\n" + Score.CATEGORIES[self.get_score()]
+
+    @staticmethod
+    def _cmp_cards(cards1, cards2):
+        rank_diff = Cards._cmp_ranks(cards1, cards2)
+        if rank_diff != 0:
+            return rank_diff
+        return Cards._cmp_suits(cards1, cards2)
+
+    @staticmethod
+    def _cmp_ranks(cards1, cards2):
+        for i in range(len(cards1)):
+            try:
+                rank_diff = cards1[i].get_rank() - cards2[i].get_rank()
+                if rank_diff:
+                    return rank_diff
+            except IndexError:
+                # cards1 is longer than cards2
+                return 1
+        return 0 if len(cards1) == len(cards2) else -1 # cards2 is longer than cards1
+
+    @staticmethod
+    def _cmp_suits(cards1, cards2):
+        for i in range(len(cards1)):
+            try:
+                suit_diff = cards1[i].get_suit() - cards2[i].get_suit()
+                if suit_diff:
+                    return suit_diff
+            except IndexError:
+                # cards1 is longer than cards2
+                return 1
+        return 0 if len(cards1) == len(cards2) else -1 # cards2 is longer than cards1
+
+    @staticmethod
+    def _get_straight(cards, lowest_rank):
+        if len(cards) < 5:
+            return None
+        straight = [cards[0]]
+        # The cards are assumed to be sorted by rank (in a descending order)
+        for i in range(1, len(cards)):
+            if cards[i].get_rank() == cards[i - 1].get_rank() - 1:
+                straight.append(cards[i])
+                if len(straight) == 5:
+                    return straight
+            elif cards[i].get_rank() != cards[i - 1].get_rank():
+                straight = [cards[i]]
+        # The Ace can go under the lowest rank card
+        if len(straight) == 4 and cards[0].get_rank() == 14 and straight[-1].get_rank() == lowest_rank:
+            straight.append(cards[0])
+            return straight
+        return None
+
+    @staticmethod
+    def _get_flush(cards):
+        suits = collections.defaultdict(list)
+        for card in cards:
+            suits[card.get_suit()].append(card)
+            # Since cards is sorted by rank, as soon as a flush is recognized
+            # we are sure it's the strongest flush of the set
+            if len(suits[card.get_suit()]) == 5:
+                return suits[card.get_suit()]
+        return None
+
+    @staticmethod
+    def _get_straight_flush(cards, lowest_rank):
+        suits = collections.defaultdict(list)
+        for card in cards:
+            suits[card.get_suit()].append(card)
+            if len(suits[card.get_suit()]) >= 5:
+                straight = Cards._get_straight(suits[card.get_suit()], lowest_rank)
+                # Since cards is sorted by rank, as soon as a straight flush is recognized
+                # we are sure it's the strongest flush of the set
+                if straight:
+                    return straight
+        return None
+
+    @staticmethod
+    def _straight_is_min(straight_sequence):
+        return straight_sequence[-1].get_rank() == 14
+
+    @staticmethod
+    def _straight_is_max(straight_sequence):
+        return straight_sequence[0].get_rank() == 14
+
+    def print_cards(self):
+        lines = ["", "", "", "", "", "", ""]
+        for card in self.get_card_list():
+            lines[0] += "+-------+"
+            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
+            lines[2] += "|       |"
+            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
+            lines[4] += "|       |"
+            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
+            lines[6] += "+-------+"
+        print("\n".join(lines))
+        print(Score.CATEGORIES[self.get_score()])
 
 
-class CardSetFactory:
-    def __init__(self, lowest_rank=2):
+class CardsFactory:
+    def __init__(self, lowest_rank):
         self._lowest_rank = lowest_rank
 
-    def get_card_set(self, cards):
-        return CardSet(cards, self._lowest_rank)
+    def get_cards(self, cards):
+        return Cards(cards, self._lowest_rank)
 
 
 class Deck:
-    def __init__(self, lowest_rank=2):
+    def __init__(self, lowest_rank):
         self._lowest_rank = lowest_rank
-        self._cards = None
-
-    def reset(self):
-        self._cards = collections.deque([Card(rank, suit) for rank in range(self._lowest_rank, 15) for suit in range(0, 4)])
+        self._cards = [Card(rank, suit) for rank in range(self._lowest_rank, 15) for suit in range(0, 4)]
+        self._discards = []
         random.shuffle(self._cards)
 
     def get_cards(self, num_cards=1):
-        return [self._cards.popleft() for _ in range(num_cards)]
+        new_cards = []
+        if len(self._cards) < num_cards:
+            new_cards = self._cards
+            self._cards = self._discards
+            self._discards = []
+            random.shuffle(self._cards)
+        return new_cards + [self._cards.pop() for _ in range(num_cards - len(new_cards))]
 
     def change_cards(self, given_up_cards):
-        for card in given_up_cards:
-            self._cards.append(card)
-        return self.get_cards(len(given_up_cards))
+        new_cards = self.get_cards(len(given_up_cards))
+        self._discards += given_up_cards
+        return new_cards
+
+
+class DeckFactory:
+    def __init__(self, lowest_rank):
+        self._lowest_rank = lowest_rank
+
+    def get_deck(self):
+        return Deck(self._lowest_rank)
 
 
 class Player:
-    def __init__(self, name, money, card_set_factory):
+    def __init__(self, name, money, cards_factory):
         self.name = name
         self.money = money
-        self._card_set_factory = card_set_factory
-        self._card_set = None
+        self._cards_factory = cards_factory
+        self._cards = None
 
-    def get_card_set(self):
-        return self._card_set
+    def get_cards(self):
+        return self._cards
 
     def assign_cards(self, cards):
-        self._card_set = self._card_set_factory.get_card_set(cards)
+        self._cards = self._cards_factory.get_cards(cards)
 
     def _print_cards(self):
         print()
         print("{} ${:,.2f}".format(self.name, self.money))
-        for i in range(len(self._card_set.get_cards())):
-            print(" - {}: {}".format(i, self._card_set.get_cards()[i]))
-        print(Score.CATEGORIES[self._card_set.get_score()])
+        self._cards.print_cards()
 
     def change_cards(self, deck):
         self._print_cards()
         while True:
             try:
-                cards = self._card_set.get_cards()
-                given_up_card_ids = input("Please type a comma separated list of card id you wish to change: ")
+                cards = self._cards.get_card_list()
+                given_up_card_ids = input("Please type a comma separated list of card id you wish to change (1 to 5, left to right): ")
                 if given_up_card_ids:
                     # Convert the string into a list of unique integers
-                    given_up_card_ids = set([int(card_id.strip()) for card_id in given_up_card_ids.split(",")])
+                    given_up_card_ids = set([int(card_id.strip()) - 1 for card_id in given_up_card_ids.split(",")])
                     # Works out the new card set
                     given_up_cards = [cards[card_id] for card_id in given_up_card_ids]
                     remaining_cards = [cards[card_id] for card_id in range(len(cards)) if
                                        card_id not in given_up_card_ids]
                     new_cards = deck.change_cards(given_up_cards)
-                    print("New cards: {}".format(new_cards))
-                    self._card_set = self._card_set_factory.get_card_set(remaining_cards + new_cards)
-                    print(self._card_set)
-                    input("")
+                    self._cards = self._cards_factory.get_cards(remaining_cards + new_cards)
+                    Cards.print_cards(self._cards)
+                    input()
                 return
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
@@ -334,8 +391,9 @@ class Player:
 
 
 class Game:
-    def __init__(self, deck, players):
-        self._deck = deck
+    def __init__(self, deck_factory, players):
+        self._deck_factory = deck_factory
+        self._deck = None
         self._players = players
         self._dealer_id = 0
         self._pot = 0.0
@@ -364,7 +422,8 @@ class Game:
     def play_hand(self):
         # Initialization
         self._pot = 0.0
-        self._deck.reset()
+        self._deck = self._deck_factory.get_deck()
+        self._folder_ids = []
 
         # Distribute cards
         for player_id in self.player_ids(self._dealer_id):
@@ -373,8 +432,8 @@ class Game:
         # Opening
         current_player_id = -1
         for player_id in self.player_ids(self._dealer_id):
-            card_set = self._players[player_id].get_card_set()
-            if card_set.get_score() > Score.PAIR or card_set.get_score() == Score.PAIR and card_set.get_pair1_rank() >= 11:
+            cards = self._players[player_id].get_cards()
+            if cards.get_score() > Score.PAIR or cards.get_score() == Score.PAIR and cards.get_pair1_rank() >= 11:
                 current_player_id = player_id
                 break
 
@@ -391,12 +450,10 @@ class Game:
         # Final bet
         self.bet_round(current_player_id, check_allowed=True)
 
-        print("Working out who is the winner...")
-
         # Works out the winner
         winner_id = -1
         for player_id in self.player_ids(current_player_id):
-            if winner_id == -1 or self._players[player_id].get_card_set() > self._players[winner_id].get_card_set():
+            if winner_id == -1 or self._players[player_id].get_cards() > self._players[winner_id].get_cards():
                 winner_id = player_id
 
         print("The winner is {}".format(self._players[winner_id].name))
@@ -429,9 +486,11 @@ class Game:
         return highest_bet_player_id
 
 
-d = Deck(7)
-csf = CardSetFactory(7)
-players = [Player("A", 1000, csf), Player("B", 1000, csf), Player("C", 1000, csf), Player("D", 1000, csf)]
-
-g = Game(d, players)
+deck_factory = DeckFactory(7)
+cards_factory = CardsFactory(7)
+players = [Player("Player 1", 1000, cards_factory),
+           Player("Player 2", 1000, cards_factory),
+           Player("Player 3", 1000, cards_factory),
+           Player("Player 4", 1000, cards_factory)]
+g = Game(deck_factory, players)
 g.play_game()
