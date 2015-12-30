@@ -295,8 +295,7 @@ class CardsFactory:
 
 class Deck:
     def __init__(self, lowest_rank):
-        self._lowest_rank = lowest_rank
-        self._cards = [Card(rank, suit) for rank in range(self._lowest_rank, 15) for suit in range(0, 4)]
+        self._cards = [Card(rank, suit) for rank in range(lowest_rank, 15) for suit in range(0, 4)]
         self._discards = []
         random.shuffle(self._cards)
 
@@ -441,14 +440,16 @@ class Game:
             print("Nobody was able to open.")
             return
 
+        # There are 2 or more players alive
         current_player_id = self.bet_round(current_player_id, check_allowed=False)
 
-        # Change cards
-        for player_id in self.player_ids(self._dealer_id):
-            self._players[player_id].change_cards(self._deck)
+        if len(self._folder_ids) + 1 < len(self._players):
+            # Change cards
+            for player_id in self.player_ids(self._dealer_id):
+                self._players[player_id].change_cards(self._deck)
 
-        # Final bet
-        self.bet_round(current_player_id, check_allowed=True)
+            # Final bet
+            self.bet_round(current_player_id, check_allowed=True)
 
         # Works out the winner
         winner_id = -1
@@ -461,16 +462,23 @@ class Game:
         self._dealer_id = (self._dealer_id + 1) % len(self._players)
 
     def bet_round(self, current_player_id, check_allowed=True):
+        if len(self._players) == len(self._folder_ids):
+            return -1
         bets = [0.0 for _ in self._players]
         highest_bet_player_id = -1
         while current_player_id != highest_bet_player_id:
             # Exclude folders
             if current_player_id not in self._folder_ids:
-                # Works out the minimum bet
+                # Only one player left
+                if len(self._folder_ids) + 1 == len(self._players):
+                    highest_bet_player_id = current_player_id
+                    break
+                # Two or more players still alive
+                # Works out the minimum bet for the current player
                 min_partial_bet = 0.0 if highest_bet_player_id == -1 \
                     else bets[highest_bet_player_id] - bets[current_player_id]
-                # Bet
                 check_allowed = check_allowed or highest_bet_player_id != -1
+                # Bet
                 current_bet = self._players[current_player_id].bet(min_partial_bet, check_allowed)
                 if current_bet == -1:
                     # Fold
@@ -478,7 +486,7 @@ class Game:
                 else:
                     self._pot += current_bet
                     bets[current_player_id] += current_bet
-                    if current_bet > min_partial_bet:
+                    if current_bet > min_partial_bet or highest_bet_player_id == -1:
                         # Raise
                         highest_bet_player_id = current_player_id
             # Next player
