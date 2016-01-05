@@ -72,10 +72,9 @@ class Score:
         7: "Four of a Kind",
         8: "Straight Flush"}
 
-
-class CardSet:
-    def __init__(self, cards, lowest_rank):
-        self._score, self._cards = self.detect_score(cards, lowest_rank)
+    def __init__(self, score, cards):
+        self._score = score
+        self._cards = cards
 
     def get_score(self):
         """Gets the highest score for the given list of cards."""
@@ -85,54 +84,37 @@ class CardSet:
         """Gets the list of cards sorted in a descending order according to their score."""
         return self._cards if not limit or len(self._cards) < limit else self._cards[0:limit]
 
-    def __str__(self):
-        lines = ["", "", "", "", "", "", ""]
-        for card in self.get_cards():
-            lines[0] += "+-------+"
-            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
-            lines[2] += "|       |"
-            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
-            lines[4] += "|       |"
-            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
-            lines[6] += "+-------+"
-        return "\n".join(lines) + "\n" + Score.CATEGORIES[self.get_score()]
-
-    def __lt__(self, other):
-        return CardSet.cmp(self, other) < 0
-
-    def __eq__(self, other):
-        return CardSet.cmp(self, other) == 0
-
-    @staticmethod
-    def cmp(card_set1, card_set2):
-        """Compare two set of cards according to their score."""
+    def cmp(self, other):
+        """Compare scores.
+        Returns a positive integer if self is lower than score2,
+        0 if the two scores are identical, a negative integer if score2 is higher than this score."""
 
         # Compare scores first
-        score_diff = card_set1.get_score() - card_set2.get_score()
+        score_diff = self.get_score() - other.get_score()
         if score_diff:
             return score_diff
 
         # Same score, compare the list of cards
-        cards1 = card_set1.get_cards()
-        cards2 = card_set2.get_cards()
+        cards1 = self.get_cards()
+        cards2 = other.get_cards()
 
         # In the traditional italian poker royal flushes are weaker than minimum straight flushes (e.g. 10, 9, 8, 7, A)
         # This is done so you are not mathematically sure to have the strongest hand.
-        if card_set1.get_score() == Score.STRAIGHT_FLUSH:
-            if CardSet._straight_is_max(cards1) and CardSet._straight_is_min(cards2):
+        if self.get_score() == Score.STRAIGHT_FLUSH:
+            if Score._straight_is_max(cards1) and Score._straight_is_min(cards2):
                 return -1
-            elif CardSet._straight_is_min(cards1) and CardSet._straight_is_max(cards2):
+            elif Score._straight_is_min(cards1) and Score._straight_is_max(cards2):
                 return 1
 
-        return CardSet._cmp_cards(cards1, cards2)
+        return Score._cmp_cards(cards1, cards2)
 
     @staticmethod
     def _cmp_cards(cards1, cards2):
         """Compare two list of cards according to ranks and suits."""
-        rank_diff = CardSet._cmp_ranks(cards1, cards2)
+        rank_diff = Score._cmp_ranks(cards1, cards2)
         if rank_diff:
             return rank_diff
-        return CardSet._cmp_suits(cards1, cards2)
+        return Score._cmp_suits(cards1, cards2)
 
     @staticmethod
     def _cmp_ranks(cards1, cards2):
@@ -163,7 +145,36 @@ class CardSet:
         return 0 if len(cards1) == len(cards2) else -1 # cards2 is longer than cards1
 
     @staticmethod
-    def detect_score(cards, lowest_rank):
+    def _straight_is_min(straight_sequence):
+        return straight_sequence[4].get_rank() == 14
+
+    @staticmethod
+    def _straight_is_max(straight_sequence):
+        return straight_sequence[0].get_rank() == 14
+
+    def __str__(self):
+        lines = ["", "", "", "", "", "", ""]
+        for card in self.get_cards():
+            lines[0] += "+-------+"
+            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
+            lines[2] += "|       |"
+            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
+            lines[4] += "|       |"
+            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
+            lines[6] += "+-------+"
+        return "\n".join(lines) + "\n" + Score.CATEGORIES[self.get_score()]
+
+
+class ScoreDetector:
+    def __init__(self, lowest_rank):
+        self._lowest_rank = lowest_rank
+
+    def get_score(self, cards):
+        score, cards = ScoreDetector._detect_score(cards, self._lowest_rank)
+        return Score(score, cards)
+
+    @staticmethod
+    def _detect_score(cards, lowest_rank):
         """Detects the highest score in the list of cards.
         Returns a tuple (score, cards) where score is an integer (see Score class) and cards is a list of cards sorted
         according to the score in a descending order.
@@ -176,7 +187,7 @@ class CardSet:
         cards = sorted(cards, key=int, reverse=True)
 
         # Straight flush
-        straight_flush = CardSet._get_straight_flush(cards, lowest_rank)
+        straight_flush = ScoreDetector._get_straight_flush(cards, lowest_rank)
         if straight_flush:
             return Score.STRAIGHT_FLUSH, merge_sequence(straight_flush, cards)
 
@@ -193,7 +204,7 @@ class CardSet:
             return Score.FOUR_OF_A_KIND, merge_sequence(ranks[four_oak_rank[0]], cards)
 
         # Flush
-        flush = CardSet._get_flush(cards)
+        flush = ScoreDetector._get_flush(cards)
         if flush:
             return Score.FLUSH, flush
 
@@ -206,7 +217,7 @@ class CardSet:
             return Score.FULL_HOUSE, merge_sequence(ranks[three_oak_ranks[0]] + ranks[pair_ranks[0]], cards)
 
         # Straight
-        straight = CardSet._get_straight(cards, lowest_rank)
+        straight = ScoreDetector._get_straight(cards, lowest_rank)
         if straight:
             return Score.STRAIGHT, merge_sequence(straight, cards)
 
@@ -264,24 +275,21 @@ class CardSet:
         for card in cards:
             suits[card.get_suit()].append(card)
             if len(suits[card.get_suit()]) >= 5:
-                straight = CardSet._get_straight(suits[card.get_suit()], lowest_rank)
+                straight = ScoreDetector._get_straight(suits[card.get_suit()], lowest_rank)
                 # Since cards is sorted, the first straight flush detected is guaranteed to be the highest one
                 if straight:
                     return straight
         return None
 
-    @staticmethod
-    def _straight_is_min(straight_sequence):
-        return straight_sequence[4].get_rank() == 14
-
-    @staticmethod
-    def _straight_is_max(straight_sequence):
-        return straight_sequence[0].get_rank() == 14
-
 
 class Deck:
     def __init__(self, lowest_rank):
-        self._cards = [Card(rank, suit) for rank in range(lowest_rank, 15) for suit in range(0, 4)]
+        self._lowest_rank = lowest_rank
+        self._cards = None
+        self._discards = None
+
+    def initialize(self):
+        self._cards = [Card(rank, suit) for rank in range(self._lowest_rank, 15) for suit in range(0, 4)]
         self._discards = []
         random.shuffle(self._cards)
 
@@ -300,17 +308,6 @@ class Deck:
         return new_cards
 
 
-class CardsFactory:
-    def __init__(self, lowest_rank):
-        self._lowest_rank = lowest_rank
-
-    def create_deck(self):
-        return Deck(self._lowest_rank)
-
-    def create_card_set(self, cards):
-        return CardSet(cards, self._lowest_rank)
-
-
 class Player:
     def get_name(self):
         raise NotImplementedError()
@@ -327,7 +324,7 @@ class Player:
     def change_cards(self, deck):
         raise NotImplementedError()
 
-    def get_card_set(self):
+    def get_score(self):
         raise NotImplementedError()
 
     def bet(self, min_bet=0.0, max_bet=0.0, check_allowed=True):
@@ -335,11 +332,11 @@ class Player:
 
 
 class ConsolePlayer(Player):
-    def __init__(self, name, money, cards_factory):
+    def __init__(self, name, money, score_detector):
         self._name = name
         self._money = money
-        self._cards_factory = cards_factory
-        self._card_set = None
+        self._score_detector = score_detector
+        self._score = None
 
     def get_name(self):
         return self._name
@@ -350,22 +347,20 @@ class ConsolePlayer(Player):
     def add_money(self, money):
         self._money += money
 
-    def get_card_set(self):
-        return self._card_set
+    def get_score(self):
+        return self._score
 
     def assign_cards(self, cards):
-        self._card_set = self._cards_factory.create_card_set(cards)
+        self._score = self._score_detector.get_score(cards)
 
     def __str__(self):
-        print()
-        print("{} ${:,.2f}".format(self.get_name(), self.get_money()))
-        self._card_set.print_cards()
+        return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money()) + "\n" + str(self._score)
 
     def change_cards(self, deck):
-        self.__str__()
+        print(str(self))
         while True:
             try:
-                cards = self._card_set.get_cards()
+                cards = self._score.get_cards()
                 given_up_card_ids = input("Please type a comma separated list of card id you wish to change (1 to 5, left to right): ")
                 if given_up_card_ids:
                     # Convert the string into a list of unique integers
@@ -375,15 +370,15 @@ class ConsolePlayer(Player):
                     remaining_cards = [cards[card_id] for card_id in range(len(cards)) if
                                        card_id not in given_up_card_ids]
                     new_cards = deck.change_cards(given_up_cards)
-                    self._card_set = self._cards_factory.create_card_set(remaining_cards + new_cards)
-                    CardSet.print_cards(self._card_set)
+                    self._score = self._score_detector.get_score(remaining_cards + new_cards)
+                    print(str(self._score))
                     input()
                 return
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
     def bet(self, min_bet=0.0, max_bet=0.0, check_allowed=True):
-        self.__str__()
+        print(str(self))
         while True:
             message = "Type your bet" if not min_bet else "${:,.2f} to call".format(min_bet)
             bet = input(message + " (-1 to fold): ".format(min_bet))
@@ -414,21 +409,22 @@ class ConsolePlayer(Player):
 
 
 class Game:
-    def __init__(self, players, cards_factory):
+    def __init__(self, players, deck, score_detector):
         self._players = players
-        self._cards_factory = cards_factory
+        self._deck = deck
+        self._score_detector = score_detector
         self._dealer_id = 0
         self._pot = 0.0
         self._folder_ids = []
         self._min_opening_scores = [
             # Pair of J
-            cards_factory.create_card_set([Card(11, 0), Card(11, 1)]),
+            score_detector.get_score([Card(11, 0), Card(11, 1)]),
             # Pair of Q
-            cards_factory.create_card_set([Card(12, 0), Card(12, 1)]),
+            score_detector.get_score([Card(12, 0), Card(12, 1)]),
             # Pair of K
-            cards_factory.create_card_set([Card(13, 0), Card(13, 1)]),
+            score_detector.get_score([Card(13, 0), Card(13, 1)]),
             # Pair of A
-            cards_factory.create_card_set([Card(14, 0), Card(14, 1)])]
+            score_detector.get_score([Card(14, 0), Card(14, 1)])]
 
     def play_game(self):
         self._play_hand()
@@ -452,19 +448,19 @@ class Game:
 
     def _play_hand(self, failed_hands=0):
         # Initialization
-        deck = self._cards_factory.create_deck()
+        self._deck.initialize()
         self._folder_ids = []
 
         # Distribute cards
         for player_id in self._player_ids(self._dealer_id):
-            self._players[player_id].assign_cards(deck.get_cards(5))
+            self._players[player_id].assign_cards(self._deck.get_cards(5))
 
         min_opening_score = self._min_opening_scores[failed_hands % len(self._min_opening_scores)]
 
         # Opening bet round
         current_player_id = -1
         for player_id in self._player_ids(self._dealer_id):
-            if self._players[player_id].get_card_set() > min_opening_score:
+            if self._players[player_id].get_score().cmp(min_opening_score) > 0:
                 current_player_id = player_id
                 break
 
@@ -479,14 +475,14 @@ class Game:
         if len(self._folder_ids) + 1 < len(self._players):
             # Change cards
             for player_id in self._player_ids(self._dealer_id):
-                self._players[player_id].change_cards(deck)
+                self._players[player_id].change_cards(self._deck)
             # Final bet round
             self._bet_round(current_player_id, check_allowed=True)
 
         # Works out the winner
         winner_id = -1
         for player_id in self._player_ids(current_player_id):
-            if winner_id == -1 or self._players[player_id].get_card_set() > self._players[winner_id].get_card_set():
+            if winner_id == -1 or self._players[player_id].get_score().cmp(self._players[winner_id].get_score()) > 0:
                 winner_id = player_id
 
         print("The winner is {}".format(self._players[winner_id].get_name()))
@@ -527,10 +523,11 @@ class Game:
         return highest_bet_player_id
 
 
-cards_factory = CardsFactory(7)
-players = [ConsolePlayer("Player 1", 1000, cards_factory),
-           ConsolePlayer("Player 2", 1000, cards_factory),
-           ConsolePlayer("Player 3", 1000, cards_factory),
-           ConsolePlayer("Player 4", 1000, cards_factory)]
-g = Game(players, cards_factory)
+score_detector = ScoreDetector(7)
+deck = Deck(7)
+players = [ConsolePlayer("Player 1", 1000, score_detector),
+           ConsolePlayer("Player 2", 1000, score_detector),
+           ConsolePlayer("Player 3", 1000, score_detector),
+           ConsolePlayer("Player 4", 1000, score_detector)]
+g = Game(players, deck, score_detector)
 g.play_game()
