@@ -80,7 +80,7 @@ class Score:
         """Gets the highest score for the given list of cards."""
         return self._score
 
-    def get_cards(self, limit=5):
+    def get_cards(self, limit=0):
         """Gets the list of cards sorted in a descending order according to their score."""
         return self._cards if not limit or len(self._cards) < limit else self._cards[0:limit]
 
@@ -95,8 +95,8 @@ class Score:
             return score_diff
 
         # Same score, compare the list of cards
-        cards1 = self.get_cards()
-        cards2 = other.get_cards()
+        cards1 = self.get_cards(limit=5)
+        cards2 = other.get_cards(limit=5)
 
         # In the traditional italian poker royal flushes are weaker than minimum straight flushes (e.g. 10, 9, 8, 7, A)
         # This is done so you are not mathematically sure to have the strongest hand.
@@ -315,10 +315,13 @@ class Player:
     def get_money(self):
         raise NotImplementedError()
 
-    def add_money(self):
+    def alter_money(self):
         raise NotImplementedError()
 
     def assign_cards(self, cards):
+        raise NotImplementedError()
+
+    def open(self, minimum_score, min_bet=0.0, max_bet=0.0):
         raise NotImplementedError()
 
     def change_cards(self, deck):
@@ -327,7 +330,7 @@ class Player:
     def get_score(self):
         raise NotImplementedError()
 
-    def bet(self, min_bet=0.0, max_bet=0.0, check_allowed=True):
+    def bet(self, min_bet=0.0, max_bet=0.0):
         raise NotImplementedError()
 
 
@@ -344,7 +347,7 @@ class ConsolePlayer(Player):
     def get_money(self):
         return self._money
 
-    def add_money(self, money):
+    def alter_money(self, money):
         self._money += money
 
     def get_score(self):
@@ -352,6 +355,50 @@ class ConsolePlayer(Player):
 
     def assign_cards(self, cards):
         self._score = self._score_detector.get_score(cards)
+
+    def open(self, minimum_score, min_bet=0.0, max_bet=0.0):
+        print(str(self))
+        if self._score.cmp(minimum_score) < 0:
+            input("Not allowed to open. Press enter to continue.")
+            return -1
+
+        while True:
+            message = "Type your opening bet" if not min_bet else "${:,.2f} minimum to open".format(min_bet)
+            if max_bet:
+                message += " Max bet: ${:,.2f}".format(max_bet)
+            bet = input(message + " Type -1 to fold: ".format(min_bet))
+            try:
+                bet = float(bet)
+                if bet == -1:
+                    return -1
+                elif bet < min_bet:
+                    raise ValueError
+                elif max_bet and bet > max_bet:
+                    raise ValueError
+                self._money -= bet
+                return bet
+            except ValueError:
+                print("Invalid bet.")
+
+    def bet(self, min_bet=0.0, max_bet=0.0):
+        print(str(self))
+        while True:
+            message = "Type your bet" if not min_bet else "${:,.2f} to call".format(min_bet)
+            if max_bet:
+                message += " Max bet: ${:,.2f}".format(max_bet)
+            bet = input(message + " Type -1 to fold: ".format(min_bet))
+            try:
+                bet = float(bet)
+                if bet == -1:
+                    return -1
+                elif bet < min_bet:
+                    raise ValueError
+                elif max_bet and bet > max_bet:
+                    raise ValueError
+                self._money -= bet
+                return bet
+            except ValueError:
+                print("Invalid bet.")
 
     def __str__(self):
         return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money()) + "\n" + str(self._score)
@@ -365,6 +412,9 @@ class ConsolePlayer(Player):
                 if given_up_card_ids:
                     # Convert the string into a list of unique integers
                     given_up_card_ids = set([int(card_id.strip()) - 1 for card_id in given_up_card_ids.split(",")])
+                    if len(given_up_card_ids) > 4:
+                        print("You cannot change more than 4 cards")
+                        continue
                     # Works out the new card set
                     given_up_cards = [cards[card_id] for card_id in given_up_card_ids]
                     remaining_cards = [cards[card_id] for card_id in range(len(cards)) if
@@ -377,42 +427,13 @@ class ConsolePlayer(Player):
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
-    def bet(self, min_bet=0.0, max_bet=0.0, check_allowed=True):
-        print(str(self))
-        while True:
-            message = "Type your bet" if not min_bet else "${:,.2f} to call".format(min_bet)
-            bet = input(message + " (-1 to fold): ".format(min_bet))
-            try:
-                bet = float(bet)
-                if bet == -1:
-                    print("Fold")
-                    return -1
-                elif bet < min_bet:
-                    raise ValueError("Not enough money")
-                elif not bet:
-                    if check_allowed:
-                        print("Check")
-                    else:
-                        print("Check not allowed.")
-                        raise ValueError
-                elif bet == min_bet:
-                    print("Call")
-                elif max_bet and bet > max_bet:
-                    print("Max bet exceeded")
-                    raise ValueError
-                else:
-                    print("Raise")
-                self._money -= bet
-                return bet
-            except ValueError:
-                print("Invalid bet.")
-
 
 class Game:
-    def __init__(self, players, deck, score_detector):
+    def __init__(self, players, deck, score_detector, stake=0.0):
         self._players = players
         self._deck = deck
         self._score_detector = score_detector
+        self._stake = stake
         self._dealer_id = 0
         self._pot = 0.0
         self._folder_ids = []
@@ -451,25 +472,38 @@ class Game:
         self._deck.initialize()
         self._folder_ids = []
 
-        # Distribute cards
         for player_id in self._player_ids(self._dealer_id):
+            # Distribute cards
             self._players[player_id].assign_cards(self._deck.get_cards(5))
+            # Collect stakes
+            self._players[player_id].alter_money(-self._stake)
+            self._pot += self._stake
 
+        print("Pot: ${:,.2f}".format(self._pot))
+
+        # Define the minimum score to open
         min_opening_score = self._min_opening_scores[failed_hands % len(self._min_opening_scores)]
 
         # Opening bet round
+        opening_bet = None
         current_player_id = -1
         for player_id in self._player_ids(self._dealer_id):
-            if self._players[player_id].get_score().cmp(min_opening_score) > 0:
+            bet = self._players[player_id].open(min_opening_score, 1.0, self._pot)
+            if bet == -1:
+                print("Player '{}' did not open.".format(self._players[player_id].get_name()))
+            else:
+                print("Player '{}' opening bet: ${:,.2f}".format(self._players[player_id].get_name(), bet))
                 current_player_id = player_id
+                opening_bet = bet
+                self._pot += opening_bet
                 break
 
-        if current_player_id == -1:
-            print("Nobody was able to open.")
+        if not opening_bet:
+            print("Nobody opened.")
             return
 
         # Opening bet round
-        current_player_id = self._bet_round(current_player_id, check_allowed=False)
+        current_player_id = self._bet_round(current_player_id, opening_bet=opening_bet)
 
         # There are 2 or more players alive
         if len(self._folder_ids) + 1 < len(self._players):
@@ -477,7 +511,7 @@ class Game:
             for player_id in self._player_ids(self._dealer_id):
                 self._players[player_id].change_cards(self._deck)
             # Final bet round
-            self._bet_round(current_player_id, check_allowed=True)
+            self._bet_round(current_player_id)
 
         # Works out the winner
         winner_id = -1
@@ -486,15 +520,22 @@ class Game:
                 winner_id = player_id
 
         print("The winner is {}".format(self._players[winner_id].get_name()))
-        self._players[winner_id].add_money(self._pot)
+        self._players[winner_id].alter_money(self._pot)
         self._pot = 0.0
         self._dealer_id = (self._dealer_id + 1) % len(self._players)
 
-    def _bet_round(self, current_player_id, check_allowed=True):
+    def _bet_round(self, current_player_id, opening_bet=0.0):
         if len(self._players) == len(self._folder_ids):
             return -1
+
         bets = [0.0 for _ in self._players]
         highest_bet_player_id = -1
+
+        if opening_bet:
+            bets[current_player_id] = opening_bet
+            highest_bet_player_id = current_player_id
+            current_player_id = (current_player_id + 1) % len(self._players)
+
         while current_player_id != highest_bet_player_id:
             # Exclude folders
             if current_player_id not in self._folder_ids:
@@ -506,18 +547,23 @@ class Game:
                 # Works out the minimum bet for the current player
                 min_partial_bet = 0.0 if highest_bet_player_id == -1 \
                     else bets[highest_bet_player_id] - bets[current_player_id]
-                check_allowed = check_allowed or highest_bet_player_id != -1
                 # Bet
-                current_bet = self._players[current_player_id].bet(min_partial_bet, self._pot, check_allowed)
+                current_bet = self._players[current_player_id].bet(min_partial_bet, self._pot)
                 if current_bet == -1:
                     # Fold
                     self._folder_ids.append(current_player_id)
+                    print("Player '{}' fold.".format(self._players[current_player_id].get_name()))
                 else:
                     self._pot += current_bet
                     bets[current_player_id] += current_bet
                     if current_bet > min_partial_bet or highest_bet_player_id == -1:
                         # Raise
                         highest_bet_player_id = current_player_id
+                        print("Player '{}' raised.".format(self._players[current_player_id].get_name()))
+                    elif not current_bet:
+                        print("Player '{}' checked.".format(self._players[current_player_id].get_name()))
+                    else:
+                        print("Player '{}' called.".format(self._players[current_player_id].get_name()))
             # Next player
             current_player_id = (current_player_id + 1) % len(self._players)
         return highest_bet_player_id
@@ -529,5 +575,5 @@ players = [ConsolePlayer("Player 1", 1000, score_detector),
            ConsolePlayer("Player 2", 1000, score_detector),
            ConsolePlayer("Player 3", 1000, score_detector),
            ConsolePlayer("Player 4", 1000, score_detector)]
-g = Game(players, deck, score_detector)
+g = Game(players, deck, score_detector, 10.0)
 g.play_game()
