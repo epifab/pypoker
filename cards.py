@@ -310,28 +310,28 @@ class Deck:
 
 class Player:
     def get_name(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_money(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def alter_money(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def assign_cards(self, cards):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def open(self, minimum_score, min_bet=0.0, max_bet=0.0):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def change_cards(self, deck):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_score(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def bet(self, min_bet=0.0, max_bet=0.0):
-        raise NotImplementedError()
+    def bet(self, min_bet=0.0, max_bet=0.0, min_score=None):
+        raise NotImplementedError
 
 
 class ConsolePlayer(Player):
@@ -356,37 +356,23 @@ class ConsolePlayer(Player):
     def assign_cards(self, cards):
         self._score = self._score_detector.get_score(cards)
 
-    def open(self, minimum_score, min_bet=0.0, max_bet=0.0):
+    def bet(self, min_bet=0.0, max_bet=0.0, min_score=None):
         print(str(self))
-        if self._score.cmp(minimum_score) < 0:
+
+        if min_score and self._score.cmp(min_score) < 0:
             input("Not allowed to open. Press enter to continue.")
             return -1
 
         while True:
-            message = "Type your opening bet" if not min_bet else "${:,.2f} minimum to open".format(min_bet)
+            message = "Type your bet."
+            if min_bet:
+                message += " min bet: ${:,.2f}".format(min_bet)
             if max_bet:
-                message += " Max bet: ${:,.2f}".format(max_bet)
-            bet = input(message + " Type -1 to fold: ".format(min_bet))
-            try:
-                bet = float(bet)
-                if bet == -1:
-                    return -1
-                elif bet < min_bet:
-                    raise ValueError
-                elif max_bet and bet > max_bet:
-                    raise ValueError
-                self._money -= bet
-                return bet
-            except ValueError:
-                print("Invalid bet.")
+                message += " max bet: ${:,.2f}".format(max_bet)
+            message += " -1 to " + ("skip opening" if min_score else "fold") + ": "
 
-    def bet(self, min_bet=0.0, max_bet=0.0):
-        print(str(self))
-        while True:
-            message = "Type your bet" if not min_bet else "${:,.2f} to call".format(min_bet)
-            if max_bet:
-                message += " Max bet: ${:,.2f}".format(max_bet)
-            bet = input(message + " Type -1 to fold: ".format(min_bet))
+            bet = input(message)
+
             try:
                 bet = float(bet)
                 if bet == -1:
@@ -473,11 +459,11 @@ class Game:
         self._folder_ids = []
 
         for player_id in self._player_ids(self._dealer_id):
-            # Distribute cards
-            self._players[player_id].assign_cards(self._deck.get_cards(5))
             # Collect stakes
             self._players[player_id].alter_money(-self._stake)
             self._pot += self._stake
+            # Distribute cards
+            self._players[player_id].assign_cards(self._deck.get_cards(5))
 
         print("Pot: ${:,.2f}".format(self._pot))
 
@@ -488,7 +474,7 @@ class Game:
         opening_bet = None
         current_player_id = -1
         for player_id in self._player_ids(self._dealer_id):
-            bet = self._players[player_id].open(min_opening_score, 1.0, self._pot)
+            bet = self._players[player_id].bet(min_bet=1.0, max_bet=self._pot, min_score=min_opening_score)
             if bet == -1:
                 print("Player '{}' did not open.".format(self._players[player_id].get_name()))
             else:
@@ -525,6 +511,10 @@ class Game:
         self._dealer_id = (self._dealer_id + 1) % len(self._players)
 
     def _bet_round(self, current_player_id, opening_bet=0.0):
+        """Do a bet round. Returns the id of the player who made the strongest bet first.
+        If opening_bet is specified, current_player_id is assumed to have made the opening bet already."""
+
+        # Should never happen...
         if len(self._players) == len(self._folder_ids):
             return -1
 
@@ -532,6 +522,7 @@ class Game:
         highest_bet_player_id = -1
 
         if opening_bet:
+            # current_player_id has already made an opening bet
             bets[current_player_id] = opening_bet
             highest_bet_player_id = current_player_id
             current_player_id = (current_player_id + 1) % len(self._players)
@@ -543,29 +534,41 @@ class Game:
                 if len(self._folder_ids) + 1 == len(self._players):
                     highest_bet_player_id = current_player_id
                     break
+
                 # Two or more players still alive
                 # Works out the minimum bet for the current player
                 min_partial_bet = 0.0 if highest_bet_player_id == -1 \
                     else bets[highest_bet_player_id] - bets[current_player_id]
+
                 # Bet
-                current_bet = self._players[current_player_id].bet(min_partial_bet, self._pot)
+                current_bet = self._players[current_player_id].bet(min_bet=min_partial_bet, max_bet=self._pot)
+
+                player_name = self._players[current_player_id].get_name()
+
                 if current_bet == -1:
                     # Fold
                     self._folder_ids.append(current_player_id)
-                    print("Player '{}' fold.".format(self._players[current_player_id].get_name()))
+                    print("Player '{}' fold.".format(player_name))
                 else:
                     self._pot += current_bet
                     bets[current_player_id] += current_bet
                     if current_bet > min_partial_bet or highest_bet_player_id == -1:
                         # Raise
                         highest_bet_player_id = current_player_id
-                        print("Player '{}' raised.".format(self._players[current_player_id].get_name()))
+
+                    if current_bet > min_partial_bet:
+                        # Raise
+                        print("Player '{}' raised.".format(player_name))
                     elif not current_bet:
-                        print("Player '{}' checked.".format(self._players[current_player_id].get_name()))
+                        # Check
+                        print("Player '{}' checked.".format(player_name))
                     else:
-                        print("Player '{}' called.".format(self._players[current_player_id].get_name()))
+                        # Call
+                        print("Player '{}' called.".format(player_name))
+
             # Next player
             current_player_id = (current_player_id + 1) % len(self._players)
+
         return highest_bet_player_id
 
 
