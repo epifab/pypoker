@@ -321,9 +321,6 @@ class Player:
     def assign_cards(self, cards):
         raise NotImplementedError
 
-    def open(self, minimum_score, min_bet=0.0, max_bet=0.0):
-        raise NotImplementedError
-
     def change_cards(self, deck):
         raise NotImplementedError
 
