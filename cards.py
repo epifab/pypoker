@@ -302,9 +302,9 @@ class Deck:
             random.shuffle(self._cards)
         return new_cards + [self._cards.pop() for _ in range(num_cards - len(new_cards))]
 
-    def change_cards(self, given_up_cards):
-        new_cards = self.get_cards(len(given_up_cards))
-        self._discards += given_up_cards
+    def change_cards(self, discards):
+        new_cards = self.get_cards(len(discards))
+        self._discards += discards
         return new_cards
 
 
@@ -318,13 +318,16 @@ class Player:
     def get_money(self):
         raise NotImplementedError
 
-    def alter_money(self):
+    def get_cards(self):
         raise NotImplementedError
 
-    def assign_cards(self, cards):
+    def set_money(self):
         raise NotImplementedError
 
-    def change_cards(self, deck):
+    def set_cards(self, cards):
+        raise NotImplementedError
+
+    def discard_cards(self):
         raise NotImplementedError
 
     def get_score(self):
@@ -333,12 +336,16 @@ class Player:
     def bet(self, min_bet=0.0, max_bet=0.0, min_score=None):
         raise NotImplementedError
 
+    def send_message(self, message):
+        raise NotImplementedError
+
 
 class ConsolePlayer(Player):
     def __init__(self, identifier, name, money, score_detector):
         self._id = identifier
         self._name = name
         self._money = money
+        self._cards = None
         self._score_detector = score_detector
         self._score = None
 
@@ -351,17 +358,46 @@ class ConsolePlayer(Player):
     def get_money(self):
         return self._money
 
-    def alter_money(self, money):
-        self._money += money
+    def set_money(self, money):
+        self._money = money
+
+    def get_cards(self):
+        return self._cards
+
+    def set_cards(self, cards):
+        self._cards = cards
+        self._score = self._score_detector.get_score(cards)
+        print(str(self))
+        print(str(self._score))
+
+    def discard_cards(self):
+        print(str(self))
+        while True:
+            try:
+                for k in range(len(self._cards)):
+                    print("{}) {}".format(k + 1, str(self._cards[k])))
+                discard_keys = input("Please type a comma separated list of card id you wish to change: ")
+                if discard_keys:
+                    # Convert the string into a list of unique integers
+                    discard_keys = set([int(card_id.strip()) - 1 for card_id in discard_keys.split(",")])
+                    if len(discard_keys) > 4:
+                        print("You cannot change more than 4 cards")
+                        continue
+                    # Works out the new card set
+                    discards = [self._cards[key] for key in discard_keys]
+                    remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
+                    self.set_cards(remaining_cards)
+                    return discards
+                return []
+            except (ValueError, IndexError):
+                print("One or more invalid card id.")
 
     def get_score(self):
         return self._score
 
-    def assign_cards(self, cards):
-        self._score = self._score_detector.get_score(cards)
-
     def bet(self, min_bet=0.0, max_bet=0.0, min_score=None):
         print(str(self))
+        print(str(self._score))
 
         if min_score and self._score.cmp(min_score) < 0:
             input("Not allowed to open. Press enter to continue.")
@@ -390,40 +426,27 @@ class ConsolePlayer(Player):
             except ValueError:
                 print("Invalid bet.")
 
-    def change_cards(self, deck):
-        print(str(self))
-        while True:
-            try:
-                cards = self._score.get_cards()
-                given_up_card_ids = input("Please type a comma separated list of card id you wish to change (1 to 5, left to right): ")
-                if given_up_card_ids:
-                    # Convert the string into a list of unique integers
-                    given_up_card_ids = set([int(card_id.strip()) - 1 for card_id in given_up_card_ids.split(",")])
-                    if len(given_up_card_ids) > 4:
-                        print("You cannot change more than 4 cards")
-                        continue
-                    # Works out the new card set
-                    given_up_cards = [cards[card_id] for card_id in given_up_card_ids]
-                    remaining_cards = [cards[card_id] for card_id in range(len(cards)) if
-                                       card_id not in given_up_card_ids]
-                    new_cards = deck.change_cards(given_up_cards)
-                    self._score = self._score_detector.get_score(remaining_cards + new_cards)
-                    print(str(self._score))
-                    input()
-                return
-            except (ValueError, IndexError):
-                print("One or more invalid card id.")
+    def send_message(self, message):
+        pass
 
     def __str__(self):
-        return "\n" + "{} #{} ${:,.2f}".format(self.get_name(), self.get_id(), self.get_money()) + "\n" + str(self._score)
+        return "\n" + "{} #{} ${:,.2f}".format(self.get_name(), self.get_id(), self.get_money())
 
 
 class Game:
+    # Phases
+    PHASE_CARDS_ASSIGNMENT = 'CARDS_ASSIGNMENT'
+    PHASE_OPENING = 'OPENING'
+    PHASE_CARDS_CHANGE = 'CARDS_CHANGE'
+    PHASE_FINAL_BET = 'FINAL_BET'
+    PHASE_SHOW_CARDS = 'SHOW_CARDS'
+
     def __init__(self, players, deck, score_detector, stake=0.0):
         self._players = players
         self._deck = deck
         self._score_detector = score_detector
         self._stake = stake
+        self._phase = None
         self._dealer_key = 0
         self._folder_keys = []
         self._pot = 0.0
@@ -455,29 +478,40 @@ class Game:
         self._deck.initialize()
         self._folder_keys = []
 
-        for player_key in self._player_keys(self._dealer_key):
+        ################################
+        # Cards assignment phase
+        ################################
+        self._phase = Game.PHASE_CARDS_ASSIGNMENT
+
+        for _, player in self._players_round(self._dealer_key):
             # Collect stakes
-            self._players[player_key].alter_money(-self._stake)
+            player.set_money(player.get_money() - self._stake)
             self._pot += self._stake
             # Distribute cards
-            self._players[player_key].assign_cards(self._deck.get_cards(5))
+            player.set_cards(self._deck.get_cards(5))
+            self._broadcast({'player_id': player.get_id()})
 
-        print("Pot: ${:,.2f}".format(self._pot))
+        ################################
+        # Opening phase
+        ################################
+        self._phase = Game.PHASE_OPENING
 
         # Define the minimum score to open
         min_opening_score = self._min_opening_scores[failed_hands % len(self._min_opening_scores)]
 
         # Opening bet round
         opening_bet = None
-        player_key = -1
-        for player_key in self._player_keys(self._dealer_key):
-            bet = self._players[player_key].bet(min_bet=1.0, max_bet=self._pot, min_score=min_opening_score)
+        strongest_bet_player_key = -1
+        for player_key, player in self._players_round(self._dealer_key):
+            bet = player.bet(min_bet=1.0, max_bet=self._pot, min_score=min_opening_score)
             if bet == -1:
-                print("Player '{}' did not open.".format(self._players[player_key].get_name()))
+                print("Player '{}' did not open".format(player.get_name()))
+                self._broadcast({'player_id': player.get_id(), 'bet': -1, 'bet_type': 'PASS'})
             else:
-                print("Player '{}' opening bet: ${:,.2f}".format(self._players[player_key].get_name(), bet))
-                player_key = player_key
+                print("Player '{}' opening bet: ${:,.2f}".format(player.get_name(), bet))
+                self._broadcast({'player_id': player.get_id(), 'bet': bet, 'bet_type': 'RAISE'})
                 opening_bet = bet
+                strongest_bet_player_key = player_key
                 self._pot += opening_bet
                 break
 
@@ -486,32 +520,64 @@ class Game:
             return
 
         # Opening bet round
-        player_key = self._bet_round(player_key, opening_bet=opening_bet)
+        strongest_bet_player_key = self._bet_round(strongest_bet_player_key, opening_bet=opening_bet)
+
+        num_active_players = len(self._players) - len(self._folder_keys)
 
         # There are 2 or more players alive
-        if len(self._folder_keys) + 1 < len(self._players):
+        if num_active_players > 1:
+            ################################
+            # Cards change phase
+            ################################
+            self._phase = Game.PHASE_CARDS_CHANGE
+
             # Change cards
-            for player_key in self._player_keys(self._dealer_key):
-                self._players[player_key].change_cards(self._deck)
+            for _, player in self._players_round(self._dealer_key):
+                discards = player.discard_cards()
+                if discards:
+                    remaining_cards = player.get_cards()
+                    new_cards = self._deck.get_cards(len(discards))
+                    player.set_cards(remaining_cards + new_cards)
+                self._broadcast({'player_id': player.get_id(), 'num_cards': len(discards)})
+
+            ################################
+            # Final bet phase
+            ################################
+            self._phase = Game.PHASE_FINAL_BET
+
             # Final bet round
-            self._bet_round(player_key)
+            strongest_bet_player_key = self._bet_round(strongest_bet_player_key)
+
+        ################################
+        # Show cards phase
+        ################################
+        self._phase = Game.PHASE_SHOW_CARDS
 
         # Works out the winner
-        winner_id = -1
-        for player_key in self._player_keys(player_key):
-            if winner_id == -1 or self._players[player_key].get_score().cmp(self._players[winner_id].get_score()) > 0:
-                winner_id = player_key
+        winner = None
+        for _, player in self._players_round(strongest_bet_player_key):
+            if not winner or player.get_score().cmp(winner.get_score()) > 0:
+                winner = player
+                if num_active_players > 1:
+                    self._broadcast({'player_id': player.get_id(), 'score': player.get_score()})
+            else:
+                self._broadcast({'player_id': player.get_id(), 'score': None})
 
-        print("The winner is {}".format(self._players[winner_id].get_name()))
-        self._players[winner_id].alter_money(self._pot)
+        print("The winner is {}".format(winner.get_name()))
+        winner.set_money(winner.get_money() + self._pot)
         self._pot = 0.0
         self._dealer_key = (self._dealer_key + 1) % len(self._players)
 
-    def _player_keys(self, start_id=0):
+    def _broadcast(self, message):
+        message['phase'] = self._phase
+        for player in self._players:
+            player.send_message(message)
+
+    def _players_round(self, start_id=0):
         for i in range(len(self._players)):
             player_key = (i + start_id) % len(self._players)
             if player_key not in self._folder_keys:
-                yield player_key
+                yield player_key, self._players[player_key]
         raise StopIteration
 
     def _bet_round(self, player_key, opening_bet=0.0):
@@ -534,6 +600,8 @@ class Game:
         while player_key != highest_bet_player_key:
             # Exclude folders
             if player_key not in self._folder_keys:
+                player = self._players[player_key]
+
                 # Only one player left
                 if len(self._folder_keys) + 1 == len(self._players):
                     highest_bet_player_key = player_key
@@ -547,12 +615,12 @@ class Game:
                 # Bet
                 current_bet = self._players[player_key].bet(min_bet=min_partial_bet, max_bet=self._pot)
 
-                player_name = self._players[player_key].get_name()
+                bet_type = None
 
                 if current_bet == -1:
                     # Fold
                     self._folder_keys.append(player_key)
-                    print("Player '{}' fold.".format(player_name))
+                    bet_type = 'FOLD'
                 else:
                     self._pot += current_bet
                     bets[player_key] += current_bet
@@ -562,13 +630,16 @@ class Game:
 
                     if current_bet > min_partial_bet:
                         # Raise
-                        print("Player '{}' raised.".format(player_name))
+                        bet_type = 'RAISE'
                     elif not current_bet:
                         # Check
-                        print("Player '{}' checked.".format(player_name))
+                        bet_type = 'CHECK'
                     else:
                         # Call
-                        print("Player '{}' called.".format(player_name))
+                        bet_type = 'CALL'
+
+                print("Player '{}' #{}: {}".format(player.get_name(), player.get_id(), bet_type))
+                self._broadcast({'player_id': player.get_id(), 'bet': current_bet, 'bet_type': bet_type})
 
             # Next player
             player_key = (player_key + 1) % len(self._players)
