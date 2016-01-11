@@ -318,10 +318,10 @@ class Player:
     def get_money(self):
         raise NotImplementedError
 
-    def get_cards(self):
+    def set_money(self):
         raise NotImplementedError
 
-    def set_money(self):
+    def get_cards(self):
         raise NotImplementedError
 
     def set_cards(self, cards):
@@ -447,6 +447,7 @@ class Game:
         self._score_detector = score_detector
         self._stake = stake
         self._phase = None
+        self._failed_hands = 0
         self._dealer_key = 0
         self._folder_keys = []
         self._pot = 0.0
@@ -473,7 +474,7 @@ class Game:
             else:
                 print("Invalid answer")
 
-    def play_hand(self, failed_hands=0):
+    def play_hand(self):
         # Initialization
         self._deck.initialize()
         self._folder_keys = []
@@ -497,7 +498,7 @@ class Game:
         self._phase = Game.PHASE_OPENING
 
         # Define the minimum score to open
-        min_opening_score = self._min_opening_scores[failed_hands % len(self._min_opening_scores)]
+        min_opening_score = self._min_opening_scores[self._failed_hands % len(self._min_opening_scores)]
 
         # Opening bet round
         opening_bet = None
@@ -516,6 +517,7 @@ class Game:
                 break
 
         if not opening_bet:
+            self._failed_hands += 1
             print("Nobody opened.")
             return
 
