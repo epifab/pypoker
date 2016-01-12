@@ -159,8 +159,8 @@ class Game:
                 self._broadcast({
                     'player': player_key,
                     'score': {
-                        'score': player.get_score().get_score(),
-                        'cards': player.get_score().get_cards()
+                        'category': player.get_score().get_category(),
+                        'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]
                     },
                 })
             else:

@@ -22,16 +22,16 @@ class Score:
         7: "Four of a Kind",
         8: "Straight Flush"}
 
-    def __init__(self, score, cards):
-        self._score = score
+    def __init__(self, category, cards):
+        self._category = category
         self._cards = cards
 
-    def get_score(self):
-        """Gets the highest score for the given list of cards."""
-        return self._score
+    def get_category(self):
+        """Gets the category for this score."""
+        return self._category
 
     def get_cards(self, limit=0):
-        """Gets the list of cards sorted in a descending order according to their score."""
+        """Gets the list of cards sorted in a descending order according to their category."""
         return self._cards if not limit or len(self._cards) < limit else self._cards[0:limit]
 
     def cmp(self, other):
@@ -40,7 +40,7 @@ class Score:
         0 if the two scores are identical, a negative integer if score2 is higher than this score."""
 
         # Compare scores first
-        score_diff = self.get_score() - other.get_score()
+        score_diff = self.get_category() - other.get_category()
         if score_diff:
             return score_diff
 
@@ -50,7 +50,7 @@ class Score:
 
         # In the traditional italian poker royal flushes are weaker than minimum straight flushes (e.g. 10, 9, 8, 7, A)
         # This is done so you are not mathematically sure to have the strongest hand.
-        if self.get_score() == Score.STRAIGHT_FLUSH:
+        if self.get_category() == Score.STRAIGHT_FLUSH:
             if Score._straight_is_max(cards1) and Score._straight_is_min(cards2):
                 return -1
             elif Score._straight_is_min(cards1) and Score._straight_is_max(cards2):
@@ -112,4 +112,4 @@ class Score:
             lines[4] += "|       |"
             lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
             lines[6] += "+-------+"
-        return "\n".join(lines) + "\n" + Score.CATEGORIES[self.get_score()]
+        return "\n".join(lines) + "\n" + Score.CATEGORIES[self.get_category()]
