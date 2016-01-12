@@ -1,7 +1,7 @@
 from poker.player import Player
 
 
-class ConsolePlayer(Player):
+class PlayerConsole(Player):
     def __init__(self, identifier, name, money, score_detector):
         self._id = identifier
         self._name = name
