@@ -1,6 +1,10 @@
 from poker.card import Card
 
 
+class FailHandException(Exception):
+    pass
+
+
 class Game:
     # Phases
     PHASE_CARDS_ASSIGNMENT = 'CARDS_ASSIGNMENT'
@@ -8,6 +12,7 @@ class Game:
     PHASE_CARDS_CHANGE = 'CARDS_CHANGE'
     PHASE_FINAL_BET = 'FINAL_BET'
     PHASE_SHOW_CARDS = 'SHOW_CARDS'
+    PHASE_WINNER_DETECTION = 'WINNER_DETECTION'
 
     def __init__(self, players, deck, score_detector, stake=0.0):
         self._players = players
@@ -19,6 +24,7 @@ class Game:
         self._dealer_key = 0
         self._folder_keys = []
         self._pot = 0.0
+        self._bets = [0.0 for _ in players]
         self._min_opening_scores = [
             # Pair of J
             score_detector.get_score([Card(11, 0), Card(11, 1)]),
@@ -31,7 +37,6 @@ class Game:
 
     def play_game(self):
         """Play an indefinite number of hands."""
-
         self.play_hand()
         while True:
             print()
@@ -51,101 +56,133 @@ class Game:
         self._deck.initialize()
         self._folder_keys = []
 
-        ################################
-        # Cards assignment phase
-        ################################
-        self._phase = Game.PHASE_CARDS_ASSIGNMENT
+        # Cards assignment
+        self._assign_cards()
 
-        for _, player in self._players_round(self._dealer_key):
+        try:
+            # Opening
+            player_key = self._opening_bet_round()
+
+            # 2 or more players alive
+            if len(self._players) - len(self._folder_keys) > 1:
+                # Change cards
+                self._change_cards()
+                # Final bet round
+                player_key = self._final_bet_round(player_key)
+
+            # 2 or more players still alive
+            if len(self._players) - len(self._folder_keys) > 1:
+                # Show cards (winner detection)
+                player_key = self._show_cards(player_key)
+
+            # Broadcast winner key
+            self._phase = Game.PHASE_CARDS_CHANGE
+            self._broadcast({'winner': player_key})
+
+            # Winner and hand finalization
+            winner = self._players[player_key]
+            winner.set_money(winner.get_money() + self._pot)
+            print("Player '{}' won".format(winner.get_name()))
+
+            # Re-initialize pot, bets and move to the next dealer
+            self._pot = 0.0
+            self._bets = [0.0 for _ in self._players]
+            self._dealer_key = (self._dealer_key + 1) % len(self._players)
+
+        except FailHandException:
+            self._failed_hands += 1
+            return False
+
+    def _assign_cards(self):
+        self._phase = Game.PHASE_CARDS_ASSIGNMENT
+        # Assign cards
+        for player_key, player in self._players_round(self._dealer_key):
             # Collect stakes
-            player.set_money(player.get_money() - self._stake)
             self._pot += self._stake
+            self._bets[player_key] += self._stake
+            player.set_money(player.get_money() - self._stake)
             # Distribute cards
             player.set_cards(self._deck.get_cards(5))
-            self._broadcast({'player_id': player.get_id()})
+        # Broadcasting
+        self._broadcast()
 
-        ################################
-        # Opening phase
-        ################################
+    def _opening_bet_round(self):
         self._phase = Game.PHASE_OPENING
-
         # Define the minimum score to open
         min_opening_score = self._min_opening_scores[self._failed_hands % len(self._min_opening_scores)]
-
         # Opening bet round
-        opening_bet = None
-        strongest_bet_player_key = -1
         for player_key, player in self._players_round(self._dealer_key):
             bet = player.bet(min_bet=1.0, max_bet=self._pot, min_score=min_opening_score)
             if bet == -1:
+                # Broadcasting
                 print("Player '{}' did not open".format(player.get_name()))
-                self._broadcast({'player_id': player.get_id(), 'bet': -1, 'bet_type': 'PASS'})
+                self._broadcast({'player': player_key, 'bet': -1, 'bet_type': 'PASS'})
             else:
+                # Updating pots
+                self._pot += bet
+                self._bets[player_key] += bet
+                # Broadcasting
                 print("Player '{}' opening bet: ${:,.2f}".format(player.get_name(), bet))
-                self._broadcast({'player_id': player.get_id(), 'bet': bet, 'bet_type': 'RAISE'})
-                opening_bet = bet
-                strongest_bet_player_key = player_key
-                self._pot += opening_bet
-                break
+                self._broadcast({'player': player_key, 'bet': bet, 'bet_type': 'RAISE'})
+                # Completing the bet round
+                return self._bet_round(player_key, opening_bet=bet)
+        raise FailHandException
 
-        if not opening_bet:
-            self._failed_hands += 1
-            print("Nobody opened.")
-            return
+    def _change_cards(self):
+        self._phase = Game.PHASE_CARDS_CHANGE
+        # Change cards
+        for player_key, player in self._players_round(self._dealer_key):
+            discards = player.discard_cards()
+            if discards:
+                remaining_cards = player.get_cards()
+                new_cards = self._deck.get_cards(len(discards))
+                self._deck.add_discards(discards)
+                player.set_cards(remaining_cards + new_cards)
+            # Broadcasting
+            print("Player '{}' changed {} cards".format(player.get_name(), len(discards)))
+            self._broadcast({'player': player_key, 'num_cards': len(discards)})
 
-        # Opening bet round
-        strongest_bet_player_key = self._bet_round(strongest_bet_player_key, opening_bet=opening_bet)
+    def _final_bet_round(self, strongest_bet_player_key):
+        self._phase = Game.PHASE_FINAL_BET
+        return self._bet_round(strongest_bet_player_key)
 
-        num_active_players = len(self._players) - len(self._folder_keys)
-
-        # There are 2 or more players alive
-        if num_active_players > 1:
-            ################################
-            # Cards change phase
-            ################################
-            self._phase = Game.PHASE_CARDS_CHANGE
-
-            # Change cards
-            for _, player in self._players_round(self._dealer_key):
-                discards = player.discard_cards()
-                if discards:
-                    remaining_cards = player.get_cards()
-                    new_cards = self._deck.get_cards(len(discards))
-                    self._deck.add_discards(discards)
-                    player.set_cards(remaining_cards + new_cards)
-                self._broadcast({'player_id': player.get_id(), 'num_cards': len(discards)})
-
-            ################################
-            # Final bet phase
-            ################################
-            self._phase = Game.PHASE_FINAL_BET
-
-            # Final bet round
-            strongest_bet_player_key = self._bet_round(strongest_bet_player_key)
-
-        ################################
-        # Show cards phase
-        ################################
+    def _show_cards(self, strongest_bet_player_key):
         self._phase = Game.PHASE_SHOW_CARDS
-
         # Works out the winner
         winner = None
-        for _, player in self._players_round(strongest_bet_player_key):
+        winner_key = -1
+        for player_key, player in self._players_round(strongest_bet_player_key):
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
-                if num_active_players > 1:
-                    self._broadcast({'player_id': player.get_id(), 'score': player.get_score()})
+                winner_key = player_key
+                print("Player '{}':\n{}".format(player.get_name(), str(player.get_score())))
+                self._broadcast({
+                    'player': player_key,
+                    'score': {
+                        'score': player.get_score().get_score(),
+                        'cards': player.get_score().get_cards()
+                    },
+                })
             else:
-                self._broadcast({'player_id': player.get_id(), 'score': None})
+                print("Player '{}' fold.".format(player.get_name()))
+                self._broadcast({'player': player_key, 'score': None})
 
-        print("The winner is {}".format(winner.get_name()))
-        winner.set_money(winner.get_money() + self._pot)
-        self._pot = 0.0
-        self._dealer_key = (self._dealer_key + 1) % len(self._players)
+        return winner_key
 
-    def _broadcast(self, message):
-        """Sends a message to every player (notify them about events)"""
-        message['phase'] = self._phase
+    def _broadcast(self, message={}):
+        """Sends a game-update message to every player"""
+        message.update({
+            'msg_id': 'game-update',
+            'players': {key: {'id': self._players[key].get_id(),
+                              'name': self._players[key].get_name(),
+                              'money': self._players[key].get_money(),
+                              'alive': key not in self._folder_keys,
+                              'bet': self._bets[key],
+                              'dealer': key == self._dealer_key}
+                        for key in range(len(self._players))},
+            'phase': self._phase,
+            'pot': self._pot,
+        })
         for player in self._players:
             player.send_message(message)
 
@@ -214,9 +251,9 @@ class Game:
                     else:
                         # Call
                         bet_type = 'CALL'
-
-                print("Player '{}' #{}: {}".format(player.get_name(), player.get_id(), bet_type))
-                self._broadcast({'player_id': player.get_id(), 'bet': current_bet, 'bet_type': bet_type})
+                # Broadcasting
+                print("Player '{}': {}".format(player.get_name(), bet_type))
+                self._broadcast({'player': player_key, 'bet': current_bet, 'bet_type': bet_type})
 
             # Next player
             player_key = (player_key + 1) % len(self._players)

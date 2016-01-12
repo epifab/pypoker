@@ -34,8 +34,6 @@ class ConsolePlayer(Player):
         """Assigns a list of cards to the player"""
         self._cards = cards
         self._score = self._score_detector.get_score(cards)
-        print(str(self))
-        print(str(self._score))
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
