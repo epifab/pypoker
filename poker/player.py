@@ -11,7 +11,7 @@ class Player:
     def get_cards(self):
         raise NotImplementedError
 
-    def set_cards(self, cards):
+    def set_cards(self, cards, score):
         raise NotImplementedError
 
     def get_score(self):

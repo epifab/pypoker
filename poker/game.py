@@ -35,20 +35,6 @@ class Game:
             # Pair of A
             score_detector.get_score([Card(14, 0), Card(14, 1)])]
 
-    def play_game(self):
-        """Play an indefinite number of hands."""
-        self.play_hand()
-        while True:
-            print()
-            yes_no = input("Another hand? (Y/N) ")
-            if yes_no.upper() == 'Y':
-                self.play_hand()
-                continue
-            elif yes_no.upper() == 'N':
-                break
-            else:
-                print("Invalid answer")
-
     def play_hand(self):
         """Play a single hand."""
 
@@ -102,7 +88,9 @@ class Game:
             self._bets[player_key] += self._stake
             player.set_money(player.get_money() - self._stake)
             # Distribute cards
-            player.set_cards(self._deck.get_cards(5))
+            cards = self._deck.get_cards(5)
+            score = self._score_detector.get_score(cards)
+            player.set_cards(cards, score)
         # Broadcasting
         self._broadcast()
 
@@ -133,12 +121,13 @@ class Game:
         self._phase = Game.PHASE_CARDS_CHANGE
         # Change cards
         for player_key, player in self._players_round(self._dealer_key):
-            discards = player.discard_cards()
+            remaining_cards, discards = player.discard_cards()
             if discards:
-                remaining_cards = player.get_cards()
                 new_cards = self._deck.get_cards(len(discards))
                 self._deck.add_discards(discards)
-                player.set_cards(remaining_cards + new_cards)
+                cards = remaining_cards + new_cards
+                score = self._score_detector.get_score(cards)
+                player.set_cards(cards, score)
             # Broadcasting
             print("Player '{}' changed {} cards".format(player.get_name(), len(discards)))
             self._broadcast({'player': player_key, 'num_cards': len(discards)})

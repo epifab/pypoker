@@ -2,11 +2,10 @@ from poker import Player
 
 
 class PlayerConsole(Player):
-    def __init__(self, name, money, score_detector):
+    def __init__(self, name, money):
         self._name = name
         self._money = money
         self._cards = None
-        self._score_detector = score_detector
         self._score = None
 
     def get_name(self):
@@ -29,10 +28,10 @@ class PlayerConsole(Player):
         """Gets the player score. Returns a Score object."""
         return self._score
 
-    def set_cards(self, cards):
+    def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
         self._cards = cards
-        self._score = self._score_detector.get_score(cards)
+        self._score = score
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
@@ -52,9 +51,8 @@ class PlayerConsole(Player):
                     # Works out the new card set
                     discards = [self._cards[key] for key in discard_keys]
                     remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
-                    self.set_cards(remaining_cards)
-                    return discards
-                return []
+                    return remaining_cards, discards
+                return remaining_cards, []
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
