@@ -52,7 +52,7 @@ class PlayerConsole(Player):
                     discards = [self._cards[key] for key in discard_keys]
                     remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
                     return remaining_cards, discards
-                return remaining_cards, []
+                return self._cards, []
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
