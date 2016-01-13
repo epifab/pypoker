@@ -1,4 +1,4 @@
-from poker.card import Card
+from poker import Card
 
 
 class FailHandException(Exception):
@@ -112,7 +112,8 @@ class Game:
         min_opening_score = self._min_opening_scores[self._failed_hands % len(self._min_opening_scores)]
         # Opening bet round
         for player_key, player in self._players_round(self._dealer_key):
-            bet = player.bet(min_bet=1.0, max_bet=self._pot, min_score=min_opening_score)
+            max_bet = -1 if player.get_score().cmp(min_opening_score) < 0 else self._pot
+            bet = player.bet(min_bet=1.0, max_bet=max_bet, opening=True)
             if bet == -1:
                 # Broadcasting
                 print("Player '{}' did not open".format(player.get_name()))
@@ -173,8 +174,7 @@ class Game:
         """Sends a game-update message to every player"""
         message.update({
             'msg_id': 'game-update',
-            'players': {key: {'id': self._players[key].get_id(),
-                              'name': self._players[key].get_name(),
+            'players': {key: {'name': self._players[key].get_name(),
                               'money': self._players[key].get_money(),
                               'alive': key not in self._folder_keys,
                               'bet': self._bets[key],

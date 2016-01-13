@@ -1,18 +1,13 @@
-from poker.player import Player
+from poker import Player
 
 
 class PlayerConsole(Player):
-    def __init__(self, identifier, name, money, score_detector):
-        self._id = identifier
+    def __init__(self, name, money, score_detector):
         self._name = name
         self._money = money
         self._cards = None
         self._score_detector = score_detector
         self._score = None
-
-    def get_id(self):
-        """Player ID"""
-        return self._id
 
     def get_name(self):
         """Player name"""
@@ -29,6 +24,10 @@ class PlayerConsole(Player):
     def get_cards(self):
         """Gets the list of cards assigned to the player"""
         return self._cards
+
+    def get_score(self):
+        """Gets the player score. Returns a Score object."""
+        return self._score
 
     def set_cards(self, cards):
         """Assigns a list of cards to the player"""
@@ -59,17 +58,13 @@ class PlayerConsole(Player):
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
-    def get_score(self):
-        """Gets the player score. Returns a Score object."""
-        return self._score
-
-    def bet(self, min_bet=0.0, max_bet=0.0, min_score=None):
+    def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
         print(str(self))
         print(str(self._score))
 
-        if min_score and self._score.cmp(min_score) < 0:
+        if max_bet == -1:
             input("Not allowed to open. Press enter to continue.")
             return -1
 
@@ -79,7 +74,7 @@ class PlayerConsole(Player):
                 message += " min bet: ${:,.2f}".format(min_bet)
             if max_bet:
                 message += " max bet: ${:,.2f}".format(max_bet)
-            message += " -1 to " + ("skip opening" if min_score else "fold") + ": "
+            message += " -1 to " + ("skip opening" if opening else "fold") + ": "
 
             bet = input(message)
 
@@ -97,9 +92,12 @@ class PlayerConsole(Player):
                 print("Invalid bet.")
 
     def send_message(self, message):
-        """Sends a message to the player.
-        This method will be used in a client/server architecture to notify the player about game events."""
+        """Sends a message to the client."""
+        pass
+
+    def recv_message(self):
+        """Receives a message to the client."""
         pass
 
     def __str__(self):
-        return "\n" + "{} #{} ${:,.2f}".format(self.get_name(), self.get_id(), self.get_money())
+        return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money())

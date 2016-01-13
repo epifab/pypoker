@@ -1,6 +1,5 @@
 import random
-
-from poker.card import Card
+from poker import Card
 
 
 class Deck:
