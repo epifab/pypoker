@@ -7,7 +7,7 @@ class PlayerConsole(Player):
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
-        Returns a list of discarded cards."""
+        Returns a tuple: (remaining cards, discards)."""
         print(str(self))
         print(Card.format_cards(self._cards))
         while True:
@@ -67,6 +67,48 @@ class PlayerConsole(Player):
     def recv_message(self):
         """Receives a message to the client."""
         pass
+
+    def __str__(self):
+        return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money())
+
+
+class PlayerClientConsole(PlayerConsole):
+    def __init__(self, server, name, money):
+        PlayerConsole.__init__(self, name=name, money=money)
+        self._server = server
+        self._connect()
+
+    def _connect(self):
+        self.send_message({'msg_id': 'connect', 'player': {'name': self.get_name(), 'money': self.get_money()}})
+        message = self.recv_message()
+        Player.check_msg_id(message, 'connect')
+
+    def set_cards(self, cards, score):
+        """Assigns a list of cards to the player"""
+        super().set_cards(cards, score)
+        print(str(self))
+        print(str(self._score))
+
+    def discard_cards(self):
+        """Gives players the opportunity to discard some of their cards.
+        Returns a list of discarded cards."""
+        remaining_cards, discards = super().discard_cards()
+        discard_keys = [key for key in range(len(self._cards)) if self._cards[key] in discards]
+        self.send_message({'msg_id': 'discard-cards', 'cards': discard_keys})
+        return remaining_cards, discards
+
+    def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
+        """Bet handling.
+        Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
+        bet = super().bet(min_bet, max_bet, opening)
+        self.send_message({'msg_id': 'bet', 'bet': bet})
+        return bet
+
+    def send_message(self, message):
+        return self._server.send_message(message)
+
+    def recv_message(self):
+        return self._server.recv_message()
 
     def __str__(self):
         return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money())

@@ -41,3 +41,10 @@ class Player:
 
     def recv_message(self):
         raise NotImplementedError
+
+    @staticmethod
+    def check_msg_id(message, expected_msg_id):
+        # Retrieving message id
+        msg_id = message['msg_id']
+        if msg_id != expected_msg_id:
+            raise ValueError("Invalid msg_id. Expected: '{}' received: '{}'.".format(expected_msg_id, msg_id))
