@@ -25,7 +25,7 @@ class Game:
         self._dealer_key = 0
         self._folder_keys = []
         self._pot = 0.0
-        self._bets = [0.0 for _ in players]
+        self._bets = [0.0] * len(players)
         self._min_opening_scores = [
             # Pair of J
             score_detector.get_score([Card(11, 0), Card(11, 1)]),
@@ -75,6 +75,7 @@ class Game:
             self._pot = 0.0
             self._bets = [0.0 for _ in self._players]
             self._dealer_key = (self._dealer_key + 1) % len(self._players)
+            return True
 
         except FailHandException:
             self._failed_hands += 1

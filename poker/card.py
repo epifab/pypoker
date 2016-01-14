@@ -45,3 +45,16 @@ class Card:
 
     def __int__(self):
         return self._value
+
+    @staticmethod
+    def format_cards(cards):
+        lines = [""] * 7
+        for card in cards:
+            lines[0] += "+-------+"
+            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
+            lines[2] += "|       |"
+            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
+            lines[4] += "|       |"
+            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
+            lines[6] += "+-------+"
+        return "\n".join(lines)

@@ -35,14 +35,15 @@ class Score:
         return self._cards if not limit or len(self._cards) < limit else self._cards[0:limit]
 
     def cmp(self, other):
-        """Compare scores.
-        Returns a positive integer if self is lower than score2,
-        0 if the two scores are identical, a negative integer if score2 is higher than this score."""
+        """Compare scores. Returns:
+        a positive integer if self is stronger than other,
+        0 if the two scores are identical,
+        a negative integer if score2 is higher than this score."""
 
-        # Compare scores first
-        score_diff = self.get_category() - other.get_category()
-        if score_diff:
-            return score_diff
+        # Compare categories first
+        categories_diff = self.get_category() - other.get_category()
+        if categories_diff:
+            return categories_diff
 
         # Same score, compare the list of cards
         cards1 = self.get_cards(limit=5)
@@ -103,13 +104,4 @@ class Score:
         return straight_sequence[0].get_rank() == 14
 
     def __str__(self):
-        lines = ["", "", "", "", "", "", ""]
-        for card in self.get_cards():
-            lines[0] += "+-------+"
-            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
-            lines[2] += "|       |"
-            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
-            lines[4] += "|       |"
-            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
-            lines[6] += "+-------+"
-        return "\n".join(lines) + "\n" + Score.CATEGORIES[self.get_category()]
+        return Card.format_cards(self._cards) + "\n" + Score.CATEGORIES[self.get_category()]

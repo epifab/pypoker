@@ -8,11 +8,10 @@ class ScoreDetector:
         self._lowest_rank = lowest_rank
 
     def get_score(self, cards):
-        score, cards = ScoreDetector._detect_score(cards, self._lowest_rank)
+        score, cards = self.detect_score(cards)
         return Score(score, cards)
 
-    @staticmethod
-    def _detect_score(cards, lowest_rank):
+    def detect_score(self, cards):
         """Detects the highest score in the list of cards.
         Returns a tuple (score, cards) where score is an integer (see Score class) and cards is a list of cards sorted
         according to the score in a descending order.
@@ -27,7 +26,7 @@ class ScoreDetector:
         cards = sorted(cards, key=int, reverse=True)
 
         # Straight flush
-        straight_flush = ScoreDetector._get_straight_flush(cards, lowest_rank)
+        straight_flush = ScoreDetector._get_straight_flush(cards, self._lowest_rank)
         if straight_flush:
             return Score.STRAIGHT_FLUSH, merge_sequence(straight_flush, cards)
 
@@ -57,7 +56,7 @@ class ScoreDetector:
             return Score.FULL_HOUSE, merge_sequence(ranks[three_oak_ranks[0]] + ranks[pair_ranks[0]], cards)
 
         # Straight
-        straight = ScoreDetector._get_straight(cards, lowest_rank)
+        straight = ScoreDetector._get_straight(cards, self._lowest_rank)
         if straight:
             return Score.STRAIGHT, merge_sequence(straight, cards)
 

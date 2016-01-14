@@ -1,21 +1,34 @@
 class Player:
+    def __init__(self, name, money):
+        self._name = name
+        self._money = money
+        self._cards = None
+        self._score = None
+
     def get_name(self):
-        raise NotImplementedError
+        """Player name"""
+        return self._name
 
     def get_money(self):
-        raise NotImplementedError
+        """Player money"""
+        return self._money
 
-    def set_money(self):
-        raise NotImplementedError
+    def set_money(self, money):
+        """Sets player money"""
+        self._money = money
 
     def get_cards(self):
-        raise NotImplementedError
-
-    def set_cards(self, cards, score):
-        raise NotImplementedError
+        """Gets the list of cards assigned to the player"""
+        return self._cards
 
     def get_score(self):
-        raise NotImplementedError
+        """Gets the player score. Returns a Score object."""
+        return self._score
+
+    def set_cards(self, cards, score):
+        """Assigns a list of cards to the player"""
+        self._cards = cards
+        self._score = score
 
     def discard_cards(self):
         raise NotImplementedError

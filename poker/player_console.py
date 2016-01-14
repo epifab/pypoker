@@ -1,47 +1,18 @@
-from poker import Player
+from poker import Player, Card
 
 
 class PlayerConsole(Player):
     def __init__(self, name, money):
-        self._name = name
-        self._money = money
-        self._cards = None
-        self._score = None
-
-    def get_name(self):
-        """Player name"""
-        return self._name
-
-    def get_money(self):
-        """Player money"""
-        return self._money
-
-    def set_money(self, money):
-        """Sets player money"""
-        self._money = money
-
-    def get_cards(self):
-        """Gets the list of cards assigned to the player"""
-        return self._cards
-
-    def get_score(self):
-        """Gets the player score. Returns a Score object."""
-        return self._score
-
-    def set_cards(self, cards, score):
-        """Assigns a list of cards to the player"""
-        self._cards = cards
-        self._score = score
+        Player.__init__(self, name, money)
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
         Returns a list of discarded cards."""
         print(str(self))
+        print(Card.format_cards(self._cards))
         while True:
             try:
-                for k in range(len(self._cards)):
-                    print("{}) {}".format(k + 1, str(self._cards[k])))
-                discard_keys = input("Please type a comma separated list of card id you wish to change: ")
+                discard_keys = input("Please type a comma separated list of card (1 to 5 from left to right): ")
                 if discard_keys:
                     # Convert the string into a list of unique integers
                     discard_keys = set([int(card_id.strip()) - 1 for card_id in discard_keys.split(",")])
