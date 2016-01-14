@@ -2,8 +2,8 @@ from poker import Player, Card
 
 
 class PlayerConsole(Player):
-    def __init__(self, name, money):
-        Player.__init__(self, name, money)
+    def __init__(self, id, name, money):
+        Player.__init__(self, id, name, money)
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
@@ -74,14 +74,20 @@ class PlayerConsole(Player):
 
 class PlayerClientConsole(PlayerConsole):
     def __init__(self, server, name, money):
-        PlayerConsole.__init__(self, name=name, money=money)
+        PlayerConsole.__init__(self, id=None, name=name, money=money)
         self._server = server
         self._connect()
 
     def _connect(self):
-        self.send_message({'msg_id': 'connect', 'player': {'name': self.get_name(), 'money': self.get_money()}})
+        self.send_message({
+            'msg_id': 'connect',
+            'player': {
+                'id': self.get_id(),
+                'name': self.get_name(),
+                'money': self.get_money()}})
         message = self.recv_message()
         Player.check_msg_id(message, 'connect')
+        self._id = message['player']['id']
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""

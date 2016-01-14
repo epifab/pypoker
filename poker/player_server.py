@@ -4,7 +4,7 @@ import logging
 
 class PlayerServer(Player):
     def __init__(self, client):
-        Player.__init__(self, name=None, money=None)
+        Player.__init__(self, id=id(self), name=None, money=None)
         self._client = client
         self._connect()
 
@@ -13,7 +13,12 @@ class PlayerServer(Player):
         Player.check_msg_id(message, 'connect')
         self._name = message['player']['name']
         self._money = message['player']['money']
-        self.send_message({'msg_id': 'connect', 'player': {'name': self.get_name(), 'money': self.get_money()}})
+        self.send_message({
+            'msg_id': 'connect',
+            'player': {
+                'id': self.get_id(),
+                'name': self.get_name(),
+                'money': self.get_money()}})
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -23,16 +28,12 @@ class PlayerServer(Player):
             'cards': [(c.get_rank(), c.get_suit()) for c in self._cards],
             'score': {
                 'category': self.get_score().get_category(),
-                'cards': [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]
-            }
-        })
+                'cards': [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
         Returns a tuple: (remaining cards, discards)."""
-        self.send_message({
-            'msg_id': 'discard-cards'
-        })
+        self.send_message({'msg_id': 'discard-cards'})
         message = self.recv_message()
         Player.check_msg_id(message, 'discard-cards')
         discard_keys = message['cards']
@@ -58,10 +59,11 @@ class PlayerServer(Player):
             'msg_id': 'bet',
             'min_bet': min_bet,
             'max_bet': max_bet,
-            'opening': opening
-        })
+            'opening': opening})
+
         message = self.recv_message()
         Player.check_msg_id(message, 'bet')
+
         try:
             bet = float(message['bet'])
             if max_bet != -1 and (bet < min_bet or bet > max_bet):

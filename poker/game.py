@@ -64,7 +64,7 @@ class Game:
 
             # Broadcast winner key
             self._phase = Game.PHASE_WINNER_DESIGNATION
-            self._broadcast({'winner': player_key})
+            self._broadcast({'player': player_key})
 
             # Winner and hand finalization
             winner = self._players[player_key]
@@ -152,9 +152,7 @@ class Game:
                     'player': player_key,
                     'score': {
                         'category': player.get_score().get_category(),
-                        'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]
-                    },
-                })
+                        'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
                 logging.info("Player '{}' fold.".format(player.get_name()))
                 self._broadcast({'player': player_key, 'score': None})
@@ -165,12 +163,16 @@ class Game:
         """Sends a game-update message to every player"""
         message.update({
             'msg_id': 'game-update',
-            'players': {key: {'name': self._players[key].get_name(),
-                              'money': self._players[key].get_money(),
-                              'alive': key not in self._folder_keys,
-                              'bet': self._bets[key],
-                              'dealer': key == self._dealer_key}
-                        for key in range(len(self._players))},
+            'players': [
+                {
+                    'id': self._players[key].get_id(),
+                    'name': self._players[key].get_name(),
+                    'money': self._players[key].get_money(),
+                    'alive': key not in self._folder_keys,
+                    'bet': self._bets[key],
+                    'dealer': key == self._dealer_key
+                }
+                for key in range(len(self._players))],
             'phase': self._phase,
             'pot': self._pot,
         })

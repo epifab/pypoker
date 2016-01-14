@@ -1,9 +1,14 @@
 class Player:
-    def __init__(self, name, money):
+    def __init__(self, id, name, money):
+        self._id = id
         self._name = name
         self._money = money
         self._cards = None
         self._score = None
+
+    def get_id(self):
+        """Unique player ID"""
+        return self._id
 
     def get_name(self):
         """Player name"""
