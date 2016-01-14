@@ -3,9 +3,8 @@ from poker import ScoreDetector, Score, Card
 
 
 class ScoreDetectorTests(unittest.TestCase):
-    """ScoreDetector tests"""
-
     def _test_detect(self, cards, expected_category, expected_cards):
+        """Helper method"""
         actual_category, actual_cards = ScoreDetector(lowest_rank=7).detect_score(cards)
         self.assertEqual(actual_category, expected_category, "Wrong category detected")
         self.assertEqual(actual_cards, expected_cards, "Incorrect cards order")
@@ -30,7 +29,7 @@ class ScoreDetectorTests(unittest.TestCase):
 
     def test_detect_three_of_a_kind(self):
         expected_category = Score.THREE_OF_A_KIND
-        cards = [Card(10, 0), Card(10, 1), Card(10, 2), Card(14, 0), Card(9, 1)]
+        cards = [Card(10, 0), Card(10, 1), Card(14, 0), Card(10, 2), Card(9, 1)]
         expected_cards = [Card(10, 2), Card(10, 1), Card(10, 0), Card(14, 0), Card(9, 1)]
         self._test_detect(cards, expected_category, expected_cards)
 
@@ -70,6 +69,18 @@ class ScoreDetectorTests(unittest.TestCase):
         expected_cards = [Card(14, 2), Card(13, 2), Card(12, 2), Card(11, 2), Card(10, 2)]
         self._test_detect(cards, expected_category, expected_cards)
 
+    def test_detect_longer_sequence(self):
+        expected_category = Score.THREE_OF_A_KIND
+        cards = [Card(7, 0), Card(7, 2), Card(8, 0), Card(7, 3), Card(8, 1), Card(8, 2), Card(14, 0)]
+        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(14, 0), Card(7, 3), Card(7, 2), Card(7, 0)]
+        self._test_detect(cards, expected_category, expected_cards)
+
+    def test_detect_shorter_sequence(self):
+        expected_category = Score.THREE_OF_A_KIND
+        cards = [Card(8, 0), Card(7, 3), Card(8, 1), Card(8, 2)]
+        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(7, 3)]
+        self._test_detect(cards, expected_category, expected_cards)
+
 
 class ScoreTests(unittest.TestCase):
     def test_get_cards(self):
@@ -85,6 +96,7 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(score.get_category(), category)
 
     def _test_cmp(self, score1, score2):
+        """Helper method"""
         self.assertGreater(score1.cmp(score2), 0)
         self.assertLess(score2.cmp(score1), 0)
 
@@ -120,15 +132,24 @@ class ScoreTests(unittest.TestCase):
         self.assertGreater(min_straight.cmp(max_straight), 0)
         self.assertLess(max_straight.cmp(min_straight), 0)
 
-    def test_cmp_same_cards_shorter_and_longer_sequence(self):
+    def test_cmp_shorter_and_longer_sequence_same_cards(self):
         score1 = Score(Score.HIGHEST_CARD, [Card(14, 0), Card(11, 1), Card(10, 3), Card(9, 2), Card(7, 2)])
         score2 = Score(Score.HIGHEST_CARD, [Card(14, 0), Card(11, 1), Card(10, 3), Card(9, 2)])
         self._test_cmp(score1, score2)
-        score1 = Score(Score.HIGHEST_CARD, [Card(14, 0), Card(11, 1), Card(10, 3), Card(9, 2)])
+
+    def test_cmp_shorter_and_longer_sequence_different_ranks(self):
+        # Even if score1 is a shorter sequence, it's still stronger than score2 because of the card ranks
+        score1 = Score(Score.HIGHEST_CARD, [Card(13, 0), Card(11, 1), Card(10, 3), Card(10, 2)])
         score2 = Score(Score.HIGHEST_CARD, [Card(13, 0), Card(11, 1), Card(10, 3), Card(9, 2), Card(7, 2)])
         self._test_cmp(score1, score2)
 
-
+    def test_cmp_shorter_and_longer_sequence_same_ranks(self):
+        # In this scenario, even if score2 has better cards according the the suits, score1 is still stronger as it has
+        # the same ranks but it's a longer sequence.
+        # When comparing two scores with a different sequence size, suits are not taken into account.
+        score1 = Score(Score.HIGHEST_CARD, [Card(13, 0), Card(11, 1), Card(10, 3), Card(9, 2), Card(7, 2)])
+        score2 = Score(Score.HIGHEST_CARD, [Card(13, 3), Card(11, 3), Card(10, 3), Card(9, 2)])
+        self._test_cmp(score1, score2)
 
 
 if __name__ == '__main__':
