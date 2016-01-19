@@ -1,6 +1,7 @@
 from poker import PlayerServer, JsonSocket, ScoreDetector, Deck, Game
 import socket
 
+
 if __name__ == '__main__':
     server_address = ('localhost', 9000)
 
@@ -10,31 +11,34 @@ if __name__ == '__main__':
 
     print("Poker server listening {}".format(str(server_address)))
 
-    clients = []
     players = []
 
     try:
-        while len(clients) != 2:
+        room_size = 2
+        stakes = 10.0
+
+        while len(players) < room_size:
             client, address = sock.accept()
-            clients.append(client)
             print("New connection from {}".format(address))
+            # Initializing the player
             player = PlayerServer(JsonSocket(client))
             players.append(player)
-            print("Player '{}' ${:,.2f} CONNECTED".format(player.get_name(), player.get_money()))
+            print("Player {} '{}' CONNECTED".format(player.get_id(), player.get_name()))
 
-        print("Starting a new game")
+        abort_game = False
         game = Game(players, Deck(lowest_rank=7), ScoreDetector(lowest_rank=7), stake=10.0)
 
-        game.play_hand()
-        while True:
-            print()
-            yes_no = input("Another hand? (Y/N) ")
-            if yes_no.upper() == 'Y':
-                game.play_hand()
-                continue
-            elif yes_no.upper() == 'N':
-                break
+        while not abort_game:
+            game.play_hand()
+
+            players_in_error = game.get_players_in_error()
+
+            if players_in_error:
+                for player in players_in_error:
+                    if not player.try_resume():
+                        player.disconnect()
+                        abort_game = True
 
     finally:
-        for client in clients:
-            client.close()
+        for player in players:
+            player.disconnect()

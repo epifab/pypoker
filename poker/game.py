@@ -2,8 +2,36 @@ from poker import Card
 import logging
 
 
-class FailHandException(Exception):
+class GameError(Exception):
     pass
+
+
+class HandFailException(Exception):
+    pass
+
+
+class MessageException(Exception):
+    def __init__(self, attribute=None, desc=None, expected=None, found=None):
+        message = "Invalid message received."
+        if attribute:
+            message += " Invalid message attribute {}. ".format(attribute)
+            if expected is not None and found is not None:
+                message += " '{}' expected, found '{}'.".format(attribute, expected, found)
+        if desc:
+            message += desc
+        Exception.__init__(self, message)
+
+    @staticmethod
+    def validate_msg_id(message, expected):
+        if "msg_id" not in message:
+            raise MessageException(attribute="msg_id", desc="Attribute is missing")
+        elif message["msg_id"] == "error":
+            if "error" in message:
+                raise MessageException(desc="Error received from the remote host: '{}'".format(message['error']))
+            else:
+                raise MessageException(desc="Unknown error received from the remote host")
+        if message["msg_id"] != expected:
+            raise MessageException(attribute="msg_id", expected=expected, found=message["msg_id"])
 
 
 class Game:
@@ -38,48 +66,56 @@ class Game:
 
     def play_hand(self):
         """Play a single hand."""
+        while True:
+            try:
+                # Initialization
+                self._deck.initialize()
+                self._folder_keys = [key for key, player in enumerate(self._players) if player.get_error()]
 
-        # Initialization
-        self._deck.initialize()
-        self._folder_keys = []
+                if len(self._players) - len(self._folder_keys) < 2:
+                    raise GameError("Not enough players to play another hand")
 
-        # Cards assignment
-        self._assign_cards()
+                # Cards assignment
+                self._assign_cards()
 
-        try:
-            # Opening
-            player_key = self._opening_bet_round()
+                # Opening
+                player_key = self._opening_bet_round()
 
-            # 2 or more players alive
-            if len(self._players) - len(self._folder_keys) > 1:
-                # Change cards
-                self._change_cards()
-                # Final bet round
-                player_key = self._final_bet_round(player_key)
+                # 2 or more players alive
+                if len(self._players) - len(self._folder_keys) > 1:
+                    # Change cards
+                    self._change_cards()
+                    # Final bet round
+                    player_key = self._final_bet_round(player_key)
 
-            # 2 or more players still alive
-            if len(self._players) - len(self._folder_keys) > 1:
-                # Show cards (winner detection)
-                player_key = self._show_cards(player_key)
+                # 2 or more players still alive
+                if len(self._players) - len(self._folder_keys) > 1:
+                    # Show cards (winner detection)
+                    player_key = self._show_cards(player_key)
 
-            # Broadcast winner key
-            self._phase = Game.PHASE_WINNER_DESIGNATION
-            self._broadcast({'player': player_key})
+                # Broadcast winner key
+                self._phase = Game.PHASE_WINNER_DESIGNATION
+                self._broadcast({'player': player_key})
 
-            # Winner and hand finalization
-            winner = self._players[player_key]
-            winner.set_money(winner.get_money() + self._pot)
-            logging.info("Player '{}' won".format(winner.get_name()))
+                # Winner and hand finalization
+                winner = self._players[player_key]
+                winner.set_money(winner.get_money() + self._pot)
+                logging.info("Player {} won".format(winner.get_id()))
 
-            # Re-initialize pot, bets and move to the next dealer
-            self._pot = 0.0
-            self._bets = [0.0 for _ in self._players]
-            self._dealer_key = (self._dealer_key + 1) % len(self._players)
-            return True
+                # Re-initialize pot, bets and move to the next dealer
+                self._pot = 0.0
+                self._bets = [0.0] * len(self._players)
+                self._dealer_key = (self._dealer_key + 1) % len(self._players)
+                break
 
-        except FailHandException:
-            self._failed_hands += 1
-            return False
+            except HandFailException:
+                # Automatically play another hand if the last has failed
+                self._failed_hands += 1
+                continue
+
+    def get_players_in_error(self):
+        """Returns a list of players in error."""
+        return [player for player in self._players if player.get_error()]
 
     def _assign_cards(self):
         self._phase = Game.PHASE_CARDS_ASSIGNMENT
@@ -106,18 +142,18 @@ class Game:
             bet = player.bet(min_bet=1.0, max_bet=max_bet, opening=True)
             if bet == -1:
                 # Broadcasting
-                logging.info("Player '{}' did not open".format(player.get_name()))
+                logging.info("Player {} did not open".format(player.get_id()))
                 self._broadcast({'player': player_key, 'bet': -1, 'bet_type': 'PASS'})
             else:
                 # Updating pots
                 self._pot += bet
                 self._bets[player_key] += bet
                 # Broadcasting
-                logging.info("Player '{}' opening bet: ${:,.2f}".format(player.get_name(), bet))
+                logging.info("Player {} opening bet: ${:,.2f}".format(player.get_id(), bet))
                 self._broadcast({'player': player_key, 'bet': bet, 'bet_type': 'RAISE'})
                 # Completing the bet round
                 return self._bet_round(player_key, opening_bet=bet)
-        raise FailHandException
+        raise HandFailException
 
     def _change_cards(self):
         self._phase = Game.PHASE_CARDS_CHANGE
@@ -131,30 +167,30 @@ class Game:
                 score = self._score_detector.get_score(cards)
                 player.set_cards(cards, score)
             # Broadcasting
-            logging.info("Player '{}' changed {} cards".format(player.get_name(), len(discards)))
+            logging.info("Player {} changed {} cards".format(player.get_id(), len(discards)))
             self._broadcast({'player': player_key, 'num_cards': len(discards)})
 
-    def _final_bet_round(self, strongest_bet_player_key):
+    def _final_bet_round(self, best_player_key):
         self._phase = Game.PHASE_FINAL_BET
-        return self._bet_round(strongest_bet_player_key)
+        return self._bet_round(best_player_key)
 
-    def _show_cards(self, strongest_bet_player_key):
+    def _show_cards(self, best_player_key):
         self._phase = Game.PHASE_SHOW_CARDS
         # Works out the winner
         winner = None
         winner_key = -1
-        for player_key, player in self._players_round(strongest_bet_player_key):
+        for player_key, player in self._players_round(best_player_key):
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
                 winner_key = player_key
-                logging.info("Player '{}':\n{}".format(player.get_name(), str(player.get_score())))
+                logging.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
                 self._broadcast({
                     'player': player_key,
                     'score': {
                         'category': player.get_score().get_category(),
                         'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
-                logging.info("Player '{}' fold.".format(player.get_name()))
+                logging.info("Player {} fold.".format(player.get_id()))
                 self._broadcast({'player': player_key, 'score': None})
 
         return winner_key
@@ -165,14 +201,15 @@ class Game:
             'msg_id': 'game-update',
             'players': [
                 {
-                    'id': self._players[key].get_id(),
-                    'name': self._players[key].get_name(),
-                    'money': self._players[key].get_money(),
-                    'alive': key not in self._folder_keys,
-                    'bet': self._bets[key],
-                    'dealer': key == self._dealer_key
+                    'id': player.get_id(),
+                    'name': player.get_name(),
+                    'money': player.get_money(),
+                    'alive': player_key not in self._folder_keys,
+                    'bet': self._bets[player_key],
+                    'dealer': player_key == self._dealer_key
                 }
-                for key in range(len(self._players))],
+                for player_key, player in enumerate(self._players)
+            ],
             'phase': self._phase,
             'pot': self._pot,
         })
@@ -195,29 +232,28 @@ class Game:
         if len(self._players) == len(self._folder_keys):
             return -1
 
-        bets = [0.0 for _ in self._players]
-        highest_bet_player_key = -1
+        bets = [0.0] * len(self._players)
+        best_player_key = -1
 
         if opening_bet:
             # player_key has already made an opening bet
             bets[player_key] = opening_bet
-            highest_bet_player_key = player_key
+            best_player_key = player_key
             player_key = (player_key + 1) % len(self._players)
 
-        while player_key != highest_bet_player_key:
+        while player_key != best_player_key:
             # Exclude folders
             if player_key not in self._folder_keys:
                 player = self._players[player_key]
 
-                # Only one player left
-                if len(self._folder_keys) + 1 == len(self._players):
-                    highest_bet_player_key = player_key
+                # Only one player left, break and do not ask for a bet
+                if len(self._players) - len(self._folder_keys) == 1:
+                    best_player_key = player_key
                     break
 
                 # Two or more players still alive
                 # Works out the minimum bet for the current player
-                min_partial_bet = 0.0 if highest_bet_player_key == -1 \
-                    else bets[highest_bet_player_key] - bets[player_key]
+                min_partial_bet = 0.0 if best_player_key == -1 else bets[best_player_key] - bets[player_key]
 
                 # Bet
                 current_bet = self._players[player_key].bet(min_bet=min_partial_bet, max_bet=self._pot)
@@ -231,9 +267,9 @@ class Game:
                 else:
                     self._pot += current_bet
                     bets[player_key] += current_bet
-                    if current_bet > min_partial_bet or highest_bet_player_key == -1:
+                    if current_bet > min_partial_bet or best_player_key == -1:
                         # Raise
-                        highest_bet_player_key = player_key
+                        best_player_key = player_key
 
                     if current_bet > min_partial_bet:
                         # Raise
@@ -245,10 +281,10 @@ class Game:
                         # Call
                         bet_type = 'CALL'
                 # Broadcasting
-                logging.info("Player '{}': {}".format(player.get_name(), bet_type))
+                logging.info("Player {}: {}".format(player.get_id(), bet_type))
                 self._broadcast({'player': player_key, 'bet': current_bet, 'bet_type': bet_type})
 
             # Next player
             player_key = (player_key + 1) % len(self._players)
 
-        return highest_bet_player_key
+        return best_player_key

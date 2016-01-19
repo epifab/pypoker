@@ -1,4 +1,4 @@
-from poker import Player, Card
+from poker import Player, Card, MessageException
 
 
 class PlayerConsole(Player):
@@ -85,9 +85,15 @@ class PlayerClientConsole(PlayerConsole):
                 'id': self.get_id(),
                 'name': self.get_name(),
                 'money': self.get_money()}})
+
         message = self.recv_message()
-        Player.check_msg_id(message, 'connect')
-        self._id = message['player']['id']
+
+        MessageException.validate_msg_id(message, "connect")
+
+        try:
+            self._id = message['player']['id']
+        except IndexError:
+            raise MessageException(attribute="player", desc="Missing required information")
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""

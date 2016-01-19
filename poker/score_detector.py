@@ -1,5 +1,4 @@
 import collections
-
 from poker import Score
 
 

@@ -5,6 +5,7 @@ class Player:
         self._money = money
         self._cards = None
         self._score = None
+        self._error = None
 
     def get_id(self):
         """Unique player ID"""
@@ -47,9 +48,5 @@ class Player:
     def recv_message(self):
         raise NotImplementedError
 
-    @staticmethod
-    def check_msg_id(message, expected_msg_id):
-        # Retrieving message id
-        msg_id = message['msg_id']
-        if msg_id != expected_msg_id:
-            raise ValueError("Invalid msg_id. Expected: '{}' received: '{}'.".format(expected_msg_id, msg_id))
+    def get_error(self):
+        return self._error

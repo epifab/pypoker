@@ -1,6 +1,6 @@
 from poker.card import Card
 from poker.deck import Deck
-from poker.game import Game
+from poker.game import Game, MessageException, GameError
 from poker.json_socket import JsonSocket
 from poker.player import Player
 from poker.player_console import PlayerConsole, PlayerClientConsole

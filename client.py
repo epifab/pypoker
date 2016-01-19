@@ -1,5 +1,6 @@
 from poker import JsonSocket, PlayerClientConsole, Card, Score, Game
-import socket, sys
+import socket
+import sys
 
 
 def print_game_update(message, player):
@@ -61,6 +62,7 @@ def print_game_update(message, player):
     print()
     print("Waiting...")
 
+
 if __name__ == '__main__':
     name = sys.argv[1]
 
@@ -75,7 +77,6 @@ if __name__ == '__main__':
         while True:
             message = player.recv_message()
 
-
             if message['msg_id'] == 'game-update':
                 print_game_update(message, player)
 
@@ -89,5 +90,6 @@ if __name__ == '__main__':
 
             elif message['msg_id'] == 'discard-cards':
                 player.discard_cards()
+
     finally:
         sock.close()

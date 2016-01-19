@@ -96,7 +96,6 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(score.get_category(), category)
 
     def _test_cmp(self, score1, score2):
-        """Helper method"""
         self.assertGreater(score1.cmp(score2), 0)
         self.assertLess(score2.cmp(score1), 0)
 
