@@ -1,10 +1,12 @@
+from poker import MessageException
 import json
 import logging
 
 
 class JsonSocket:
-    def __init__(self, socket):
+    def __init__(self, socket, logger=None):
         self._socket = socket
+        self._logger = logger if logger else logging
 
     def close(self):
         self._socket.close()
@@ -40,6 +42,9 @@ class JsonSocket:
             serialized = encoded.decode('utf-8')
             logging.debug("Received message from {}: {}".format(self._socket.getpeername(), serialized))
             return json.loads(serialized)
+        except json.decoder.JSONDecoderError:
+            logging.exception("Unable to receive a JSON message from {}".format(self._socket.getpeername()))
+            raise MessageException(desc="Unable to decode the message")
         except:
             logging.exception("Unable to receive a JSON message from {}".format(self._socket.getpeername()))
             raise

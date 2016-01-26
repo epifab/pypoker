@@ -5,7 +5,6 @@ class Player:
         self._money = money
         self._cards = None
         self._score = None
-        self._error = None
 
     def get_id(self):
         """Unique player ID"""
@@ -47,6 +46,3 @@ class Player:
 
     def recv_message(self):
         raise NotImplementedError
-
-    def get_error(self):
-        return self._error

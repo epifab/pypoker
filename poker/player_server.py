@@ -1,4 +1,3 @@
-import logging
 import time
 from poker import Player, MessageException
 
@@ -19,10 +18,16 @@ class PlayerServer(Player):
         MessageException.validate_msg_id(message, "connect")
 
         try:
-            self._name = message['player']['name']
+            self._name = str(message['player']['name'])
+        except IndexError:
+            raise MessageException(attribute="player.name", desc="Missing attribute")
+        except ValueError:
+            raise MessageException(attribute="player.name", desc="Invalid player name")
+
+        try:
             self._money = float(message['player']['money'])
         except IndexError:
-            raise MessageException(attribute="player", desc="Missing required information")
+            raise MessageException(attribute="player.money", desc="Missing attribute")
         except ValueError:
             raise MessageException(attribute="player.money",
                                    desc="'{}' is not a number".format(message['player']['money']))
@@ -45,7 +50,6 @@ class PlayerServer(Player):
                     'category': self.get_score().get_category(),
                     'cards': [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
         except Exception as e:
-            logging.exception('Unable to send the cards to player {}'.format(self._id))
             self._error = e
 
     def discard_cards(self):
@@ -77,7 +81,6 @@ class PlayerServer(Player):
                 raise MessageException(attribute="cards", desc="Invalid list of cards")
 
         except Exception as e:
-            logging.exception("Player {} failed to discard cards".format(self._id))
             self.try_send_message({'msg_id': 'error'})
             self._error = e
             return self._cards, []
@@ -126,7 +129,6 @@ class PlayerServer(Player):
                 raise MessageException(attribute="bet", desc="'{}' is not a number".format(bet))
 
         except Exception as e:
-            logging.exception("Player {} failed to bet".format(self._id))
             self.try_send_message({'msg_id': 'error'})
             self._error = e
             return -1
@@ -159,7 +161,6 @@ class PlayerServer(Player):
             return True
 
         except Exception as e:
-            logging.exception('Unable to resume player {}'.format(self._id))
             self._error = e
             return False
 
@@ -175,3 +176,6 @@ class PlayerServer(Player):
 
     def recv_message(self, timeout=None):
         return self._client.recv_message(timeout)
+
+    def get_error(self):
+        return self._error

@@ -1,37 +1,5 @@
-from poker import Card
+from poker import Card, GameError, HandFailException
 import logging
-
-
-class GameError(Exception):
-    pass
-
-
-class HandFailException(Exception):
-    pass
-
-
-class MessageException(Exception):
-    def __init__(self, attribute=None, desc=None, expected=None, found=None):
-        message = "Invalid message received."
-        if attribute:
-            message += " Invalid message attribute {}. ".format(attribute)
-            if expected is not None and found is not None:
-                message += " '{}' expected, found '{}'.".format(attribute, expected, found)
-        if desc:
-            message += desc
-        Exception.__init__(self, message)
-
-    @staticmethod
-    def validate_msg_id(message, expected):
-        if "msg_id" not in message:
-            raise MessageException(attribute="msg_id", desc="Attribute is missing")
-        elif message["msg_id"] == "error":
-            if "error" in message:
-                raise MessageException(desc="Error received from the remote host: '{}'".format(message['error']))
-            else:
-                raise MessageException(desc="Unknown error received from the remote host")
-        if message["msg_id"] != expected:
-            raise MessageException(attribute="msg_id", expected=expected, found=message["msg_id"])
 
 
 class Game:
@@ -43,7 +11,7 @@ class Game:
     PHASE_SHOW_CARDS = 'show-cards'
     PHASE_WINNER_DESIGNATION = 'winner-designation'
 
-    def __init__(self, players, deck, score_detector, stake=10.0):
+    def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
         self._players = players
         self._deck = deck
         self._score_detector = score_detector
@@ -54,15 +22,9 @@ class Game:
         self._folder_keys = []
         self._pot = 0.0
         self._bets = [0.0] * len(players)
-        self._min_opening_scores = [
-            # Pair of J
-            score_detector.get_score([Card(11, 0), Card(11, 1)]),
-            # Pair of Q
-            score_detector.get_score([Card(12, 0), Card(12, 1)]),
-            # Pair of K
-            score_detector.get_score([Card(13, 0), Card(13, 1)]),
-            # Pair of A
-            score_detector.get_score([Card(14, 0), Card(14, 1)])]
+        # Pair of J, Q, K, A
+        self._min_opening_scores = [score_detector.get_score([Card(r, 0), Card(r, 1)]) for r in [11, 12, 13, 14]]
+        self._logger = logger if logger else logging
 
     def play_hand(self):
         """Play a single hand."""
@@ -100,7 +62,7 @@ class Game:
                 # Winner and hand finalization
                 winner = self._players[player_key]
                 winner.set_money(winner.get_money() + self._pot)
-                logging.info("Player {} won".format(winner.get_id()))
+                self._logger.info("Player {} won".format(winner.get_id()))
 
                 # Re-initialize pot, bets and move to the next dealer
                 self._pot = 0.0
@@ -114,8 +76,12 @@ class Game:
                 continue
 
     def get_players_in_error(self):
-        """Returns a list of players in error."""
+        """Returns the list of players in error."""
         return [player for player in self._players if player.get_error()]
+
+    def get_players(self):
+        """Returns the list of players"""
+        return self._players
 
     def _assign_cards(self):
         self._phase = Game.PHASE_CARDS_ASSIGNMENT
@@ -142,14 +108,14 @@ class Game:
             bet = player.bet(min_bet=1.0, max_bet=max_bet, opening=True)
             if bet == -1:
                 # Broadcasting
-                logging.info("Player {} did not open".format(player.get_id()))
+                self._logger.info("Player {} did not open".format(player.get_id()))
                 self._broadcast({'player': player_key, 'bet': -1, 'bet_type': 'PASS'})
             else:
                 # Updating pots
                 self._pot += bet
                 self._bets[player_key] += bet
                 # Broadcasting
-                logging.info("Player {} opening bet: ${:,.2f}".format(player.get_id(), bet))
+                self._logger.info("Player {} opening bet: ${:,.2f}".format(player.get_id(), bet))
                 self._broadcast({'player': player_key, 'bet': bet, 'bet_type': 'RAISE'})
                 # Completing the bet round
                 return self._bet_round(player_key, opening_bet=bet)
@@ -167,7 +133,7 @@ class Game:
                 score = self._score_detector.get_score(cards)
                 player.set_cards(cards, score)
             # Broadcasting
-            logging.info("Player {} changed {} cards".format(player.get_id(), len(discards)))
+            self._logger.info("Player {} changed {} cards".format(player.get_id(), len(discards)))
             self._broadcast({'player': player_key, 'num_cards': len(discards)})
 
     def _final_bet_round(self, best_player_key):
@@ -183,14 +149,14 @@ class Game:
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
                 winner_key = player_key
-                logging.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
+                self._logger.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
                 self._broadcast({
                     'player': player_key,
                     'score': {
                         'category': player.get_score().get_category(),
                         'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
-                logging.info("Player {} fold.".format(player.get_id()))
+                self._logger.info("Player {} fold.".format(player.get_id()))
                 self._broadcast({'player': player_key, 'score': None})
 
         return winner_key
@@ -281,7 +247,7 @@ class Game:
                         # Call
                         bet_type = 'CALL'
                 # Broadcasting
-                logging.info("Player {}: {}".format(player.get_id(), bet_type))
+                self._logger.info("Player {}: {}".format(player.get_id(), bet_type))
                 self._broadcast({'player': player_key, 'bet': current_bet, 'bet_type': bet_type})
 
             # Next player

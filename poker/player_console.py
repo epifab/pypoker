@@ -97,14 +97,14 @@ class PlayerClientConsole(PlayerConsole):
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
-        super().set_cards(cards, score)
+        PlayerConsole.set_cards(self, cards, score)
         print(str(self))
         print(str(self._score))
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
         Returns a list of discarded cards."""
-        remaining_cards, discards = super().discard_cards()
+        remaining_cards, discards = PlayerConsole.discard_cards(self)
         discard_keys = [key for key in range(len(self._cards)) if self._cards[key] in discards]
         self.send_message({'msg_id': 'discard-cards', 'cards': discard_keys})
         return remaining_cards, discards
@@ -112,7 +112,7 @@ class PlayerClientConsole(PlayerConsole):
     def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
-        bet = super().bet(min_bet, max_bet, opening)
+        bet = PlayerConsole.bet(self, min_bet, max_bet, opening)
         self.send_message({'msg_id': 'bet', 'bet': bet})
         return bet
 
