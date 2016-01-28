@@ -1,52 +1,84 @@
-from poker import MessageException
+from poker import MessageFormatError, SocketError, MessageTimeout
+import errno
 import json
 import logging
+import socket
+import time
 
 
 class JsonSocket:
-    def __init__(self, socket, logger=None):
+    def __init__(self, socket, address, logger=None):
         self._socket = socket
+        self._address = address
+        self._socket.setblocking(False)
         self._logger = logger if logger else logging
 
     def close(self):
         self._socket.close()
 
     def send_message(self, message):
+        # Encode the message
+        msg_serialized = json.dumps(message)
+        msg_encoded = msg_serialized.encode("utf-8")
+
+        msg_len = str(len(msg_encoded)) + "\n"
+        msg_len_encoded = msg_len.encode("utf-8")
+
+        self._logger.debug("Sending message to {}: {}".format(self._address, msg_serialized))
+
         try:
-            # Encode the message
-            serialized = json.dumps(message)
-            encoded = serialized.encode('utf-8')
-            logging.debug("Sending message to {}: {}".format(self._socket.getpeername(), serialized))
             # Sends message length
-            self._socket.send(bytes(str(len(encoded)) + "\n", 'utf-8'))
+            self._socket.send(msg_len_encoded)
             # Sends the message
-            self._socket.sendall(encoded)
+            self._socket.sendall(msg_encoded)
         except:
-            logging.exception("Unable to send a JSON message to {}".format(self._socket.getpeername()))
-            raise
+            raise SocketError
+
+    def _recv(self, size, time_timeout):
+        message = b''
+        while not time_timeout or time.time() < time_timeout:
+            try:
+                message += self._socket.recv(size)
+                if len(message) >= size:
+                    return message
+            except socket.error as e:
+                err = e.args[0]
+                if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
+                    # Wait for 200 milliseconds
+                    time.sleep(0.2)
+                    continue
+                else:
+                    raise SocketError
+        raise MessageTimeout
+
+    def _recv_message_len(self, time_timeout):
+        message = b''
+        while not time_timeout or time.time() < time_timeout:
+            chr = self._recv(1, time_timeout)
+            if chr == b'\n':
+                try:
+                    return int(message.decode("utf-8"))
+                except ValueError:
+                    raise MessageFormatError(desc="Unable to receive the JSON message")
+            else:
+                message += chr
+        raise MessageTimeout
 
     def recv_message(self, timeout=None):
-        default_timeout = self._socket.gettimeout()
+        time_timeout = None if not timeout else time.time() + timeout
+
+        # Read the json message size
+        msg_len = self._recv_message_len(time_timeout)
+
+        # Read and decode the json message
+        encoded = self._recv(msg_len, time_timeout)
+        serialized = encoded.decode("utf-8")
+
+        self._logger.debug("JSON(?) message receive from {}: {}".format(self._address, serialized))
+
         try:
-            self._socket.settimeout(timeout)
-            # Read the message length
-            msg_len_bytes= b''
-            char = self._socket.recv(1)
-            while char != b'\n':
-                msg_len_bytes += char
-                char = self._socket.recv(1)
-            msg_len = int(msg_len_bytes.decode('utf-8'))
-            # Read the message
-            encoded = self._socket.recv(msg_len)
-            # Decode the message
-            serialized = encoded.decode('utf-8')
-            logging.debug("Received message from {}: {}".format(self._socket.getpeername(), serialized))
+            # Deserialize and return the message
             return json.loads(serialized)
-        except json.decoder.JSONDecoderError:
-            logging.exception("Unable to receive a JSON message from {}".format(self._socket.getpeername()))
-            raise MessageException(desc="Unable to decode the message")
-        except:
-            logging.exception("Unable to receive a JSON message from {}".format(self._socket.getpeername()))
-            raise
-        finally:
-            self._socket.settimeout(default_timeout)
+        except ValueError:
+            # Invalid json
+            raise MessageFormatError(desc="Unable to decode the JSON message")

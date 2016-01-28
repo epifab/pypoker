@@ -1,4 +1,4 @@
-from poker import Game, ScoreDetector, Deck, PlayerServer, JsonSocket, MessageException
+from poker import Game, ScoreDetector, Deck, PlayerServer, JsonSocket, MessageFormatError, SocketError, MessageTimeout
 import socket
 import logging
 import threading
@@ -30,22 +30,30 @@ class Server:
             self._lock.release()
 
     def play_game(self, game, players):
-        abort_game = False
-
-        while not abort_game:
-            game.play_hand()
-
+        try:
             for player in players:
-                try:
+                player.try_send_message({"msg_id": "game-status", "status": 1})
+
+            abort_game = False
+
+            while not abort_game:
+                game.play_hand()
+
+                for player in players:
                     if player.get_error():
-                        raise player.get_error()
-                except socket.timeout:
-                    self._logger.warning("Player {} timeout".format(player.get_id()))
-                except (socket.error, MessageException):
-                    self._logger.exception("Communication breakdown")
-                    self._logger.info("Disconnecting player {}".format(player.get_id()))
+                        # self._logger.exception("Player {}: Communication breakdown".format(player.get_id()))
+                        player.disconnect()
+                        abort_game = True
+
+        except:
+            self._logger.exception("Unexpected error happened.")
+            raise
+        finally:
+            self._logger.info("Terminating the game")
+            for player in players:
+                if not player.get_error():
+                    player.try_send_message({"msg_id": "game-status", "status": 0})
                     player.disconnect()
-                    abort_game = True
 
         # Re-add alive players to the waiting list
         for player in players:
@@ -61,8 +69,8 @@ class Server:
             self._logger.info("New connection from {}".format(address))
             try:
                 # Initializing the player
-                player = PlayerServer(client=JsonSocket(client))
+                player = PlayerServer(client=JsonSocket(socket=client, address=address))
                 self._logger.info("Player {} '{}' CONNECTED".format(player.get_id(), player.get_name()))
                 self.new_player(player)
-            except (socket.error, socket.timeout, MessageException):
+            except (socket.error, socket.timeout, MessageFormatError):
                 self._logger.exception("Cannot connect the player")

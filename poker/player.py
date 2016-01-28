@@ -41,6 +41,13 @@ class Player:
     def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
         raise NotImplementedError
 
+    def try_send_message(self, message):
+        try:
+            self.send_message(message)
+            return True
+        except:
+            return False
+
     def send_message(self, message):
         raise NotImplementedError
 

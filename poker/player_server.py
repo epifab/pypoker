@@ -1,10 +1,9 @@
 import time
-from poker import Player, MessageException
+from poker import Player, MessageFormatError, SocketError, MessageTimeout
 
 
 class PlayerServer(Player):
-    DEFAULT_TIMEOUT = 5
-    USER_ACTION_TIMEOUT = 60
+    USER_ACTION_TIMEOUT = 30
 
     def __init__(self, client):
         Player.__init__(self, id=id(self), name=None, money=None)
@@ -13,24 +12,24 @@ class PlayerServer(Player):
         self._connect()
 
     def _connect(self):
-        message = self.recv_message(PlayerServer.DEFAULT_TIMEOUT)
+        message = self.recv_message()
 
-        MessageException.validate_msg_id(message, "connect")
+        MessageFormatError.validate_msg_id(message, "connect")
 
         try:
             self._name = str(message['player']['name'])
         except IndexError:
-            raise MessageException(attribute="player.name", desc="Missing attribute")
+            raise MessageFormatError(attribute="player.name", desc="Missing attribute")
         except ValueError:
-            raise MessageException(attribute="player.name", desc="Invalid player name")
+            raise MessageFormatError(attribute="player.name", desc="Invalid player name")
 
         try:
             self._money = float(message['player']['money'])
         except IndexError:
-            raise MessageException(attribute="player.money", desc="Missing attribute")
+            raise MessageFormatError(attribute="player.money", desc="Missing attribute")
         except ValueError:
-            raise MessageException(attribute="player.money",
-                                   desc="'{}' is not a number".format(message['player']['money']))
+            raise MessageFormatError(attribute="player.money",
+                                     desc="'{}' is not a number".format(message['player']['money']))
 
         self.send_message({
             'msg_id': 'connect',
@@ -41,15 +40,17 @@ class PlayerServer(Player):
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
-        Player.set_cards(self, cards, score)
         try:
+            Player.set_cards(self, cards, score)
+
             self.send_message({
-                'msg_id': 'set-cards',
-                'cards': [(c.get_rank(), c.get_suit()) for c in self._cards],
-                'score': {
-                    'category': self.get_score().get_category(),
-                    'cards': [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
-        except Exception as e:
+                "msg_id": "set-cards",
+                "cards": [(c.get_rank(), c.get_suit()) for c in self._cards],
+                "score": {
+                    "category": self.get_score().get_category(),
+                    "cards": [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
+
+        except (SocketError, MessageFormatError) as e:
             self._error = e
 
     def discard_cards(self):
@@ -57,31 +58,35 @@ class PlayerServer(Player):
         Returns a tuple: (remaining cards, discards)."""
         try:
             time_timeout = time.gmtime(time.time() + PlayerServer.USER_ACTION_TIMEOUT)
+
             self.send_message({
-                'msg_id': 'discard-cards',
-                'timeout': time.strftime('%Y-%m-%d %H:%M:%S', time_timeout)})
+                "msg_id": "discard-cards",
+                "timeout": time.strftime("%Y-%m-%d %H:%M:%S", time_timeout)})
 
             message = self.recv_message(PlayerServer.USER_ACTION_TIMEOUT)
 
-            MessageException.validate_msg_id(message, "discard-cards")
+            MessageFormatError.validate_msg_id(message, "discard-cards")
 
             if "cards" not in message:
-                raise MessageException(attribute="cards", desc="Attribute is missing")
+                raise MessageFormatError(attribute="cards", desc="Attribute is missing")
 
-            discard_keys = message['cards']
-
-            if len(discard_keys) > 4:
-                raise MessageException(attribute="cards", desc="Maximum number of cards exceeded")
+            discard_keys = message["cards"]
 
             try:
+                if len(discard_keys) > 4:
+                    raise MessageFormatError(attribute="cards", desc="Maximum number of cards exceeded")
+
                 discards = [self._cards[key] for key in discard_keys]
                 remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
                 return remaining_cards, discards
-            except IndexError:
-                raise MessageException(attribute="cards", desc="Invalid list of cards")
 
-        except Exception as e:
-            self.try_send_message({'msg_id': 'error'})
+            except (TypeError, IndexError):
+                raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
+
+        except MessageTimeout:
+            return self._cards, []
+
+        except (SocketError, MessageFormatError) as e:
             self._error = e
             return self._cards, []
 
@@ -91,6 +96,7 @@ class PlayerServer(Player):
 
         try:
             time_timeout = time.gmtime(time.time() + PlayerServer.USER_ACTION_TIMEOUT)
+
             self.send_message({
                 "msg_id": "bet",
                 "timeout": time.strftime("%Y-%m-%d %H:%M:%S", time_timeout),
@@ -100,17 +106,17 @@ class PlayerServer(Player):
 
             message = self.recv_message(PlayerServer.USER_ACTION_TIMEOUT)
 
-            MessageException.validate_msg_id(message, "bet")
+            MessageFormatError.validate_msg_id(message, "bet")
 
             # No bet actually required (opening phase, score is too weak)
             if max_bet == -1:
                 return -1
 
             if "bet" not in message:
-                raise MessageException(attribute="bet", desc="Attribute is missing")
+                raise MessageFormatError(attribute="bet", desc="Attribute is missing")
 
             try:
-                bet = float(message['bet'])
+                bet = float(message["bet"])
 
                 # Fold
                 if bet == -1.0:
@@ -118,7 +124,7 @@ class PlayerServer(Player):
 
                 # Bet range
                 if bet < min_bet or bet > max_bet:
-                    raise MessageException(
+                    raise MessageFormatError(
                         attribute="bet",
                         desc=" Bet out of range. min: {} max: {}, actual: {}".format(min_bet, max_bet, bet))
 
@@ -126,56 +132,28 @@ class PlayerServer(Player):
                 return bet
 
             except ValueError:
-                raise MessageException(attribute="bet", desc="'{}' is not a number".format(bet))
+                raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except Exception as e:
-            self.try_send_message({'msg_id': 'error'})
+        except MessageTimeout:
+            return -1
+
+        except (SocketError, MessageFormatError) as e:
             self._error = e
             return -1
 
-    def try_send_message(self, message):
-        try:
-            self.send_message(message)
-        finally:
-            pass
-
     def get_error(self):
         return self._error
-
-    def try_resume(self):
-        """Try to resume a player in error"""
-        try:
-            time_timeout = time.gmtime(time.time() + PlayerServer.USER_ACTION_TIMEOUT)
-            self.send_message({
-                'msg_id': 'resume',
-                'timeout': time.strftime('%Y-%m-%d %H:%M:%S', time_timeout)})
-
-            message = self.recv_message(PlayerServer.USER_ACTION_TIMEOUT)
-
-            MessageException.validate_msg_id(message, "resume")
-
-            if "resume" not in message or not message["resume"]:
-                raise MessageException(attribute="resume", desc="Player {} quit".format(self._id))
-
-            self._error = None
-            return True
-
-        except Exception as e:
-            self._error = e
-            return False
 
     def disconnect(self):
         """Disconnect the client"""
         try:
             self._client.close()
-        finally:
-            pass
+            return True
+        except:
+            return False
 
     def send_message(self, message):
         return self._client.send_message(message)
 
-    def recv_message(self, timeout=None):
+    def recv_message(self, timeout=5.0):
         return self._client.recv_message(timeout)
-
-    def get_error(self):
-        return self._error

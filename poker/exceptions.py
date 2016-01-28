@@ -6,7 +6,15 @@ class HandFailException(Exception):
     pass
 
 
-class MessageException(Exception):
+class SocketError(Exception):
+    pass
+
+
+class MessageTimeout(Exception):
+    pass
+
+
+class MessageFormatError(Exception):
     def __init__(self, attribute=None, desc=None, expected=None, found=None):
         message = "Invalid message received."
         if attribute:
@@ -20,11 +28,11 @@ class MessageException(Exception):
     @staticmethod
     def validate_msg_id(message, expected):
         if "msg_id" not in message:
-            raise MessageException(attribute="msg_id", desc="Attribute is missing")
+            raise MessageFormatError(attribute="msg_id", desc="Attribute is missing")
         elif message["msg_id"] == "error":
             if "error" in message:
-                raise MessageException(desc="Error received from the remote host: '{}'".format(message['error']))
+                raise MessageFormatError(desc="Error received from the remote host: '{}'".format(message['error']))
             else:
-                raise MessageException(desc="Unknown error received from the remote host")
+                raise MessageFormatError(desc="Unknown error received from the remote host")
         if message["msg_id"] != expected:
-            raise MessageException(attribute="msg_id", expected=expected, found=message["msg_id"])
+            raise MessageFormatError(attribute="msg_id", expected=expected, found=message["msg_id"])

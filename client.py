@@ -66,10 +66,12 @@ def print_game_update(message, player):
 if __name__ == '__main__':
     name = sys.argv[1]
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', 9000))
+    server_address = ('localhost', 9000)
 
-    player = PlayerClientConsole(JsonSocket(sock), name=name, money=1000)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(server_address)
+
+    player = PlayerClientConsole(JsonSocket(socket=sock, address=server_address), name=name, money=1000)
 
     print("Player '{}' ${:,.2f} CONNECTED".format(player.get_name(), player.get_money()))
 

@@ -4,12 +4,12 @@ import logging
 
 class Game:
     # Phases
-    PHASE_CARDS_ASSIGNMENT = 'cards-assignment'
-    PHASE_OPENING_BET = 'opening-bet'
-    PHASE_CARDS_CHANGE = 'cards-change'
-    PHASE_FINAL_BET = 'final-bet'
-    PHASE_SHOW_CARDS = 'show-cards'
-    PHASE_WINNER_DESIGNATION = 'winner-designation'
+    PHASE_CARDS_ASSIGNMENT = "cards-assignment"
+    PHASE_OPENING_BET = "opening-bet"
+    PHASE_CARDS_CHANGE = "cards-change"
+    PHASE_FINAL_BET = "final-bet"
+    PHASE_SHOW_CARDS = "show-cards"
+    PHASE_WINNER_DESIGNATION = "winner-designation"
 
     def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
         self._players = players
@@ -57,7 +57,7 @@ class Game:
 
                 # Broadcast winner key
                 self._phase = Game.PHASE_WINNER_DESIGNATION
-                self._broadcast({'player': player_key})
+                self._broadcast({"player": player_key})
 
                 # Winner and hand finalization
                 winner = self._players[player_key]
@@ -109,14 +109,14 @@ class Game:
             if bet == -1:
                 # Broadcasting
                 self._logger.info("Player {} did not open".format(player.get_id()))
-                self._broadcast({'player': player_key, 'bet': -1, 'bet_type': 'PASS'})
+                self._broadcast({"player": player_key, "bet": -1, "bet_type": "PASS"})
             else:
                 # Updating pots
                 self._pot += bet
                 self._bets[player_key] += bet
                 # Broadcasting
                 self._logger.info("Player {} opening bet: ${:,.2f}".format(player.get_id(), bet))
-                self._broadcast({'player': player_key, 'bet': bet, 'bet_type': 'RAISE'})
+                self._broadcast({"player": player_key, "bet": bet, "bet_type": "RAISE"})
                 # Completing the bet round
                 return self._bet_round(player_key, opening_bet=bet)
         raise HandFailException
@@ -134,7 +134,7 @@ class Game:
                 player.set_cards(cards, score)
             # Broadcasting
             self._logger.info("Player {} changed {} cards".format(player.get_id(), len(discards)))
-            self._broadcast({'player': player_key, 'num_cards': len(discards)})
+            self._broadcast({"player": player_key, "num_cards": len(discards)})
 
     def _final_bet_round(self, best_player_key):
         self._phase = Game.PHASE_FINAL_BET
@@ -151,36 +151,36 @@ class Game:
                 winner_key = player_key
                 self._logger.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
                 self._broadcast({
-                    'player': player_key,
-                    'score': {
-                        'category': player.get_score().get_category(),
-                        'cards': [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
+                    "player": player_key,
+                    "score": {
+                        "category": player.get_score().get_category(),
+                        "cards": [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
                 self._logger.info("Player {} fold.".format(player.get_id()))
-                self._broadcast({'player': player_key, 'score': None})
+                self._broadcast({"player": player_key, "score": None})
 
         return winner_key
 
     def _broadcast(self, message={}):
         """Sends a game-update message to every player"""
         message.update({
-            'msg_id': 'game-update',
-            'players': [
+            "msg_id": "game-update",
+            "players": [
                 {
-                    'id': player.get_id(),
-                    'name': player.get_name(),
-                    'money': player.get_money(),
-                    'alive': player_key not in self._folder_keys,
-                    'bet': self._bets[player_key],
-                    'dealer': player_key == self._dealer_key
+                    "id": player.get_id(),
+                    "name": player.get_name(),
+                    "money": player.get_money(),
+                    "alive": player_key not in self._folder_keys,
+                    "bet": self._bets[player_key],
+                    "dealer": player_key == self._dealer_key
                 }
                 for player_key, player in enumerate(self._players)
             ],
-            'phase': self._phase,
-            'pot': self._pot,
+            "phase": self._phase,
+            "pot": self._pot,
         })
         for player in self._players:
-            player.send_message(message)
+            player.try_send_message(message)
 
     def _players_round(self, start_id=0):
         """Iterate through a list of players who did not fold."""
@@ -229,7 +229,7 @@ class Game:
                 if current_bet == -1:
                     # Fold
                     self._folder_keys.append(player_key)
-                    bet_type = 'FOLD'
+                    bet_type = "FOLD"
                 else:
                     self._pot += current_bet
                     bets[player_key] += current_bet
@@ -239,16 +239,16 @@ class Game:
 
                     if current_bet > min_partial_bet:
                         # Raise
-                        bet_type = 'RAISE'
+                        bet_type = "RAISE"
                     elif not current_bet:
                         # Check
-                        bet_type = 'CHECK'
+                        bet_type = "CHECK"
                     else:
                         # Call
-                        bet_type = 'CALL'
+                        bet_type = "CALL"
                 # Broadcasting
                 self._logger.info("Player {}: {}".format(player.get_id(), bet_type))
-                self._broadcast({'player': player_key, 'bet': current_bet, 'bet_type': bet_type})
+                self._broadcast({"player": player_key, "bet": current_bet, "bet_type": bet_type})
 
             # Next player
             player_key = (player_key + 1) % len(self._players)

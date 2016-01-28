@@ -1,4 +1,4 @@
-from poker import Player, Card, MessageException
+from poker import Player, Card, MessageFormatError
 
 
 class PlayerConsole(Player):
@@ -88,12 +88,12 @@ class PlayerClientConsole(PlayerConsole):
 
         message = self.recv_message()
 
-        MessageException.validate_msg_id(message, "connect")
+        MessageFormatError.validate_msg_id(message, "connect")
 
         try:
             self._id = message['player']['id']
         except IndexError:
-            raise MessageException(attribute="player", desc="Missing required information")
+            raise MessageFormatError(attribute="player", desc="Missing required information")
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
