@@ -112,6 +112,7 @@ class Game:
                 self._broadcast({"player": player_key, "bet": -1, "bet_type": "PASS"})
             else:
                 # Updating pots
+                player.set_money(player.get_money() - bet)
                 self._pot += bet
                 self._bets[player_key] += bet
                 # Broadcasting
@@ -222,7 +223,7 @@ class Game:
                 min_partial_bet = 0.0 if best_player_key == -1 else bets[best_player_key] - bets[player_key]
 
                 # Bet
-                current_bet = self._players[player_key].bet(min_bet=min_partial_bet, max_bet=self._pot)
+                current_bet = player.bet(min_bet=min_partial_bet, max_bet=self._pot)
 
                 bet_type = None
 
@@ -231,7 +232,9 @@ class Game:
                     self._folder_keys.append(player_key)
                     bet_type = "FOLD"
                 else:
+                    player.set_money(player.get_money() - current_bet)
                     self._pot += current_bet
+
                     bets[player_key] += current_bet
                     if current_bet > min_partial_bet or best_player_key == -1:
                         # Raise

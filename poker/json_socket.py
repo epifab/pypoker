@@ -13,6 +13,9 @@ class JsonSocket:
         self._socket.setblocking(False)
         self._logger = logger if logger else logging
 
+    def get_address(self):
+        return self._address
+
     def close(self):
         self._socket.close()
 
@@ -32,7 +35,7 @@ class JsonSocket:
             # Sends the message
             self._socket.sendall(msg_encoded)
         except:
-            raise SocketError
+            raise SocketError("Unable to send data to the remote host")
 
     def _recv(self, size, time_timeout):
         message = b''
@@ -48,8 +51,8 @@ class JsonSocket:
                     time.sleep(0.2)
                     continue
                 else:
-                    raise SocketError
-        raise MessageTimeout
+                    raise SocketError("Unable to receive data from the remote host")
+        raise MessageTimeout("Timed out")
 
     def _recv_message_len(self, time_timeout):
         message = b''
@@ -62,7 +65,7 @@ class JsonSocket:
                     raise MessageFormatError(desc="Unable to receive the JSON message")
             else:
                 message += chr
-        raise MessageTimeout
+        raise MessageTimeout("Timed out")
 
     def recv_message(self, timeout=None):
         time_timeout = None if not timeout else time.time() + timeout

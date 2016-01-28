@@ -1,42 +1,56 @@
-import time
 from poker import Player, MessageFormatError, SocketError, MessageTimeout
+import logging
+import time
 
 
 class PlayerServer(Player):
     USER_ACTION_TIMEOUT = 30
 
-    def __init__(self, client):
+    def __init__(self, client, logger=None):
         Player.__init__(self, id=id(self), name=None, money=None)
         self._error = None
         self._client = client
-        self._connect()
+        self._logger = logger if logger else logging
 
-    def _connect(self):
+    def get_error(self):
+        return self._error
+
+    def connect(self):
+        """Connects the player"""
         message = self.recv_message()
 
         MessageFormatError.validate_msg_id(message, "connect")
 
         try:
-            self._name = str(message['player']['name'])
+            self._name = str(message["player"]["name"])
         except IndexError:
             raise MessageFormatError(attribute="player.name", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="player.name", desc="Invalid player name")
 
         try:
-            self._money = float(message['player']['money'])
+            self._money = float(message["player"]["money"])
         except IndexError:
             raise MessageFormatError(attribute="player.money", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="player.money",
-                                     desc="'{}' is not a number".format(message['player']['money']))
+                                     desc="'{}' is not a number".format(message["player"]["money"]))
 
         self.send_message({
-            'msg_id': 'connect',
-            'player': {
-                'id': self._id,
-                'name': self._name,
-                'money': self._money}})
+            "msg_id": "connect",
+            "player": {
+                "id": self._id,
+                "name": self._name,
+                "money": self._money}})
+
+    def disconnect(self):
+        """Disconnect the client"""
+        try:
+            self.try_send_message({"msg_id": "disconnect"})
+            self._client.close()
+            return True
+        except:
+            return False
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -50,7 +64,8 @@ class PlayerServer(Player):
                     "category": self.get_score().get_category(),
                     "cards": [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
 
-        except (SocketError, MessageFormatError) as e:
+        except SocketError as e:
+            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
             self._error = e
 
     def discard_cards(self):
@@ -83,10 +98,8 @@ class PlayerServer(Player):
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
-        except MessageTimeout:
-            return self._cards, []
-
-        except (SocketError, MessageFormatError) as e:
+        except (SocketError, MessageFormatError, MessageTimeout) as e:
+            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
             self._error = e
             return self._cards, []
 
@@ -126,30 +139,25 @@ class PlayerServer(Player):
                 if bet < min_bet or bet > max_bet:
                     raise MessageFormatError(
                         attribute="bet",
-                        desc=" Bet out of range. min: {} max: {}, actual: {}".format(min_bet, max_bet, bet))
+                        desc="Bet out of range. min: {} max: {}, actual: {}".format(min_bet, max_bet, bet))
 
-                self._money -= bet
                 return bet
 
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except MessageTimeout:
-            return -1
-
-        except (SocketError, MessageFormatError) as e:
+        except (SocketError, MessageFormatError, MessageTimeout) as e:
+            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
             self._error = e
             return -1
 
-    def get_error(self):
-        return self._error
-
-    def disconnect(self):
-        """Disconnect the client"""
+    def try_send_message(self, message):
         try:
-            self._client.close()
+            self.send_message(message)
             return True
-        except:
+        except SocketError as e:
+            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+            self._error = e
             return False
 
     def send_message(self, message):

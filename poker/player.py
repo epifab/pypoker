@@ -42,11 +42,7 @@ class Player:
         raise NotImplementedError
 
     def try_send_message(self, message):
-        try:
-            self.send_message(message)
-            return True
-        except:
-            return False
+        raise NotImplementedError
 
     def send_message(self, message):
         raise NotImplementedError
