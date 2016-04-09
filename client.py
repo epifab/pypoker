@@ -1,6 +1,9 @@
 from poker import JsonSocket, PlayerClientConsole, Card, Score, Game
+import logging
 import socket
 import sys
+import time
+import calendar
 
 
 def print_game_update(message, player):
@@ -66,6 +69,8 @@ def print_game_update(message, player):
 if __name__ == "__main__":
     name = sys.argv[1]
 
+    logging.basicConfig(level=logging.DEBUG)
+
     server_address = ("localhost", 9000)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -111,15 +116,29 @@ if __name__ == "__main__":
                 print_game_update(message, player)
 
             elif message["msg_id"] == "bet":
-                player.bet(min_bet=message["min_bet"], max_bet=message["max_bet"], opening=message["opening"])
+                try:
+                    timeout_epoch = int(calendar.timegm(time.strptime(message["timeout"], "%Y-%m-%d %H:%M:%S+0000")))
+                    player.bet(
+                        min_bet=message["min_bet"],
+                        max_bet=message["max_bet"],
+                        opening=message["opening"],
+                        timeout_epoch=timeout_epoch)
+                except TimeoutError:
+                    print("Time is up!")
 
             elif message["msg_id"] == "set-cards":
                 player.set_cards(
                     [Card(rank, suit) for rank, suit in message["cards"]],
-                    Score(message["score"]["category"], [Card(rank, suit) for rank, suit in message["score"]["cards"]]))
+                    Score(
+                        message["score"]["category"],
+                        [Card(rank, suit) for rank, suit in message["score"]["cards"]]))
 
             elif message["msg_id"] == "discard-cards":
-                player.discard_cards()
+                try:
+                    timeout_epoch = int(calendar.timegm(time.strptime(message["timeout"], "%Y-%m-%d %H:%M:%S+0000")))
+                    player.discard_cards(timeout_epoch)
+                except TimeoutError:
+                    print("Time is up!")
 
     finally:
         sock.close()

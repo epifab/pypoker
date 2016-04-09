@@ -1,4 +1,4 @@
-from poker import Card, GameError, HandFailException
+from . import Card, GameError, HandFailException
 import logging
 
 
@@ -126,11 +126,11 @@ class Game:
         self._phase = Game.PHASE_CARDS_CHANGE
         # Change cards
         for player_key, player in self._players_round(self._dealer_key):
-            remaining_cards, discards = player.discard_cards()
+            _, discards = player.discard_cards()
             if discards:
                 new_cards = self._deck.get_cards(len(discards))
                 self._deck.add_discards(discards)
-                cards = remaining_cards + new_cards
+                cards = [card for card in player.get_cards() if card not in discards] + new_cards
                 score = self._score_detector.get_score(cards)
                 player.set_cards(cards, score)
             # Broadcasting

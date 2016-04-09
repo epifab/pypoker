@@ -34,18 +34,3 @@ class Player:
         """Assigns a list of cards to the player"""
         self._cards = cards
         self._score = score
-
-    def discard_cards(self):
-        raise NotImplementedError
-
-    def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
-        raise NotImplementedError
-
-    def try_send_message(self, message):
-        raise NotImplementedError
-
-    def send_message(self, message):
-        raise NotImplementedError
-
-    def recv_message(self):
-        raise NotImplementedError

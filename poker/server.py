@@ -1,4 +1,6 @@
-from poker import Game, ScoreDetector, Deck, PlayerServer, JsonSocket, MessageFormatError, SocketError, MessageTimeout
+from . import Game, GameError, ScoreDetector, Deck, \
+    PlayerServer, JsonSocket, \
+    MessageFormatError, SocketError, MessageTimeout
 import socket
 import logging
 import threading
@@ -40,8 +42,11 @@ class Server:
             abort_game = False
 
             while not abort_game:
-                game.play_hand()
-                abort_game = game.get_players_in_error()
+                try:
+                    game.play_hand()
+                    abort_game = game.get_players_in_error()
+                except GameError:
+                    abort_game = True
 
             self._logger.info("Aborting the game...")
 
@@ -67,7 +72,7 @@ class Server:
 
         while True:
             client_socket, client_address = self._socket.accept()
-            self._logger.info("New connection from {}".format(client_address))
+            self._logger.info   ("New connection from {}".format(client_address))
             player = PlayerServer(client=JsonSocket(socket=client_socket, address=client_address))
             try:
                 # Connecting the remote player
@@ -75,7 +80,8 @@ class Server:
             except (SocketError, MessageFormatError, MessageTimeout) as e:
                 # Communication breakdown
                 self._logger.error("Cannot connect the player: {}".format(e.args[0]))
-                player.disconnect() # Also closes the socket
+                # Also closes the socket
+                player.disconnect()
             else:
                 # Player successfully connected: joining the lobby
                 self._logger.info("Player {} '{}' CONNECTED".format(player.get_id(), player.get_name()))

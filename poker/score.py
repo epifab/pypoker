@@ -1,4 +1,4 @@
-from poker import Card
+from . import Card
 
 
 class Score:

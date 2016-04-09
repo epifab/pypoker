@@ -1,11 +1,11 @@
-from poker.card import Card
-from poker.deck import Deck
-from poker.exceptions import *
-from poker.game import Game
-from poker.json_socket import JsonSocket
-from poker.player import Player
-from poker.player_console import PlayerConsole, PlayerClientConsole
-from poker.player_server import PlayerServer
-from poker.score import Score
-from poker.score_detector import ScoreDetector
-from poker.server import Server
+from .card import Card
+from .deck import Deck
+from .exceptions import *
+from .game import Game
+from .json_socket import JsonSocket
+from .player import Player
+from .player_console import PlayerConsole, PlayerClientConsole
+from .player_server import PlayerServer
+from .score import Score
+from .score_detector import ScoreDetector
+from .server import Server

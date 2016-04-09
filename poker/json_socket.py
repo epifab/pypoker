@@ -1,4 +1,4 @@
-from poker import MessageFormatError, SocketError, MessageTimeout
+from . import MessageFormatError, SocketError, MessageTimeout
 import errno
 import json
 import logging

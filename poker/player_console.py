@@ -1,41 +1,57 @@
-from poker import Player, Card, MessageFormatError
+from . import Player, Card, MessageFormatError, SocketError
+import time
 
 
 class PlayerConsole(Player):
     def __init__(self, id, name, money):
         Player.__init__(self, id, name, money)
 
-    def discard_cards(self):
+    @staticmethod
+    def input(timeout, question=""):
+        # @todo: Implement non blocking IO (with timeout)
+        print("{:.0f} seconds remaining".format(round(timeout)))
+        return input(question)
+
+    def discard_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
         Returns a tuple: (remaining cards, discards)."""
         print(str(self))
         print(Card.format_cards(self._cards))
+
         while True:
             try:
-                discard_keys = input("Please type a comma separated list of card (1 to 5 from left to right): ")
+                discard_keys = PlayerConsole.input(
+                    timeout_epoch - time.time(),
+                    "Please type a comma separated list of card (1 to 5 from left to right): ")
                 if discard_keys:
                     # Convert the string into a list of unique integers
-                    discard_keys = set([int(card_id.strip()) - 1 for card_id in discard_keys.split(",")])
+                    discard_keys = [int(card_id.strip()) - 1 for card_id in discard_keys.split(",")]
                     if len(discard_keys) > 4:
                         print("You cannot change more than 4 cards")
                         continue
                     # Works out the new card set
                     discards = [self._cards[key] for key in discard_keys]
                     remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
-                    return remaining_cards, discards
-                return self._cards, []
+                    return discard_keys, discards
+                return [], []
+            except TimeoutError:
+                return [], []
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
 
-    def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
+    def bet(self, min_bet, max_bet, opening, timeout_epoch):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
         print(str(self))
         print(str(self._score))
 
         if max_bet == -1:
-            input("Not allowed to open. Press enter to continue.")
-            return -1
+            try:
+                PlayerConsole.input(timeout_epoch - time.time(), "Not allowed to open. Press enter to continue.")
+            except TimeoutError:
+                pass
+            finally:
+                return -1
 
         while True:
             message = "Type your bet."
@@ -45,19 +61,25 @@ class PlayerConsole(Player):
                 message += " max bet: ${:,.2f}".format(max_bet)
             message += " -1 to " + ("skip opening" if opening else "fold") + ": "
 
-            bet = input(message)
-
             try:
+                bet = PlayerConsole.input(timeout_epoch - time.time(), message)
+
                 bet = float(bet)
+
                 if bet == -1:
                     return -1
                 elif bet < min_bet:
                     raise ValueError
                 elif max_bet and bet > max_bet:
                     raise ValueError
+
                 self._money -= bet
                 return bet
-            except ValueError:
+
+            except TimeoutError:
+                print("Timed out")
+                return -1
+            except (ValueError, TypeError):
                 print("Invalid bet.")
 
     def send_message(self, message):
@@ -101,20 +123,27 @@ class PlayerClientConsole(PlayerConsole):
         print(str(self))
         print(str(self._score))
 
-    def discard_cards(self):
+    def discard_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
         Returns a list of discarded cards."""
-        remaining_cards, discards = PlayerConsole.discard_cards(self)
-        discard_keys = [key for key in range(len(self._cards)) if self._cards[key] in discards]
+        discard_keys, discards = PlayerConsole.discard_cards(self, timeout_epoch)
         self.send_message({'msg_id': 'discard-cards', 'cards': discard_keys})
-        return remaining_cards, discards
+        return discard_keys, discards
 
-    def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
+    def bet(self, min_bet, max_bet, opening, timeout_epoch):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
-        bet = PlayerConsole.bet(self, min_bet, max_bet, opening)
+        bet = PlayerConsole.bet(self, min_bet, max_bet, opening, timeout_epoch)
         self.send_message({'msg_id': 'bet', 'bet': bet})
-        return bet
+
+    def try_send_message(self, message):
+        try:
+            self.send_message(message)
+            return True
+        except SocketError as e:
+            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+            self._error = e
+            return False
 
     def send_message(self, message):
         return self._server.send_message(message)

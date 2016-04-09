@@ -1,5 +1,5 @@
 import collections
-from poker import Score
+from . import Score
 
 
 class ScoreDetector:

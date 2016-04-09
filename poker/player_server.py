@@ -1,4 +1,4 @@
-from poker import Player, MessageFormatError, SocketError, MessageTimeout
+from . import Player, MessageFormatError, SocketError, MessageTimeout
 import logging
 import time
 
@@ -70,13 +70,13 @@ class PlayerServer(Player):
 
     def discard_cards(self):
         """Gives players the opportunity to discard some of their cards.
-        Returns a tuple: (remaining cards, discards)."""
+        Returns a tuple: (discard card ids, discards)."""
         try:
             time_timeout = time.gmtime(time.time() + PlayerServer.USER_ACTION_TIMEOUT)
 
             self.send_message({
                 "msg_id": "discard-cards",
-                "timeout": time.strftime("%Y-%m-%d %H:%M:%S", time_timeout)})
+                "timeout": time.strftime("%Y-%m-%d %H:%M:%S+0000", time_timeout)})
 
             message = self.recv_message(PlayerServer.USER_ACTION_TIMEOUT)
 
@@ -88,12 +88,12 @@ class PlayerServer(Player):
             discard_keys = message["cards"]
 
             try:
+                # removing duplicates
+                discard_keys = sorted(set(discard_keys))
                 if len(discard_keys) > 4:
                     raise MessageFormatError(attribute="cards", desc="Maximum number of cards exceeded")
-
                 discards = [self._cards[key] for key in discard_keys]
-                remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
-                return remaining_cards, discards
+                return discard_keys, discards
 
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
@@ -112,7 +112,7 @@ class PlayerServer(Player):
 
             self.send_message({
                 "msg_id": "bet",
-                "timeout": time.strftime("%Y-%m-%d %H:%M:%S", time_timeout),
+                "timeout": time.strftime("%Y-%m-%d %H:%M:%S+0000", time_timeout),
                 "min_bet": min_bet,
                 "max_bet": max_bet,
                 "opening": opening})
