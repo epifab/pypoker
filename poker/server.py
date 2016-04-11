@@ -1,6 +1,6 @@
 from . import Game, GameError, ScoreDetector, Deck, \
     PlayerServer, JsonSocket, \
-    MessageFormatError, SocketError, MessageTimeout
+    MessageFormatError, CommunicationError, MessageTimeout
 import socket
 import logging
 import threading
@@ -77,7 +77,7 @@ class Server:
             try:
                 # Connecting the remote player
                 player.connect()
-            except (SocketError, MessageFormatError, MessageTimeout) as e:
+            except (CommunicationError, MessageFormatError, MessageTimeout) as e:
                 # Communication breakdown
                 self._logger.error("Cannot connect the player: {}".format(e.args[0]))
                 # Also closes the socket

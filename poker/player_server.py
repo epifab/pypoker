@@ -1,4 +1,4 @@
-from . import Player, MessageFormatError, SocketError, MessageTimeout
+from . import Player, MessageFormatError, CommunicationError, MessageTimeout
 import logging
 import time
 
@@ -64,8 +64,8 @@ class PlayerServer(Player):
                     "category": self.get_score().get_category(),
                     "cards": [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
 
-        except SocketError as e:
-            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+        except CommunicationError as e:
+            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
 
     def discard_cards(self):
@@ -98,8 +98,8 @@ class PlayerServer(Player):
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
-        except (SocketError, MessageFormatError, MessageTimeout) as e:
-            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+        except (CommunicationError, MessageFormatError, MessageTimeout) as e:
+            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return self._cards, []
 
@@ -146,8 +146,8 @@ class PlayerServer(Player):
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except (SocketError, MessageFormatError, MessageTimeout) as e:
-            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+        except (CommunicationError, MessageFormatError, MessageTimeout) as e:
+            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return -1
 
@@ -155,8 +155,8 @@ class PlayerServer(Player):
         try:
             self.send_message(message)
             return True
-        except SocketError as e:
-            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+        except CommunicationError as e:
+            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return False
 

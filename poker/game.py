@@ -1,5 +1,13 @@
-from . import Card, GameError, HandFailException
+from . import Card
 import logging
+
+
+class GameError(Exception):
+    pass
+
+
+class HandFailException(Exception):
+    pass
 
 
 class Game:

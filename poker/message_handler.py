@@ -1,12 +1,4 @@
-class GameError(Exception):
-    pass
-
-
-class HandFailException(Exception):
-    pass
-
-
-class SocketError(Exception):
+class CommunicationError(Exception):
     pass
 
 
@@ -36,3 +28,11 @@ class MessageFormatError(Exception):
                 raise MessageFormatError(desc="Unknown error received from the remote host")
         if message["msg_id"] != expected:
             raise MessageFormatError(attribute="msg_id", expected=expected, found=message["msg_id"])
+
+
+class MessageHandler:
+    def recv_message(self, timeout=None):
+        raise NotImplementedError
+
+    def send_message(self, message):
+        raise NotImplementedError

@@ -1,7 +1,7 @@
 from .card import Card
 from .deck import Deck
-from .exceptions import *
-from .game import Game
+from .message_handler import MessageHandler, MessageTimeout, MessageFormatError, CommunicationError
+from .game import Game, GameError, HandFailException
 from .json_socket import JsonSocket
 from .player import Player
 from .player_console import PlayerConsole, PlayerClientConsole

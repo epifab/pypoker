@@ -1,4 +1,4 @@
-from . import Player, Card, MessageFormatError, SocketError
+from . import Player, Card, MessageFormatError, CommunicationError
 import time
 
 
@@ -140,8 +140,8 @@ class PlayerClientConsole(PlayerConsole):
         try:
             self.send_message(message)
             return True
-        except SocketError as e:
-            self._logger.exception("Player {} {}: {}".format(self.get_id(), self._client.get_address(), e.args[0]))
+        except CommunicationError as e:
+            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return False
 
