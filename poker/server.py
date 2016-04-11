@@ -7,9 +7,10 @@ import threading
 
 
 class Server:
-    def __init__(self, host, port, logger=None):
+    def __init__(self, address, logger=None):
+        self._address = address
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.bind((host, port))
+        self._socket.bind(address)
         self._players = []
         self._room_size = 2
         self._lock = threading.Lock()
@@ -68,7 +69,7 @@ class Server:
 
     def start(self):
         self._socket.listen(1)
-        self._logger.info("Poker server listening.")
+        self._logger.info("Poker server listening at {}.".format(self._address))
 
         while True:
             client_socket, client_address = self._socket.accept()

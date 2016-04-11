@@ -1,18 +1,15 @@
 from poker import Server
 import logging
+import os
 
-
-def main():
-    pass
 
 if __name__ == '__main__':
-    host = "localhost"
-    port = 9000
+    logging.basicConfig(level=logging.DEBUG if 'DEBUG' in os.environ else logging.INFO)
+    logger = logging.getLogger()
 
-    logging.basicConfig(level=logging.DEBUG)
+    host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]
+    port = 9000 if "POKER5_PORT" not in os.environ else os.environ["POKER5_PORT"]
+    server_address = (host, port)
 
-    logger = logging.getLogger("pypoker-server")
-    logger.setLevel(level=logging.DEBUG)
-
-    server = Server(host=host, port=port, logger=logger)
+    server = Server(server_address, logger=logger)
     server.start()
