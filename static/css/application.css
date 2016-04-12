@@ -1,26 +1,44 @@
-.table {
+.poker-table {
     background-color: #354b1c;
     width: 100%;
-    padding: 50px;
+    padding: 20px;
     color: #EED;
+}
+
+#game-log {
+    border-top: 1px solid #FFF;
+    border-bottom: 1px solid #FFF;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+#players .player {
+    margin-bottom: 20px;
+}
+
+.card {
+    float: left;
+    margin: 1px;
+    background-repeat: no-repeat;
 }
 
 .card.small {
     width: 45px;
     height: 75px;
-    float: left;
-    margin: 1px;
     background-image: url(../images/card-back-small.jpg);
-    background-repeat: no-repeat;
-    cursor: pointer;
 }
 
 .card.medium {
     width: 75px;
     height: 125px;
-    float: left;
-    margin: 1px;
     background-image: url(../images/card-back.jpg);
-    background-repeat: no-repeat;
+}
+
+.player-control .card {
     cursor: pointer;
+}
+
+h1 .py {
+    color: #66C;
 }

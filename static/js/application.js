@@ -1,84 +1,147 @@
-// Support TLS-specific URLs, when appropriate.
-if (window.location.protocol == "https:") {
-  var ws_scheme = "wss://";
-} else {
-  var ws_scheme = "ws://"
-};
+Poker5 = {
+    socket: null,
 
+    betMode: false,
 
-// var poker = new ReconnectingWebSocket(ws_scheme + location.host + "/connect");
+    cardsChangeMode: true,
 
-Card = {
-    show($element, rank, suit) {
-        x = 0;
-        y = 0;
-
-        if ($element.hasClass('small')) {
-            url = "static/images/cards-small.jpg";
-            width = 45;
-            height = 75;
+    init: function() {
+        if (window.location.protocol == "https:") {
+          var ws_scheme = "wss://";
         }
         else {
-            url = "static/images/cards.jpg";
-            width = 75;
-            height = 125;
+          var ws_scheme = "ws://"
         }
 
-        switch (suit) {
-            case 0:
-                x -= width;
-                y -= height;
-                break;
-            case 1:
-                y -= height;
-                break;
-            case 2:
-                x -= width;
-            case 3:
-                break;
+        //this.socket = new ReconnectingWebSocket(ws_scheme + location.host + "/poker5");
+
+        $('#player-control .card').click(function() {
+            if (Poker5.cardsChangeMode) {
+                if ($(this).hasClass('selected')) {
+                    $(this).css('margin-top', 0);
+                }
+                else {
+                    $(this).css('margin-top', -15);
+                }
+                $(this).toggleClass('selected');
+            }
+        })
+
+        $('#change-cards-cmd').click(function() {
+            if (Poker5.cardsChangeMode) {
+                cards = $('#player-control .card.selected')
+                console.log(cards)
+                Poker5.setCardsChangeMode(false)
+            }
+        })
+
+        this.setBetMode(false)
+        this.setCardsChangeMode(false)
+    },
+
+    setBetMode: function(betMode) {
+        this.betMode = betMode;
+
+        if (betMode) {
+            $('#bet-group').show()
         }
+        else {
+            $('#bet-group').hide()
+        }
+    },
 
-        x -= (rank - 1) * 2 * width;
+    setCardsChangeMode: function(changeMode) {
+        this.cardsChangeMode = changeMode;
 
-        $element.css('background-position', x + "px " + y + "px");
-        $element.css('background-image', 'url(' + url + ')');
+        if (changeMode) {
+            $('#change-cards-cmd').show()
+        }
+        else {
+            $('#change-cards-cmd').hide()
+        }
+    },
+
+    setCard: function(playerId, cardId, rank, suit) {
+        $('.player-' + playerId + ' .card-' + cardId).each(function() {
+            $element = $(this);
+
+            x = 0;
+            y = 0;
+
+            if ($element.hasClass('small')) {
+                url = "static/images/cards-small.jpg";
+                width = 45;
+                height = 75;
+            }
+            else {
+                url = "static/images/cards.jpg";
+                width = 75;
+                height = 125;
+            }
+
+            switch (suit) {
+                case 0:
+                    // Spades
+                    x -= width;
+                    y -= height;
+                    break;
+                case 1:
+                    // Clubs
+                    y -= height;
+                    break;
+                case 2:
+                    // Diamonds
+                    x -= width;
+                    break;
+                case 3:
+                    // Hearts
+                    break;
+                default:
+                    throw "Invalid suit";
+            }
+
+            if (rank < 1 || rank > 13) {
+                throw "Invalid rank";
+            }
+
+            x -= (rank - 1) * 2 * width;
+
+            $element.css('background-position', x + "px " + y + "px");
+            $element.css('background-image', 'url(' + url + ')');
+
+            $element.data('rank', rank)
+            $element.data('suit', suit)
+        })
     }
 }
 
 $(document).ready(function() {
-    var card1 = $('.player-1 .card-1');
-    var card2 = $('.player-1 .card-2');
-    var card3 = $('.player-1 .card-3');
-    var card4 = $('.player-1 .card-4');
-    var card5 = $('.player-1 .card-5');
+    Poker5.init()
 
-    Card.show(card1, 8, 0);
-    Card.show(card2, 8, 3);
-    Card.show(card3, 8, 1);
+    /*
+    Poker5.setCard(1, 1, 13, 2);
+    Poker5.setCard(1, 2, 12, 2);
+    Poker5.setCard(1, 3, 11, 2);
+    Poker5.setCard(1, 4, 10, 2);
+    Poker5.setCard(1, 5, 9, 2);
 
-    var card1 = $('.player-2 .card-1');
-    var card2 = $('.player-2 .card-2');
-    var card3 = $('.player-2 .card-3');
-    var card4 = $('.player-2 .card-4');
-    var card5 = $('.player-2 .card-5');
+    Poker5.setCard(2, 1, 1, 3);
+    Poker5.setCard(2, 2, 1, 2);
+    Poker5.setCard(2, 3, 1, 1);
+    Poker5.setCard(2, 4, 1, 0);
+    Poker5.setCard(2, 5, 9, 2);
+    $('.player-2').css('opacity', 0.5)
 
-    Card.show(card1, 13, 2);
-    Card.show(card2, 13, 3);
-    Card.show(card3, 12, 3);
-    Card.show(card4, 7, 3);
-    Card.show(card5, 9, 0);
+    Poker5.setCard(3, 1, 7, 2);
+    Poker5.setCard(3, 2, 8, 2);
+    Poker5.setCard(3, 3, 9, 3);
+    Poker5.setCard(3, 4, 10, 1);
+    Poker5.setCard(3, 5, 11, 1);
+    $('.player-4').css('opacity', 0.5)
 
-    $('.player-2 .card').css('opacity', 0.6);
-
-    var card1 = $('.player-3 .card-1');
-    var card2 = $('.player-3 .card-2');
-    var card3 = $('.player-3 .card-3');
-    var card4 = $('.player-3 .card-4');
-    var card5 = $('.player-3 .card-5');
-
-    Card.show(card1, 1, 0);
-    Card.show(card2, 11, 3);
-    Card.show(card3, 12, 1);
+    // Simulate Player 4 fold
+    $('.player-4 .card').css('opacity', 0.5);
+    */
 })
 
 
