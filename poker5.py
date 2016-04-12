@@ -49,6 +49,4 @@ def poker5(ws):
         if message:
             app.logger.info(u'Inserting message: {}'.format(message))
 
-
-if __name__ == '__main__':
-    app.run()
+ok
