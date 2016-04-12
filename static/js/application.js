@@ -13,24 +13,35 @@ Card = {
         x = 0;
         y = 0;
 
+        if ($element.hasClass('small')) {
+            url = "static/images/cards-small.jpg";
+            width = 45;
+            height = 75;
+        }
+        else {
+            url = "static/images/cards.jpg";
+            width = 75;
+            height = 125;
+        }
+
         switch (suit) {
             case 0:
-                x = -75;
-                y = -125;
+                x -= width;
+                y -= height;
                 break;
             case 1:
-                y = -125;
+                y -= height;
                 break;
             case 2:
-                x = -75;
+                x -= width;
             case 3:
                 break;
         }
 
-        x -= (rank - 1) * 150;
+        x -= (rank - 1) * 2 * width;
 
         $element.css('background-position', x + "px " + y + "px");
-        $element.css('background-image', 'url(../static/images/cards.jpg');
+        $element.css('background-image', 'url(' + url + ')');
     }
 }
 
@@ -44,6 +55,30 @@ $(document).ready(function() {
     Card.show(card1, 8, 0);
     Card.show(card2, 8, 3);
     Card.show(card3, 8, 1);
+
+    var card1 = $('.player-2 .card-1');
+    var card2 = $('.player-2 .card-2');
+    var card3 = $('.player-2 .card-3');
+    var card4 = $('.player-2 .card-4');
+    var card5 = $('.player-2 .card-5');
+
+    Card.show(card1, 13, 2);
+    Card.show(card2, 13, 3);
+    Card.show(card3, 12, 3);
+    Card.show(card4, 7, 3);
+    Card.show(card5, 9, 0);
+
+    $('.player-2 .card').css('opacity', 0.6);
+
+    var card1 = $('.player-3 .card-1');
+    var card2 = $('.player-3 .card-2');
+    var card3 = $('.player-3 .card-3');
+    var card4 = $('.player-3 .card-4');
+    var card5 = $('.player-3 .card-5');
+
+    Card.show(card1, 1, 0);
+    Card.show(card2, 11, 3);
+    Card.show(card3, 12, 1);
 })
 
 

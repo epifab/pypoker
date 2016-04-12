@@ -2,9 +2,20 @@
     background-color: #354b1c;
     width: 100%;
     padding: 50px;
+    color: #EED;
 }
 
-.card {
+.card.small {
+    width: 45px;
+    height: 75px;
+    float: left;
+    margin: 1px;
+    background-image: url(../images/card-back-small.jpg);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+
+.card.medium {
     width: 75px;
     height: 125px;
     float: left;
