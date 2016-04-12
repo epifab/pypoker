@@ -1,0 +1,15 @@
+.table {
+    background-color: #354b1c;
+    width: 100%;
+    padding: 50px;
+}
+
+.card {
+    width: 75px;
+    height: 125px;
+    float: left;
+    margin: 1px;
+    background-image: url(../images/card-back.jpg);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
