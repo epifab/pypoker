@@ -1,5 +1,6 @@
 from poker import *
 import logging
+import uuid
 import socket
 import sys
 import time
@@ -100,8 +101,8 @@ class PlayerConsole(Player):
 
 
 class PlayerClientConsole(PlayerConsole):
-    def __init__(self, server, name, money):
-        PlayerConsole.__init__(self, id=None, name=name, money=money)
+    def __init__(self, server, id, name, money):
+        PlayerConsole.__init__(self, id=id, name=name, money=money)
         self._server = server
         self._connect()
 
@@ -116,11 +117,6 @@ class PlayerClientConsole(PlayerConsole):
         message = self.recv_message()
 
         MessageFormatError.validate_msg_id(message, "connect")
-
-        try:
-            self._id = message['player']['id']
-        except IndexError:
-            raise MessageFormatError(attribute="player", desc="Missing required information")
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -145,7 +141,7 @@ class PlayerClientConsole(PlayerConsole):
         try:
             self.send_message(message)
             return True
-        except CommunicationError as e:
+        except ChannelError as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return False
@@ -288,6 +284,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG if 'DEBUG' in os.environ else logging.INFO)
     logger = logging.getLogger()
 
+    player_id = str(uuid.uuid4())
     player_name = sys.argv[1]
 
     host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]
@@ -298,7 +295,12 @@ if __name__ == "__main__":
     sock.connect(server_address)
     logger.info("Connection established with the Poker5 server at {}".format(server_address))
 
-    player = PlayerClientConsole(JsonSocket(socket=sock, address=server_address), name=player_name, money=1000)
+    player = PlayerClientConsole(
+                SocketChannel(socket=sock, address=server_address),
+                id=player_id,
+                name=player_name,
+                money=1000)
+
     game = GameClientConsole(player)
 
     logger.info("Player {} '{}' ${:,.2f} CONNECTED".format(player.get_id(), player.get_name(), player.get_money()))

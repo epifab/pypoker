@@ -1,4 +1,4 @@
-class CommunicationError(Exception):
+class ChannelError(Exception):
     pass
 
 
@@ -12,7 +12,7 @@ class MessageFormatError(Exception):
         if attribute:
             message += " Invalid message attribute {}.".format(attribute)
             if expected is not None and found is not None:
-                message += " '{}' expected, found '{}'.".format(attribute, expected, found)
+                message += " '{}' expected, found '{}'.".format(expected, found)
         if desc:
             message += " " + desc
         Exception.__init__(self, message)
@@ -30,9 +30,12 @@ class MessageFormatError(Exception):
             raise MessageFormatError(attribute="msg_id", expected=expected, found=message["msg_id"])
 
 
-class MessageHandler:
+class Channel:
     def recv_message(self, timeout=None):
         raise NotImplementedError
 
     def send_message(self, message):
+        raise NotImplementedError
+
+    def close(self):
         raise NotImplementedError

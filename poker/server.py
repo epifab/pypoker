@@ -1,20 +1,20 @@
 from . import Game, GameError, ScoreDetector, Deck, \
-    PlayerServer, JsonSocket, \
-    MessageFormatError, CommunicationError, MessageTimeout
+    PlayerServer, Channel, SocketChannel, \
+    MessageFormatError, ChannelError, MessageTimeout
 import socket
 import logging
 import threading
 
 
 class Server:
-    def __init__(self, address, logger=None):
-        self._address = address
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.bind(address)
+    def __init__(self, logger=None):
         self._players = []
         self._room_size = 2
         self._lock = threading.Lock()
         self._logger = logger if logger else logging
+
+    def channels(self):
+        raise NotImplementedError
 
     def join_lobby(self, player):
         self._lock.acquire()
@@ -67,23 +67,62 @@ class Server:
                 player.disconnect()
             raise
 
-    def start(self):
-        self._socket.listen(1)
-        self._logger.info("Poker server listening at {}.".format(self._address))
+    def connect_player(self, channel):
+        message = channel.recv_message()
 
-        while True:
-            client_socket, client_address = self._socket.accept()
-            self._logger.info   ("New connection from {}".format(client_address))
-            player = PlayerServer(client=JsonSocket(socket=client_socket, address=client_address))
+        MessageFormatError.validate_msg_id(message, "connect")
+
+        try:
+            id = str(message["player"]["id"])
+        except IndexError:
+            raise MessageFormatError(attribute="player.id", desc="Missing attribute")
+        except ValueError:
+            raise MessageFormatError(attribute="player.id", desc="Invalid player id")
+
+        try:
+            name = str(message["player"]["name"])
+        except IndexError:
+            raise MessageFormatError(attribute="player.name", desc="Missing attribute")
+        except ValueError:
+            raise MessageFormatError(attribute="player.name", desc="Invalid player name")
+
+        try:
+            money = float(message["player"]["money"])
+        except IndexError:
+            raise MessageFormatError(attribute="player.money", desc="Missing attribute")
+        except ValueError:
+            raise MessageFormatError(attribute="player.money",
+                                     desc="'{}' is not a number".format(message["player"]["money"]))
+
+        return PlayerServer(channel=channel, id=id, name=name, money=money)
+
+
+    def start(self):
+        for channel in self.channels():
             try:
-                # Connecting the remote player
-                player.connect()
-            except (CommunicationError, MessageFormatError, MessageTimeout) as e:
-                # Communication breakdown
-                self._logger.error("Cannot connect the player: {}".format(e.args[0]))
-                # Also closes the socket
-                player.disconnect()
-            else:
+                player = self.connect_player(channel)
                 # Player successfully connected: joining the lobby
                 self._logger.info("Player {} '{}' CONNECTED".format(player.get_id(), player.get_name()))
                 self.join_lobby(player)
+            except:
+                # Close bad connections and ignore the connection
+                channel.close()
+                self._logger.exception("Bad connection")
+                pass
+
+
+class ServerSocket(Server):
+    def __init__(self, address, logger=None):
+        self._address = address
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.bind(address)
+        self._socket.listen(1)
+        Server.__init__(self, logger)
+
+    def channels(self):
+        while True:
+            client_socket, client_address = self._socket.accept()
+            self._logger.info("New socket connection from {}".format(client_address))
+            channel = SocketChannel(socket=client_socket, address=client_address)
+            channel.send_message({'msg_id': 'connect'})
+            yield channel

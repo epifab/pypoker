@@ -1,4 +1,4 @@
-from . import Player, MessageFormatError, CommunicationError, MessageTimeout
+from . import Player, MessageFormatError, ChannelError, MessageTimeout
 import logging
 import time
 
@@ -6,51 +6,22 @@ import time
 class PlayerServer(Player):
     USER_ACTION_TIMEOUT = 30
 
-    def __init__(self, client, logger=None):
-        Player.__init__(self, id=id(self), name=None, money=None)
+    def __init__(self, channel, id, name, money, logger=None):
+        Player.__init__(self, id=id, name=name, money=money)
         self._error = None
-        self._client = client
+        self._channel = channel
         self._logger = logger if logger else logging
 
     def get_error(self):
         return self._error
 
-    def connect(self):
-        """Connects the player"""
-        message = self.recv_message()
-
-        MessageFormatError.validate_msg_id(message, "connect")
-
-        try:
-            self._name = str(message["player"]["name"])
-        except IndexError:
-            raise MessageFormatError(attribute="player.name", desc="Missing attribute")
-        except ValueError:
-            raise MessageFormatError(attribute="player.name", desc="Invalid player name")
-
-        try:
-            self._money = float(message["player"]["money"])
-        except IndexError:
-            raise MessageFormatError(attribute="player.money", desc="Missing attribute")
-        except ValueError:
-            raise MessageFormatError(attribute="player.money",
-                                     desc="'{}' is not a number".format(message["player"]["money"]))
-
-        self.send_message({
-            "msg_id": "connect",
-            "player": {
-                "id": self._id,
-                "name": self._name,
-                "money": self._money}})
-
     def disconnect(self):
         """Disconnect the client"""
         try:
             self.try_send_message({"msg_id": "disconnect"})
-            self._client.close()
-            return True
+            self._channel.close()
         except:
-            return False
+            pass
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -64,7 +35,7 @@ class PlayerServer(Player):
                     "category": self.get_score().get_category(),
                     "cards": [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
 
-        except CommunicationError as e:
+        except ChannelError as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
 
@@ -98,7 +69,7 @@ class PlayerServer(Player):
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
-        except (CommunicationError, MessageFormatError, MessageTimeout) as e:
+        except (ChannelError, MessageFormatError, MessageTimeout) as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return self._cards, []
@@ -146,7 +117,7 @@ class PlayerServer(Player):
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except (CommunicationError, MessageFormatError, MessageTimeout) as e:
+        except (ChannelError, MessageFormatError, MessageTimeout) as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return -1
@@ -155,13 +126,13 @@ class PlayerServer(Player):
         try:
             self.send_message(message)
             return True
-        except CommunicationError as e:
+        except ChannelError as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return False
 
     def send_message(self, message):
-        return self._client.send_message(message)
+        return self._channel.send_message(message)
 
     def recv_message(self, timeout=5.0):
-        return self._client.recv_message(timeout)
+        return self._channel.recv_message(timeout)

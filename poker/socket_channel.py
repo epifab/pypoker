@@ -1,4 +1,4 @@
-from . import MessageFormatError, CommunicationError, MessageTimeout, MessageHandler
+from . import MessageFormatError, ChannelError, MessageTimeout, Channel
 import errno
 import json
 import logging
@@ -6,15 +6,12 @@ import socket
 import time
 
 
-class JsonSocket(MessageHandler):
+class SocketChannel(Channel):
     def __init__(self, socket, address, logger=None):
         self._socket = socket
         self._address = address
         self._socket.setblocking(False)
         self._logger = logger if logger else logging
-
-    def get_address(self):
-        return self._address
 
     def close(self):
         self._socket.close()
@@ -35,7 +32,7 @@ class JsonSocket(MessageHandler):
             # Sends the message
             self._socket.sendall(msg_encoded)
         except:
-            raise CommunicationError("Unable to send data to the remote host")
+            raise ChannelError("Unable to send data to the remote host")
 
     def _recv(self, size, time_timeout):
         message = b''
@@ -51,7 +48,7 @@ class JsonSocket(MessageHandler):
                     time.sleep(0.2)
                     continue
                 else:
-                    raise CommunicationError("Unable to receive data from the remote host")
+                    raise ChannelError("Unable to receive data from the remote host")
         raise MessageTimeout("Timed out")
 
     def _recv_message_len(self, time_timeout):

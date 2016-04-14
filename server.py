@@ -1,4 +1,4 @@
-from poker import Server
+from poker import ServerSocket
 import logging
 import os
 
@@ -11,5 +11,5 @@ if __name__ == '__main__':
     port = 9000 if "POKER5_PORT" not in os.environ else os.environ["POKER5_PORT"]
     server_address = (host, port)
 
-    server = Server(server_address, logger=logger)
+    server = ServerSocket(server_address, logger=logger)
     server.start()
