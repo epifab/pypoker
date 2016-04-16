@@ -35,6 +35,10 @@
     background-image: url(../images/card-back.jpg);
 }
 
+.card.selected {
+    margin-top: -15px;
+}
+
 .player-control .card {
     cursor: pointer;
 }

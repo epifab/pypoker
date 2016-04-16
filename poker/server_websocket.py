@@ -12,6 +12,13 @@ class ServerWebSocket(Server):
 
     def register(self, player):
         self._new_players.append(player)
+        player.try_send_message({
+            'msg_id': 'connect',
+            'player': {
+                'id': player.get_id(),
+                'name': player.get_name(),
+                'money': player.get_money()
+            }})
 
     def new_players(self):
         while True:

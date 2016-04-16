@@ -15,100 +15,22 @@
     </div>
 
     <div class="poker-table">
-        <div class="col-md-4" id="players">
-            <div class="player-1 player">
-                <div class="cards row">
-                    <div class="card small card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-5 pull-left" data-rank="" data-suit=""></div>
-                </div>
-                <div class="player-info">
-                    <span class="player-name">Player 1</span>
-                    -
-                    <span class="player-money">$0.00</span>
-                </div>
-            </div>
-
-            <div class="player-2 player">
-                <div class="cards row">
-                    <div class="card small card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-5 pull-left" data-rank="" data-suit=""></div>
-                </div>
-                <div class="player-info">
-                    <span class="player-name">Player 2</span>
-                    -
-                    <span class="player-money">$0.00</span>
-                </div>
-            </div>
-
-            <div class="player-3 player">
-                <div class="cards row">
-                    <div class="card small card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-5 pull-left" data-rank="" data-suit=""></div>
-                </div>
-                <div class="player-info">
-                    <span class="player-name">Player 3</span>
-                    -
-                    <span class="player-money">$0.00</span>
-                </div>
-            </div>
-
-            <div class="player-4 player">
-                <div class="cards row">
-                    <div class="card small card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-5 pull-left" data-rank="" data-suit=""></div>
-                </div>
-                <div class="player-info">
-                    <span class="player-name">Player 4</span>
-                    -
-                    <span class="player-money">$0.00</span>
-                </div>
-            </div>
-
-            <div class="player-5 player">
-                <div class="cards row">
-                    <div class="card small card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card small card-5 pull-left" data-rank="" data-suit=""></div>
-                </div>
-                <div class="player-info">
-                    <span class="player-name">Player 5</span>
-                    -
-                    <span class="player-money">$0.00</span>
-                </div>
-            </div>
-        </div>
+        <div class="col-md-4" id="players"></div>
 
         <div class="col-md-8">
 
-            <div id="game-log" class="row">
-                <p>Attempting to connect to poker5...</p>
-            </div>
+            <div id="game-log" class="row"></div>
 
-
-            <div id="player-control" class="player-3">
+            <div id="player-control" class="player-{{ id }}">
                 <div class="cards row">
-                    <div class="card medium card-1 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card medium card-2 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card medium card-3 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card medium card-4 pull-left" data-rank="" data-suit=""></div>
-                    <div class="card medium card-5 pull-left" data-rank="" data-suit=""></div>
+                    <div class="card medium card-1 pull-left"></div>
+                    <div class="card medium card-2 pull-left"></div>
+                    <div class="card medium card-3 pull-left"></div>
+                    <div class="card medium card-4 pull-left"></div>
+                    <div class="card medium card-5 pull-left"></div>
                 </div>
                 <div class="player-info" data-name="{{ name }}" data-money="{{ money }}">
-                    <span class="player-name">Player 4 (you)</span>
+                    <span class="player-name">{{ name }} (you)</span>
                     -
                     <span class="player-money">{{ "${:,.2f}".format(money) }}</span>
                 </div>

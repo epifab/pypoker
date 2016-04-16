@@ -5,6 +5,10 @@ Poker5 = {
 
     cardsChangeMode: true,
 
+    playerId: null,
+
+    players: [],
+
     init: function() {
         if (window.location.protocol == "https:") {
             var ws_scheme = "wss://";
@@ -17,7 +21,6 @@ Poker5 = {
 
         this.socket.onopen = function() {
             $("#game-log").append($("<p></p>").text('Connected :)'));
-            Poker5.socket.send(JSON.stringify({'msg_id': 'connect'}))
         };
 
         this.socket.onclose = function() {
@@ -26,18 +29,57 @@ Poker5 = {
 
         this.socket.onmessage = function(message) {
             var data = JSON.parse(message.data);
-            $("#game-log").append($("<p></p>").text(message.data));
+
+            console.log(data);
+
+            switch (data.msg_id) {
+                case 'connect':
+                    Poker5.playerId = data.player.id;
+                    break;
+                case 'disconnect':
+                    break;
+                case 'set-cards':
+                    for (cardKey in data.cards) {
+                        Poker5.setCard(Poker5.playerId, cardKey + 1, data.cards[cardKey][0], data.cards[cardKey[1]]);
+                    }
+                    break;
+                case 'game-status':
+                    break;
+                case 'game-update':
+                    if (data['phase'] == 'cards-assignment') {
+                        Poker5.players = [];
+
+                        $('#players').empty();
+
+                        for (key in data.players) {
+                            player = data.players[key];
+
+                            Poker5.players.push(player);
+
+                            $('#players').append(
+                                '<div class="player player-' + player.id + '">'
+                                + '<div class="cards row">'
+                                + '<div class="card small card-1 pull-left"></div>'
+                                + '<div class="card small card-2 pull-left"></div>'
+                                + '<div class="card small card-3 pull-left"></div>'
+                                + '<div class="card small card-4 pull-left"></div>'
+                                + '<div class="card small card-5 pull-left"></div>'
+                                + '</div>'
+                                + '<div class="player-info">'
+                                + '<span class="player-name">' + player.name + '</span>'
+                                + ' - '
+                                + '<span class="player-money">$' + player.money + '.00</span>'
+                                + '</div>'
+                                + '</div>');
+                        }
+                    }
+                    break;
+            }
         };
 
 
         $('#player-control .card').click(function() {
             if (Poker5.cardsChangeMode) {
-                if ($(this).hasClass('selected')) {
-                    $(this).css('margin-top', 0);
-                }
-                else {
-                    $(this).css('margin-top', -15);
-                }
                 $(this).toggleClass('selected');
             }
         })
