@@ -48,5 +48,3 @@ def poker5(ws):
 
         if message:
             app.logger.info(u'Inserting message: {}'.format(message))
-
-ok
