@@ -13,6 +13,12 @@ class Server:
     def new_players(self):
         raise NotImplementedError
 
+    def get_player(self, id):
+        for player in self._players:
+            if player.get_id() == id:
+                return player
+        return None
+
     def join_lobby(self, player):
         self._lock.acquire()
         try:

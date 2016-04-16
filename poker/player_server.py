@@ -23,6 +23,9 @@ class PlayerServer(Player):
         except:
             pass
 
+    def update_channel(self, channel):
+        self._channel = channel
+
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
         try:

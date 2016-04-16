@@ -3,7 +3,6 @@ import logging
 import json
 import time
 import gevent
-from flask import session
 
 
 class ServerWebSocket(Server):
@@ -11,22 +10,14 @@ class ServerWebSocket(Server):
         Server.__init__(self, logger)
         self._new_players = []
 
-    def register(self, ws, id, name, money):
-        self._new_players.append(
-                PlayerServer(
-                        channel=WebSocketChannel(ws),
-                        id=id,
-                        name=name,
-                        money=money))
+    def register(self, player):
+        self._new_players.append(player)
 
     def new_players(self):
         while True:
             if self._new_players:
                 yield self._new_players.pop()
             gevent.sleep(0.1)
-
-    def connect_player(self, channel):
-        return
 
 
 class WebSocketChannel(Channel):
