@@ -40,12 +40,14 @@ class WebSocketChannel(Channel):
             raise ChannelError("Unable to send data to the remote host")
 
     def recv_message(self, timeout=None):
+        time_timeout = None if not timeout else time.time() + timeout
+
         # @todo Implement a proper timeout
         try:
             message = self._ws.receive()
         except:
             raise ChannelError("Unable to receive data from the remote host")
         else:
-            if timeout and time.time() > timeout:
+            if time_timeout and time.time() < time_timeout:
                 raise MessageTimeout("Timed out")
             return message
