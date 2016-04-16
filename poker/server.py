@@ -30,7 +30,8 @@ class Server:
                 game = Game(players=self._players,
                             deck=Deck(lowest_rank),
                             score_detector=ScoreDetector(lowest_rank),
-                            stake=10.0)
+                            stake=10.0,
+                            logger=self._logger)
                 thread = threading.Thread(target=Server.play_game, args=(self, game, self._players))
                 thread.start()
                 self._players = []
