@@ -7,13 +7,28 @@ Poker5 = {
 
     init: function() {
         if (window.location.protocol == "https:") {
-          var ws_scheme = "wss://";
+            var ws_scheme = "wss://";
         }
         else {
-          var ws_scheme = "ws://"
+            var ws_scheme = "ws://"
         }
 
-        //this.socket = new ReconnectingWebSocket(ws_scheme + location.host + "/poker5");
+        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
+
+        this.socket.onopen = function() {
+            $("#game-log").append($("<p></p>").text('Connected :)'));
+            Poker5.socket.send(JSON.stringify({'msg_id': 'connect'}))
+        };
+
+        this.socket.onclose = function() {
+            $("#game-log").append($("<p></p>").text('Connection lost :('));
+        };
+
+        this.socket.onmessage = function(message) {
+            var data = JSON.parse(message.data);
+            $("#game-log").append($("<p></p>").text(message.data));
+        };
+
 
         $('#player-control .card').click(function() {
             if (Poker5.cardsChangeMode) {

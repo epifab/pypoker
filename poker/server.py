@@ -1,7 +1,4 @@
-from . import Game, GameError, ScoreDetector, Deck, \
-    PlayerServer, Channel, SocketChannel, \
-    MessageFormatError, ChannelError, MessageTimeout
-import socket
+from . import Game, GameError, ScoreDetector, Deck, PlayerServer, MessageFormatError
 import logging
 import threading
 
@@ -21,6 +18,7 @@ class Server:
         try:
             self._players.append(player)
             self._logger.info("Player {} has joined the lobby.".format(player.get_id()))
+
             if len(self._players) >= self._room_size:
                 lowest_rank = 11 - len(self._players)
                 game = Game(players=self._players,
@@ -94,8 +92,17 @@ class Server:
             raise MessageFormatError(attribute="player.money",
                                      desc="'{}' is not a number".format(message["player"]["money"]))
 
-        return PlayerServer(channel=channel, id=id, name=name, money=money)
+        player = PlayerServer(channel=channel, id=id, name=name, money=money)
 
+        player.try_send_message({
+            'msg_id': 'connect',
+            'player': {
+                'id': player.get_id(),
+                'name': player.get_name(),
+                'money': player.get_money()
+            }})
+
+        return player
 
     def start(self):
         for channel in self.channels():
@@ -109,20 +116,3 @@ class Server:
                 channel.close()
                 self._logger.exception("Bad connection")
                 pass
-
-
-class ServerSocket(Server):
-    def __init__(self, address, logger=None):
-        self._address = address
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.bind(address)
-        self._socket.listen(1)
-        Server.__init__(self, logger)
-
-    def channels(self):
-        while True:
-            client_socket, client_address = self._socket.accept()
-            self._logger.info("New socket connection from {}".format(client_address))
-            channel = SocketChannel(socket=client_socket, address=client_address)
-            channel.send_message({'msg_id': 'connect'})
-            yield channel
