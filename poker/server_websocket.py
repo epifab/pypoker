@@ -1,4 +1,4 @@
-from poker import Channel, ChannelError, MessageTimeout, Server, PlayerServer
+from poker import Channel, ChannelError, MessageTimeout, Server
 import logging
 import json
 import time
@@ -55,6 +55,6 @@ class WebSocketChannel(Channel):
         except:
             raise ChannelError("Unable to receive data from the remote host")
         else:
-            if time_timeout and time.time() < time_timeout:
+            if not message or (time_timeout and time.time() > time_timeout):
                 raise MessageTimeout("Timed out")
             return message

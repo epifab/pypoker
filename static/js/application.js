@@ -40,8 +40,12 @@ Poker5 = {
                     break;
                 case 'set-cards':
                     for (cardKey in data.cards) {
-                        Poker5.setCard(Poker5.playerId, cardKey + 1, data.cards[cardKey][0], data.cards[cardKey[1]]);
+                        Poker5.setCard(Poker5.playerId, cardKey + 1, data.cards[cardKey][0], data.cards[cardKey][1]);
                     }
+                    console.log('Setting cards for player ' + Poker5.playerId);
+                    break;
+                case 'bet':
+                    Poker5.setBetMode(true);
                     break;
                 case 'game-status':
                     break;
@@ -68,7 +72,7 @@ Poker5 = {
                                 + '<div class="player-info">'
                                 + '<span class="player-name">' + player.name + '</span>'
                                 + ' - '
-                                + '<span class="player-money">$' + player.money + '.00</span>'
+                                + '<span class="player-money">$' + player.money + '</span>'
                                 + '</div>'
                                 + '</div>');
                         }

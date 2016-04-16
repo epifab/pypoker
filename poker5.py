@@ -43,7 +43,10 @@ def hello():
         session['player-id'] = str(uuid.uuid4())
         session['player-name'] = random.choice(names) + " " + random.choice(surnames)
         session['player-money'] = 1000.00
-    return render_template('index.html', name=session['player-name'], money=session['player-money'])
+    return render_template('index.html',
+                           id=session['player-id'],
+                           name=session['player-name'],
+                           money=session['player-money'])
 
 
 @sockets.route('/poker5')
@@ -61,3 +64,7 @@ def poker5(ws):
     while not ws.closed:
         # Sleep to prevent *constant* context-switches.
         gevent.sleep(0.1)
+
+
+#if __name__ == '__main__':
+#    app.run()
