@@ -4,7 +4,7 @@ from flask import Flask, render_template, session
 from flask_sockets import Sockets
 import random
 import uuid
-from poker import ServerWebSocket
+from poker import ServerWebSocket, WebSocketChannel
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '!!_-pyp0k3r-_!!'
@@ -48,7 +48,10 @@ def hello():
 
 @sockets.route('/poker5')
 def poker5(ws):
-    server.register(ws)
+    server.register(ws=ws,
+                    id=session['player-id'],
+                    name=session['player-name'],
+                    money=session['player-money'])
     while not ws.closed:
         # Sleep to prevent *constant* context-switches.
         gevent.sleep(0.1)

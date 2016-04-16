@@ -9,23 +9,24 @@ from flask import session
 class ServerWebSocket(Server):
     def __init__(self, logger=None):
         Server.__init__(self, logger)
-        self._clients = []
+        self._new_players = []
 
-    def register(self, ws):
-        self._clients.append(ws)
+    def register(self, ws, id, name, money):
+        self._new_players.append(
+                PlayerServer(
+                        channel=WebSocketChannel(ws),
+                        id=id,
+                        name=name,
+                        money=money))
 
-    def channels(self):
+    def new_players(self):
         while True:
-            if self._clients:
-                ws = self._clients.pop()
-                yield WebSocketChannel(ws, self._logger)
+            if self._new_players:
+                yield self._new_players.pop()
             gevent.sleep(0.1)
 
     def connect_player(self, channel):
-        return PlayerServer(channel=channel,
-                            id=session['player-id'],
-                            name=session['player-name'],
-                            money=session['player-money'])
+        return
 
 
 class WebSocketChannel(Channel):

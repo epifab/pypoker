@@ -8,5 +8,5 @@ from .player_server import PlayerServer
 from .score import Score
 from .score_detector import ScoreDetector
 from .server import Server
-from .server_websocket import ServerWebSocket
+from .server_websocket import ServerWebSocket, WebSocketChannel
 from .server_socket import ServerSocket
