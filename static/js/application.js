@@ -37,6 +37,9 @@ Poker5 = {
                 case 'disconnect':
                     Poker5.onDisconnect(data);
                     break;
+                case 'join-lobby':
+                    Poker5.onJoinLobby(data);
+                    break;
                 case 'set-cards':
                     Poker5.onSetCards(data);
                     break;
@@ -124,9 +127,13 @@ Poker5 = {
 
     },
 
+    onJoinLobby: function(message) {
+        $('#game-log').append($('<p></p>').text(message.player.name + " has joined the lobby (" + message.players.length + " players waiting to play)"));
+    },
+
     onSetCards: function(message) {
         for (cardKey in message.cards) {
-            Poker5.setCard(Poker5.playerId, cardKey + 1, message.cards[cardKey][0], message.cards[cardKey][1]);
+            Poker5.setCard(Poker5.playerId, parseInt(cardKey) + 1, message.cards[cardKey][0], message.cards[cardKey][1]);
         }
     },
 

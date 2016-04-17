@@ -25,6 +25,13 @@ class Server:
             self._players.append(player)
             self._logger.info("Player {} has joined the lobby.".format(player.get_id()))
 
+            for player in self._players:
+                player.try_send_message({
+                    'msg_id': 'join-lobby',
+                    'players': [p.dto() for p in self._players],
+                    'player': player.dto()
+                })
+
             if len(self._players) >= self._room_size:
                 lowest_rank = 11 - len(self._players)
                 game = Game(players=self._players,
