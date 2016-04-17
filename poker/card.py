@@ -58,3 +58,6 @@ class Card:
             lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
             lines[6] += "+-------+"
         return "\n".join(lines)
+
+    def dto(self):
+        return self.get_rank(), self.get_suit()

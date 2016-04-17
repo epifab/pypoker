@@ -17,6 +17,10 @@
     margin-bottom: 20px;
 }
 
+#players .player.selected {
+    background-color: #021;
+}
+
 .card {
     float: left;
     margin: 1px;

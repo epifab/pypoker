@@ -105,3 +105,9 @@ class Score:
 
     def __str__(self):
         return Card.format_cards(self._cards) + "\n" + Score.CATEGORIES[self.get_category()]
+
+    def dto(self):
+        return {
+            "category": self.get_category(),
+            "cards": [card.dto() for card in self.get_cards()]
+        }

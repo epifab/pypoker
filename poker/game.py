@@ -1,5 +1,7 @@
 from . import Card
 import logging
+import uuid
+import time
 
 
 class GameError(Exception):
@@ -11,16 +13,18 @@ class HandFailException(Exception):
 
 
 class Game:
+    WAIT_AFTER_HAND = 10
+
     # Phases
     PHASE_NEW_GAME = "new-game"
     PHASE_CARDS_ASSIGNMENT = "cards-assignment"
     PHASE_OPENING_BET = "opening-bet"
     PHASE_CARDS_CHANGE = "cards-change"
     PHASE_FINAL_BET = "final-bet"
-    PHASE_SHOW_CARDS = "show-cards"
     PHASE_WINNER_DESIGNATION = "winner-designation"
 
     def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
+        self._id = str(uuid.uuid4())
         self._players = players
         self._deck = deck
         self._score_detector = score_detector
@@ -30,6 +34,7 @@ class Game:
         self._dealer_key = 0
         self._current_player = 0
         self._folder_keys = []
+        self._public_cards_keys = []
         self._pot = 0.0
         self._bets = [0.0] * len(players)
         # Pair of J, Q, K, A
@@ -43,6 +48,7 @@ class Game:
                 # Initialization
                 self._deck.initialize()
                 self._folder_keys = [key for key, player in enumerate(self._players) if player.get_error()]
+                self._public_cards_keys = []
 
                 if len(self._players) - len(self._folder_keys) < 2:
                     raise GameError("Not enough players to play another hand")
@@ -63,6 +69,7 @@ class Game:
                 # 2 or more players still alive
                 if len(self._players) - len(self._folder_keys) > 1:
                     # Show cards (winner detection)
+                    self._public_cards_keys.append(player_key)
                     player_key = self._show_cards(player_key)
 
                 # Broadcast winner key
@@ -78,6 +85,8 @@ class Game:
                 self._pot = 0.0
                 self._bets = [0.0] * len(self._players)
                 self._dealer_key = (self._dealer_key + 1) % len(self._players)
+
+                time.sleep(Game.WAIT_AFTER_HAND)
                 break
 
             except HandFailException:
@@ -154,43 +163,39 @@ class Game:
         return self._bet_round(best_player_key)
 
     def _show_cards(self, best_player_key):
-        self._phase = Game.PHASE_SHOW_CARDS
         # Works out the winner
         winner = None
         winner_key = -1
         for player_key, player in self._players_round(best_player_key):
-            self._current_player = player_key
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
                 winner_key = player_key
                 self._logger.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
-                self.broadcast({
-                    "score": {
-                        "category": player.get_score().get_category(),
-                        "cards": [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
-                self._logger.info("Player {} fold.".format(player.get_id()))
-                self.broadcast({"score": None})
+                self._logger.info("Player {} lost.".format(player.get_id()))
 
         return winner_key
 
     def dto(self):
-        return {
-            "players": [
-                {
-                    "id": player.get_id(),
-                    "name": player.get_name(),
-                    "money": player.get_money(),
-                    "alive": player_key not in self._folder_keys,
-                    "bet": self._bets[player_key],
-                    "dealer": player_key == self._dealer_key
-                }
-                for player_key, player in enumerate(self._players)
-            ],
+        game_dto = {
+            "id": self._id,
             "phase": self._phase,
             "pot": self._pot,
-            "player": self._current_player
+            "dealer": self._dealer_key,
+            "player": self._current_player,
+            "players": [],
         }
+
+        for player_key, player in enumerate(self._players):
+            with_score = player_key in self._public_cards_keys
+            player_dto = player.dto(with_score=with_score)
+            player_dto.update({
+                "alive": player_key not in self._folder_keys,
+                "bet": self._bets[player_key],
+            })
+            game_dto["players"].append(player_dto)
+
+        return game_dto
 
     def broadcast(self, message={}):
         """Sends a game-update message to every player"""

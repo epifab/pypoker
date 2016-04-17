@@ -5,6 +5,10 @@ Poker5 = {
 
     cardsChangeMode: true,
 
+    log: function(text) {
+        $('#game-log').append($('<p></p>').text(text))
+    }.
+
     init: function() {
         if (window.location.protocol == "https:") {
             var ws_scheme = "wss://";
@@ -16,11 +20,11 @@ Poker5 = {
         this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
-            $("#game-log").append($("<p></p>").text('Connected :)'));
+            this.log('Connected :)');
         };
 
         this.socket.onclose = function() {
-            $("#game-log").append($("<p></p>").text('Connection lost :('));
+            this.log('Disconnected :(');
         };
 
         this.socket.onmessage = function(message) {
@@ -92,12 +96,10 @@ Poker5 = {
     },
 
     onGameUpdate: function(message) {
-        if ($('#players .player').length == 0 || message.phase == 'new-game') {
+        if (message.phase == 'new-game') {
             this.initGame(message);
         }
-        else {
-            this.updateGame(message);
-        }
+        this.updateGame(message);
 
         switch (message.phase) {
             case 'new-game':
@@ -105,12 +107,34 @@ Poker5 = {
             case 'cards-assignment':
                 break;
             case 'opening-bet':
+            case 'final-bet':
+                player = message.players[message.player]
+
+                switch (message.bet_type) {
+                    case 'FOLD':
+                        this.log(player.name + "; FOLD")
+                        break;
+                    case 'PASS':
+                        this.log(player.name + ": PASS")
+                        break;
+                    case 'CHECK':
+                        this.log(player.name + ": CHECK")
+                        break;
+                    case 'CALL':
+                    case 'RAISE':
+                        this.log(player.name + ": $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")")
+                        break;
+                }
+                if (message.bet_type == 'RAISE') {
+                    $('#game-log').append('<p></p>').text(message.players[message.player].name + " RAISE: " + message.bet);
+                }
+                else {
+                    $('#game-log').append('<p></p>').text(message.players[message.player],name + " " + message.bet_type);
+                }
                 break;
             case 'cards-change':
                 break;
             case 'final-bet':
-                break;
-            case 'show-cards':
                 break;
             case 'winner-designation':
                 break;
@@ -173,7 +197,31 @@ Poker5 = {
 
     updateGame: function(message) {
         for (key in message.players) {
-            $('.player.player-' + message.players[key].id + ' .player-money').text(message.players[key].money);
+            player = message.player[key]
+            if (player.score) {
+                for (cardKey in player.score.cards) {
+                    Poker5.setCard(
+                        player.id,
+                        parseInt(cardKey) + 1,
+                        player.score.cards[cardKey][0],
+                        player.score.cards[cardKey][1]);
+                }
+            }
+            $('.player.player-' + player.id + ' .player-money').text(player.money);
+
+            if (player.alive) {
+                $('.player-' + player.id).css('opacity', 100);
+            }
+            else {
+                $('.player-' + player.id).css('opacity', 50);
+            }
+
+            if (key == message.player) {
+                $('.player-' + player.id).addClass('selected');
+            }
+            else {
+                $('.player-' + player.id).removeClass('selected');
+            }
         }
     },
 

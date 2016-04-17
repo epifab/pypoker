@@ -12,11 +12,12 @@ class PlayerServer(Player):
         self._channel = channel
         self._logger = logger if logger else logging
 
-    def dto(self):
+    def dto(self, with_score=False):
         return {
             "id": self.get_id(),
             "name": self.get_name(),
-            "money": self.get_money()
+            "money": self.get_money(),
+            "score": self.get_score().dto() if with_score else None
         }
 
     def get_error(self):
@@ -40,10 +41,8 @@ class PlayerServer(Player):
 
             self.send_message({
                 "msg_id": "set-cards",
-                "cards": [(c.get_rank(), c.get_suit()) for c in self._cards],
-                "score": {
-                    "category": self.get_score().get_category(),
-                    "cards": [(c.get_rank(), c.get_suit()) for c in self.get_score().get_cards()]}})
+                "cards": [c.dto() for c in self._cards],
+                "score": self.get_score().dto()})
 
         except ChannelError as e:
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))

@@ -220,28 +220,43 @@ class GameClientConsole:
                 except TimeoutError:
                     print("Time is up!")
 
+    def _print_player(self, player):
+        print("Player '{}'\n Cash: ${:,.2f}\n Bets: ${:,.2f}".format(
+            player["name"],
+            player["money"],
+            player["bet"]))
+
+        score = None
+
+        if "score" in player and player["score"]:
+            category = player["score"]["category"]
+            cards = [Card(rank, suit) for (rank, suit) in player["score"]["cards"]]
+            score = Score(category=category, cards=cards)
+
+        elif player["id"] == self._player.get_id():
+            score = self._player.get_score()
+
+        if score:
+            print(Card.format_cards(score.get_cards()))
+        else:
+            print("+-------+" * 5)
+            print("| ///// |" * 5)
+            print("| ///// |" * 5)
+            print("| ///// |" * 5)
+            print("| ///// |" * 5)
+            print("| ///// |" * 5)
+            print("+-------+" * 5)
+
     def _print_game_update(self, message):
         print()
         print("~" * 45)
 
         if message["phase"] == Game.PHASE_CARDS_ASSIGNMENT:
+            print("NEW HAND")
+            print()
+            print("~" * 45)
             for player in message["players"]:
-                print("Player '{}'\n Cash: ${:,.2f}\n Bets: ${:,.2f}".format(
-                    player["name"],
-                    player["money"],
-                    player["bet"]))
-
-                if player["id"] == self._player.get_id():
-                    print(Card.format_cards(self._player.get_score().get_cards()))
-                    self._player.set_money(player["money"])
-                else:
-                    print("+-------+" * 5)
-                    print("| ///// |" * 5)
-                    print("| ///// |" * 5)
-                    print("| ///// |" * 5)
-                    print("| ///// |" * 5)
-                    print("| ///// |" * 5)
-                    print("+-------+" * 5)
+                self._print_player(player)
 
         elif message["phase"] == Game.PHASE_OPENING_BET or message["phase"] == Game.PHASE_FINAL_BET:
             player_name = message["players"][message["player"]]["name"]
@@ -254,30 +269,24 @@ class GameClientConsole:
             player_name = message["players"][message["player"]]["name"]
             print("Player '{}' changed {} cards".format(player_name, message["num_cards"]))
 
-        elif message["phase"] == Game.PHASE_SHOW_CARDS:
-            player_name = message["players"][message["player"]]["name"]
-            if not message["score"]:
-                print("Player '{}' FOLD".format(player_name))
-            else:
-                score = Score(
-                    message["score"]["category"],
-                    [Card(rank, suit) for (rank, suit) in message["score"]["cards"]])
-                print("Player '{}' score:".format(player_name))
-                print(str(score))
+        if message["phase"] == Game.PHASE_WINNER_DESIGNATION:
+            for player in message["players"]:
+                self._print_player(player)
 
-        elif message["phase"] == Game.PHASE_WINNER_DESIGNATION:
             player_name = message["players"][message["player"]]["name"]
             print()
             print("~" * 45)
             print("Player '{}' WON!!!".format(player_name))
             print("~" * 45)
             print()
-
-        print()
-        print("Pot: ${:,.2f}".format(message["pot"]))
-        print("~" * 45)
-        print()
-        print("Waiting...")
+            print("Waiting...")
+        else:
+            print()
+            print("~" * 45)
+            print("Pot: ${:,.2f}".format(message["pot"]))
+            print("~" * 45)
+            print()
+            print("Waiting...")
 
 
 if __name__ == "__main__":
