@@ -5,8 +5,6 @@ Poker5 = {
 
     cardsChangeMode: true,
 
-    playerId: null,
-
     init: function() {
         if (window.location.protocol == "https:") {
             var ws_scheme = "wss://";
@@ -133,7 +131,11 @@ Poker5 = {
 
     onSetCards: function(message) {
         for (cardKey in message.cards) {
-            Poker5.setCard(Poker5.playerId, parseInt(cardKey) + 1, message.cards[cardKey][0], message.cards[cardKey][1]);
+            Poker5.setCard(
+                $('#player-control .player-info').data('id'),
+                parseInt(cardKey) + 1,
+                message.cards[cardKey][0],
+                message.cards[cardKey][1]);
         }
     },
 
@@ -198,8 +200,6 @@ Poker5 = {
     },
 
     setCard: function(playerId, cardId, rank, suit) {
-        console.log('Setting card ' + cardId + ' to ' + rank + ' of ' + suit + ' for player ' + playerId);
-
         $('.player-' + playerId + ' .card-' + cardId).each(function() {
             $element = $(this);
 
@@ -238,7 +238,10 @@ Poker5 = {
                     throw "Invalid suit";
             }
 
-            if (rank < 1 || rank > 13) {
+            if (rank == 14) {
+                rank = 1;
+            }
+            else if (rank < 1 || rank > 13) {
                 throw "Invalid rank";
             }
 
