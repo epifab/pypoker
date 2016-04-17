@@ -7,7 +7,7 @@ Poker5 = {
 
     log: function(text) {
         $('#game-log').append($('<p></p>').text(text))
-    }.
+    },
 
     init: function() {
         if (window.location.protocol == "https:") {
@@ -20,11 +20,11 @@ Poker5 = {
         this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
-            this.log('Connected :)');
+            Poker5.log('Connected :)');
         };
 
         this.socket.onclose = function() {
-            this.log('Disconnected :(');
+            Poker5.log('Disconnected :(');
         };
 
         this.socket.onmessage = function(message) {
@@ -197,7 +197,7 @@ Poker5 = {
 
     updateGame: function(message) {
         for (key in message.players) {
-            player = message.player[key]
+            player = message.players[key]
             if (player.score) {
                 for (cardKey in player.score.cards) {
                     Poker5.setCard(
