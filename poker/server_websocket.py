@@ -1,4 +1,4 @@
-from poker import Channel, ChannelError, MessageTimeout, Server
+from poker import Channel, ChannelError, MessageFormatError, MessageTimeout, Server
 import logging
 import json
 import time
@@ -57,4 +57,10 @@ class WebSocketChannel(Channel):
         else:
             if not message or (time_timeout and time.time() > time_timeout):
                 raise MessageTimeout("Timed out")
-            return message
+            try:
+                # Deserialize and return the message
+                return json.loads(message)
+            except ValueError:
+                # Invalid json
+                raise MessageFormatError(desc="Unable to decode the JSON message")
+
