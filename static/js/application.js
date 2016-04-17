@@ -59,8 +59,14 @@ Poker5 = {
         });
 
         $('#change-cards-cmd').click(function() {
-            cards = $('#player-control .card.selected');
-            console.log(cards);
+            discards = [];
+            $('#player-control .card.selected').each(function() {
+                discards.push($(this).data('key'))
+            });
+            Poker5.socket.send(JSON.stringify({
+                'msg_id': 'change-cards',
+                'cards': discards
+            }));
             Poker5.setCardsChangeMode(false);
         });
 
@@ -185,6 +191,8 @@ Poker5 = {
     },
 
     setCard: function(playerId, cardId, rank, suit) {
+        console.log('Setting card ' + cardId + ' to ' + rank + ' of ' + suit + ' for player ' + playerId);
+
         $('.player-' + playerId + ' .card-' + cardId).each(function() {
             $element = $(this);
 
