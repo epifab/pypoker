@@ -12,6 +12,7 @@ class HandFailException(Exception):
 
 class Game:
     # Phases
+    PHASE_NEW_GAME = "new-game"
     PHASE_CARDS_ASSIGNMENT = "cards-assignment"
     PHASE_OPENING_BET = "opening-bet"
     PHASE_CARDS_CHANGE = "cards-change"
@@ -24,9 +25,10 @@ class Game:
         self._deck = deck
         self._score_detector = score_detector
         self._stake = stake
-        self._phase = None
+        self._phase = Game.PHASE_NEW_GAME
         self._failed_hands = 0
         self._dealer_key = 0
+        self._current_player = 0
         self._folder_keys = []
         self._pot = 0.0
         self._bets = [0.0] * len(players)
@@ -65,7 +67,7 @@ class Game:
 
                 # Broadcast winner key
                 self._phase = Game.PHASE_WINNER_DESIGNATION
-                self._broadcast({"player": player_key})
+                self.broadcast()
 
                 # Winner and hand finalization
                 winner = self._players[player_key]
@@ -104,7 +106,7 @@ class Game:
             score = self._score_detector.get_score(cards)
             player.set_cards(cards, score)
         # Broadcasting
-        self._broadcast()
+        self.broadcast()
 
     def _opening_bet_round(self):
         self._phase = Game.PHASE_OPENING_BET
@@ -112,12 +114,13 @@ class Game:
         min_opening_score = self._min_opening_scores[self._failed_hands % len(self._min_opening_scores)]
         # Opening bet round
         for player_key, player in self._players_round(self._dealer_key):
+            self._current_player = player_key
             max_bet = -1 if player.get_score().cmp(min_opening_score) < 0 else self._pot
             bet = player.bet(min_bet=1.0, max_bet=max_bet, opening=True)
             if bet == -1:
                 # Broadcasting
                 self._logger.info("Player {} did not open".format(player.get_id()))
-                self._broadcast({"player": player_key, "bet": -1, "bet_type": "PASS"})
+                self.broadcast({"bet": -1, "bet_type": "PASS"})
             else:
                 # Updating pots
                 player.set_money(player.get_money() - bet)
@@ -125,7 +128,7 @@ class Game:
                 self._bets[player_key] += bet
                 # Broadcasting
                 self._logger.info("Player {} opening bet: ${:,.2f}".format(player.get_id(), bet))
-                self._broadcast({"player": player_key, "bet": bet, "bet_type": "RAISE"})
+                self.broadcast({"bet": bet, "bet_type": "RAISE"})
                 # Completing the bet round
                 return self._bet_round(player_key, opening_bet=bet)
         raise HandFailException
@@ -134,7 +137,8 @@ class Game:
         self._phase = Game.PHASE_CARDS_CHANGE
         # Change cards
         for player_key, player in self._players_round(self._dealer_key):
-            _, discards = player.discard_cards()
+            self._current_player = player_key
+            _, discards = player.change_cards()
             if discards:
                 new_cards = self._deck.get_cards(len(discards))
                 self._deck.add_discards(discards)
@@ -143,7 +147,7 @@ class Game:
                 player.set_cards(cards, score)
             # Broadcasting
             self._logger.info("Player {} changed {} cards".format(player.get_id(), len(discards)))
-            self._broadcast({"player": player_key, "num_cards": len(discards)})
+            self.broadcast({"player": player_key, "num_cards": len(discards)})
 
     def _final_bet_round(self, best_player_key):
         self._phase = Game.PHASE_FINAL_BET
@@ -155,25 +159,23 @@ class Game:
         winner = None
         winner_key = -1
         for player_key, player in self._players_round(best_player_key):
+            self._current_player = player_key
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
                 winner_key = player_key
                 self._logger.info("Player {} score:\n{}".format(player.get_id(), str(player.get_score())))
-                self._broadcast({
-                    "player": player_key,
+                self.broadcast({
                     "score": {
                         "category": player.get_score().get_category(),
                         "cards": [(c.get_rank(), c.get_suit()) for c in player.get_score().get_cards()]}})
             else:
                 self._logger.info("Player {} fold.".format(player.get_id()))
-                self._broadcast({"player": player_key, "score": None})
+                self.broadcast({"score": None})
 
         return winner_key
 
-    def _broadcast(self, message={}):
-        """Sends a game-update message to every player"""
-        message.update({
-            "msg_id": "game-update",
+    def dto(self):
+        return {
             "players": [
                 {
                     "id": player.get_id(),
@@ -187,7 +189,13 @@ class Game:
             ],
             "phase": self._phase,
             "pot": self._pot,
-        })
+            "player": self._current_player
+        }
+
+    def broadcast(self, message={}):
+        """Sends a game-update message to every player"""
+        message.update(self.dto())
+        message["msg_id"] = "game-update"
         for player in self._players:
             player.try_send_message(message)
 
@@ -231,6 +239,7 @@ class Game:
                 min_partial_bet = 0.0 if best_player_key == -1 else bets[best_player_key] - bets[player_key]
 
                 # Bet
+                self._current_player = player_key
                 current_bet = player.bet(min_bet=min_partial_bet, max_bet=self._pot)
 
                 bet_type = None
@@ -259,7 +268,7 @@ class Game:
                         bet_type = "CALL"
                 # Broadcasting
                 self._logger.info("Player {}: {}".format(player.get_id(), bet_type))
-                self._broadcast({"player": player_key, "bet": current_bet, "bet_type": bet_type})
+                self.broadcast({"bet": current_bet, "bet_type": bet_type})
 
             # Next player
             player_key = (player_key + 1) % len(self._players)

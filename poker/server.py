@@ -42,8 +42,7 @@ class Server:
         try:
             self._logger.info("Starting a new game...")
 
-            for player in players:
-                player.send_message({"msg_id": "game-status", "status": 1})
+            game.broadcast()
 
             abort_game = False
 

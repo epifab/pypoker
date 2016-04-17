@@ -12,6 +12,13 @@ class PlayerServer(Player):
         self._channel = channel
         self._logger = logger if logger else logging
 
+    def dto(self):
+        return {
+            "id": self.get_id(),
+            "name": self.get_name(),
+            "money": self.get_money()
+        }
+
     def get_error(self):
         return self._error
 
@@ -42,19 +49,19 @@ class PlayerServer(Player):
             self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
 
-    def discard_cards(self):
-        """Gives players the opportunity to discard some of their cards.
+    def change_cards(self):
+        """Gives players the opportunity to change some of their cards.
         Returns a tuple: (discard card ids, discards)."""
         try:
             time_timeout = time.gmtime(time.time() + PlayerServer.USER_ACTION_TIMEOUT)
 
             self.send_message({
-                "msg_id": "discard-cards",
+                "msg_id": "change-cards",
                 "timeout": time.strftime("%Y-%m-%d %H:%M:%S+0000", time_timeout)})
 
             message = self.recv_message(PlayerServer.USER_ACTION_TIMEOUT)
 
-            MessageFormatError.validate_msg_id(message, "discard-cards")
+            MessageFormatError.validate_msg_id(message, "change-cards")
 
             if "cards" not in message:
                 raise MessageFormatError(attribute="cards", desc="Attribute is missing")

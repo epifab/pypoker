@@ -18,7 +18,7 @@ class PlayerConsole(Player):
         print("{:.0f} seconds remaining".format(round(timeout)))
         return input(question)
 
-    def discard_cards(self, timeout_epoch):
+    def change_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
         Returns a tuple: (remaining cards, discards)."""
         print(str(self))
@@ -124,11 +124,11 @@ class PlayerClientConsole(PlayerConsole):
         print(str(self))
         print(str(self._score))
 
-    def discard_cards(self, timeout_epoch):
+    def change_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
         Returns a list of discarded cards."""
-        discard_keys, discards = PlayerConsole.discard_cards(self, timeout_epoch)
-        self.send_message({'msg_id': 'discard-cards', 'cards': discard_keys})
+        discard_keys, discards = PlayerConsole.change_cards(self, timeout_epoch)
+        self.send_message({'msg_id': 'change-cards', 'cards': discard_keys})
         return discard_keys, discards
 
     def bet(self, min_bet, max_bet, opening, timeout_epoch):
@@ -164,23 +164,23 @@ class GameClientConsole:
         while True:
             message = self._player.recv_message()
 
-            if message["msg_id"] == "game-status":
-                if message["status"]:
-                    print()
-                    print("#" * 80)
-                    print()
-                    print("NEW GAME")
-                    print()
-                    print("#" * 80)
-                    print()
-                else:
-                    print()
-                    print("#" * 80)
-                    print()
-                    print("GAME OVER")
-                    print()
-                    print("#" * 80)
-                    print()
+            if message["msg_id"] == "new-game":
+                print()
+                print("#" * 80)
+                print()
+                print("NEW GAME")
+                print()
+                print("#" * 80)
+                print()
+
+            if message["msg_id"] == "game-over":
+                print()
+                print("#" * 80)
+                print()
+                print("GAME OVER")
+                print()
+                print("#" * 80)
+                print()
 
             elif message["msg_id"] == "disconnect":
                 print()
@@ -213,10 +213,10 @@ class GameClientConsole:
                         message["score"]["category"],
                         [Card(rank, suit) for rank, suit in message["score"]["cards"]]))
 
-            elif message["msg_id"] == "discard-cards":
+            elif message["msg_id"] == "change-cards":
                 try:
                     timeout_epoch = int(calendar.timegm(time.strptime(message["timeout"], "%Y-%m-%d %H:%M:%S+0000")))
-                    self._player.discard_cards(timeout_epoch)
+                    self._player.change_cards(timeout_epoch)
                 except TimeoutError:
                     print("Time is up!")
 

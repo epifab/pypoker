@@ -7,8 +7,6 @@ Poker5 = {
 
     playerId: null,
 
-    players: [],
-
     init: function() {
         if (window.location.protocol == "https:") {
             var ws_scheme = "wss://";
@@ -34,70 +32,125 @@ Poker5 = {
 
             switch (data.msg_id) {
                 case 'connect':
-                    Poker5.playerId = data.player.id;
+                    Poker5.onConnect(data);
                     break;
                 case 'disconnect':
+                    Poker5.onDisconnect(data);
                     break;
                 case 'set-cards':
-                    for (cardKey in data.cards) {
-                        Poker5.setCard(Poker5.playerId, cardKey + 1, data.cards[cardKey][0], data.cards[cardKey][1]);
-                    }
-                    console.log('Setting cards for player ' + Poker5.playerId);
+                    Poker5.onSetCards(data);
                     break;
                 case 'bet':
-                    Poker5.setBetMode(true);
-                    break;
-                case 'game-status':
+                    Poker5.onBet(data);
                     break;
                 case 'game-update':
-                    if (data['phase'] == 'cards-assignment') {
-                        Poker5.players = [];
-
-                        $('#players').empty();
-
-                        for (key in data.players) {
-                            player = data.players[key];
-
-                            Poker5.players.push(player);
-
-                            $('#players').append(
-                                '<div class="player player-' + player.id + '">'
-                                + '<div class="cards row">'
-                                + '<div class="card small card-1 pull-left"></div>'
-                                + '<div class="card small card-2 pull-left"></div>'
-                                + '<div class="card small card-3 pull-left"></div>'
-                                + '<div class="card small card-4 pull-left"></div>'
-                                + '<div class="card small card-5 pull-left"></div>'
-                                + '</div>'
-                                + '<div class="player-info">'
-                                + '<span class="player-name">' + player.name + '</span>'
-                                + ' - '
-                                + '<span class="player-money">$' + player.money + '</span>'
-                                + '</div>'
-                                + '</div>');
-                        }
-                    }
+                    Poker5.onGameUpdate(data);
                     break;
             }
         };
-
 
         $('#player-control .card').click(function() {
             if (Poker5.cardsChangeMode) {
                 $(this).toggleClass('selected');
             }
-        })
+        });
 
         $('#change-cards-cmd').click(function() {
-            if (Poker5.cardsChangeMode) {
-                cards = $('#player-control .card.selected')
-                console.log(cards)
-                Poker5.setCardsChangeMode(false)
-            }
-        })
+            cards = $('#player-control .card.selected');
+            console.log(cards);
+            Poker5.setCardsChangeMode(false);
+        });
 
-        this.setBetMode(false)
-        this.setCardsChangeMode(false)
+        $('#fold-cmd').click(function() {
+            Poker5.socket.send(JSON.stringify({
+                'msg_id': 'bet',
+                'bet': -1
+            }));
+            Poker5.setBetMode(false);
+        });
+
+        $('#bet-cmd').click(function() {
+            Poker5.socket.send(JSON.stringify({
+                'msg_id': 'bet',
+                'bet': $('#bet-input').val()
+            }));
+            Poker5.setBetMode(false);
+        });
+
+        this.setCardsChangeMode(false);
+        this.setBetMode(false);
+    },
+
+    onGameUpdate: function(message) {
+        if ($('#players .player').length == 0 || message.phase == 'new-game') {
+            this.initGame(message);
+        }
+        else {
+            this.updateGame(message);
+        }
+
+        switch (message.phase) {
+            case 'new-game';
+                break;
+            case 'cards-assignment':
+                break;
+            case 'opening-bet':
+                break;
+            case 'cards-change':
+                break;
+            case 'final-bet':
+                break;
+            case 'show-cards':
+                break;
+            case 'winner-designation':
+                break;
+        }
+    },
+
+    onSetCards: function(message) {
+        for (cardKey in message.cards) {
+            Poker5.setCard(Poker5.playerId, cardKey + 1, message.cards[cardKey][0], message.cards[cardKey][1]);
+        }
+    },
+
+    onBet: function(message) {
+        Poker5.setBetMode(true);
+    },
+
+    onChangeCards: function(message) {
+        this.setCardsChangeMode(true);
+    },
+
+    initGame: function(message) {
+        $('#players').empty();
+
+        for (key in message.players) {
+            player = message.players[key];
+
+            Poker5.players.push(player);
+
+            $('#players').append(
+                '<div class="player player-' + player.id + '">'
+                + '<div class="cards row">'
+                + '<div class="card small card-1 pull-left"></div>'
+                + '<div class="card small card-2 pull-left"></div>'
+                + '<div class="card small card-3 pull-left"></div>'
+                + '<div class="card small card-4 pull-left"></div>'
+                + '<div class="card small card-5 pull-left"></div>'
+                + '</div>'
+                + '<div class="player-info">'
+                + '<span class="player-name">' + player.name + '</span>'
+                + ' - '
+                + '$<span class="player-money">' + player.money + '</span>'
+                + '</div>'
+                + '</div>');
+        }
+    },
+
+    updateGame: function(message) {
+        for (key in message.players) {
+            $('.player.player-' + message.players[key].id + ' .player-money').text(message.player[key].money);
+        }
     },
 
     setBetMode: function(betMode) {
