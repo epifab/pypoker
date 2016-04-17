@@ -40,6 +40,9 @@ Poker5 = {
                 case 'set-cards':
                     Poker5.onSetCards(data);
                     break;
+                case 'change-cards':
+                    Poker5.onChangeCards(data);
+                    break;
                 case 'bet':
                     Poker5.onBet(data);
                     break;
@@ -90,7 +93,7 @@ Poker5 = {
         }
 
         switch (message.phase) {
-            case 'new-game';
+            case 'new-game':
                 break;
             case 'cards-assignment':
                 break;
@@ -105,6 +108,14 @@ Poker5 = {
             case 'winner-designation':
                 break;
         }
+    },
+
+    onConnect: function(message) {
+
+    },
+
+    onDisconnect: function(message) {
+
     },
 
     onSetCards: function(message) {
@@ -127,8 +138,6 @@ Poker5 = {
         for (key in message.players) {
             player = message.players[key];
 
-            Poker5.players.push(player);
-
             $('#players').append(
                 '<div class="player player-' + player.id + '">'
                 + '<div class="cards row">'
@@ -149,7 +158,7 @@ Poker5 = {
 
     updateGame: function(message) {
         for (key in message.players) {
-            $('.player.player-' + message.players[key].id + ' .player-money').text(message.player[key].money);
+            $('.player.player-' + message.players[key].id + ' .player-money').text(message.players[key].money);
         }
     },
 
