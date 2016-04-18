@@ -98,6 +98,7 @@ Poker5 = {
     onGameUpdate: function(message) {
         if (message.phase == 'new-game') {
             this.initGame(message);
+            this.log('New game')
         }
         this.updateGame(message);
 
@@ -126,17 +127,17 @@ Poker5 = {
                         break;
                 }
                 if (message.bet_type == 'RAISE') {
-                    $('#game-log').append('<p></p>').text(message.players[message.player].name + " RAISE: " + message.bet);
+                    Poker5.log(message.players[message.player].name + " RAISE: " + message.bet);
                 }
                 else {
-                    $('#game-log').append('<p></p>').text(message.players[message.player],name + " " + message.bet_type);
+                    Poker5.log(message.players[message.player].name + " " + message.bet_type);
                 }
                 break;
             case 'cards-change':
-                break;
-            case 'final-bet':
+                Poker5.log("Player " + message.players[message.player].name + " changed " + message.num_cards + " cards.");
                 break;
             case 'winner-designation':
+                Poker5.log("Player " + message.players[message.player].name + " won!");
                 break;
         }
     },
@@ -150,7 +151,7 @@ Poker5 = {
     },
 
     onJoinLobby: function(message) {
-        $('#game-log').append($('<p></p>').text(message.player.name + " has joined the lobby (" + message.players.length + " players waiting to play)"));
+        this.log(message.player.name + " has joined the lobby (" + message.players.length + " players waiting to play)");
     },
 
     onSetCards: function(message) {
