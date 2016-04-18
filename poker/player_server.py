@@ -77,12 +77,18 @@ class PlayerServer(Player):
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
-        except (ChannelError, MessageFormatError) as e:
-            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+        except ChannelError as e:
             self._error = e
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+
+        except MessageFormatError as e:
+            self._error = e
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+            self.try_send_message({'msg_id': 'error', 'error': e.args[0]})
 
         except MessageTimeout as e:
             self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+            self.try_send_message({'msg_id': 'timeout'})
 
         return [], []
 
@@ -129,12 +135,18 @@ class PlayerServer(Player):
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except (ChannelError, MessageFormatError) as e:
-            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+        except ChannelError as e:
             self._error = e
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+
+        except MessageFormatError as e:
+            self._error = e
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+            self.try_send_message({'msg_id': 'error', 'error': e.args[0]})
 
         except MessageTimeout as e:
             self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+            self.try_send_message({'msg_id': 'timeout'})
 
         return -1
 

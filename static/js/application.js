@@ -54,6 +54,12 @@ Poker5 = {
                 case 'game-update':
                     Poker5.onGameUpdate(data);
                     break;
+                case 'error':
+                    Poker5.log('Error received: ' + data.error)
+                    break;
+                case 'timeout':
+                    Poker5.log('Timed out')
+                    break;
             }
         };
 
@@ -98,7 +104,6 @@ Poker5 = {
     onGameUpdate: function(message) {
         if (message.phase == 'new-game') {
             this.initGame(message);
-            this.log('New game')
         }
         this.updateGame(message);
 
@@ -106,6 +111,7 @@ Poker5 = {
             case 'new-game':
                 break;
             case 'cards-assignment':
+                this.log('New hand');
                 break;
             case 'opening-bet':
             case 'final-bet':
@@ -136,11 +142,21 @@ Poker5 = {
     },
 
     onConnect: function(message) {
-        this.log("Connection established with poker5 server: " + message.id);
+        this.log("Connection established with poker5 server: " + message.server);
     },
 
     onDisconnect: function(message) {
 
+    },
+
+    onError: function(message) {
+        Poker5.log('ERROR: ' + message.error);
+    },
+
+    onTimeout: function(message) {
+        Poker5.log('Time is up!');
+        Poker5.setBetMode(false);
+        Poker5.setCardsChangeMode(false);
     },
 
     onJoinLobby: function(message) {
@@ -238,6 +254,7 @@ Poker5 = {
         }
         else {
             $('#change-cards-cmd').hide();
+            $('#player-control .card.selected').removeClass('selected');
         }
     },
 
