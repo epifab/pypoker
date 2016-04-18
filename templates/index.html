@@ -23,15 +23,15 @@
 
             <div id="pot"></div>
 
-            <div id="player-control" class="player player-{{ id }}">
+            <div id="player-control" class="player" data-id="{{ id }}">
                 <div class="cards row">
-                    <div class="card medium card-1 pull-left"></div>
-                    <div class="card medium card-2 pull-left"></div>
-                    <div class="card medium card-3 pull-left"></div>
-                    <div class="card medium card-4 pull-left"></div>
-                    <div class="card medium card-5 pull-left"></div>
+                    <div class="card medium pull-left" data-key="0"></div>
+                    <div class="card medium pull-left" data-key="1"></div>
+                    <div class="card medium pull-left" data-key="2"></div>
+                    <div class="card medium pull-left" data-key="3"></div>
+                    <div class="card medium pull-left" data-key="4"></div>
                 </div>
-                <div class="player-info" data-id="{{ id }}" data-name="{{ name }}" data-money="{{ money }}">
+                <div class="player-info">
                     <span class="player-name">{{ name }} (you)</span>
                     -
                     <span class="player-money">{{ "${:,.2f}".format(money) }}</span>

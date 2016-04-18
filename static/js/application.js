@@ -109,28 +109,21 @@ Poker5 = {
                 break;
             case 'opening-bet':
             case 'final-bet':
-                player = message.players[message.player]
-
+                player = message.players[message.player];
                 switch (message.bet_type) {
                     case 'FOLD':
-                        this.log(player.name + "; FOLD")
+                        this.log(player.name + ": FOLD");
                         break;
                     case 'PASS':
-                        this.log(player.name + ": PASS")
+                        this.log(player.name + ": PASS");
                         break;
                     case 'CHECK':
-                        this.log(player.name + ": CHECK")
+                        this.log(player.name + ": CHECK");
                         break;
                     case 'CALL':
                     case 'RAISE':
-                        this.log(player.name + ": $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")")
+                        this.log(player.name + ": BET $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")");
                         break;
-                }
-                if (message.bet_type == 'RAISE') {
-                    Poker5.log(message.players[message.player].name + " RAISE: " + message.bet);
-                }
-                else {
-                    Poker5.log(message.players[message.player].name + " " + message.bet_type);
                 }
                 break;
             case 'cards-change':
@@ -143,7 +136,7 @@ Poker5 = {
     },
 
     onConnect: function(message) {
-
+        this.log("Connection established with poker5 server: " + message.id);
     },
 
     onDisconnect: function(message) {
@@ -157,8 +150,8 @@ Poker5 = {
     onSetCards: function(message) {
         for (cardKey in message.cards) {
             Poker5.setCard(
-                $('#player-control .player-info').data('id'),
-                parseInt(cardKey) + 1,
+                $('#player-control').data('id'),
+                cardKey,
                 message.cards[cardKey][0],
                 message.cards[cardKey][1]);
         }
@@ -179,18 +172,18 @@ Poker5 = {
             player = message.players[key];
 
             $('#players').append(
-                '<div class="player player-' + player.id + '">'
+                '<div class="player" data-id="' + player.id + '">'
                 + '<div class="cards row">'
-                + '<div class="card small card-1 pull-left"></div>'
-                + '<div class="card small card-2 pull-left"></div>'
-                + '<div class="card small card-3 pull-left"></div>'
-                + '<div class="card small card-4 pull-left"></div>'
-                + '<div class="card small card-5 pull-left"></div>'
+                + '<div class="card small pull-left" data-key="0"></div>'
+                + '<div class="card small pull-left" data-key="1"></div>'
+                + '<div class="card small pull-left" data-key="2"></div>'
+                + '<div class="card small pull-left" data-key="3"></div>'
+                + '<div class="card small pull-left" data-key="4"></div>'
                 + '</div>'
                 + '<div class="player-info">'
                 + '<span class="player-name">' + player.name + '</span>'
                 + ' - '
-                + '$<span class="player-money">' + player.money + '</span>'
+                + '<span class="player-money">$' + parseInt(player.money) + '.00</span>'
                 + '</div>'
                 + '</div>');
         }
@@ -203,25 +196,25 @@ Poker5 = {
                 for (cardKey in player.score.cards) {
                     Poker5.setCard(
                         player.id,
-                        parseInt(cardKey) + 1,
+                        cardKey,
                         player.score.cards[cardKey][0],
                         player.score.cards[cardKey][1]);
                 }
             }
-            $('.player.player-' + player.id + ' .player-money').text(player.money);
+            $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money) + ".00");
 
             if (player.alive) {
-                $('.player-' + player.id).css('opacity', 100);
+                $('.player[data-id="' + player.id + '"]').css('opacity', 100);
             }
             else {
-                $('.player-' + player.id).css('opacity', 50);
+                $('.player[data-id="' + player.id + '"]').css('opacity', 50);
             }
 
             if (key == message.player) {
-                $('.player-' + player.id).addClass('selected');
+                $('.player[data-id="' + player.id + '"]').addClass('selected');
             }
             else {
-                $('.player-' + player.id).removeClass('selected');
+                $('.player[data-id="' + player.id + '"]').removeClass('selected');
             }
         }
     },
@@ -230,10 +223,10 @@ Poker5 = {
         this.betMode = betMode;
 
         if (betMode) {
-            $('#bet-group').show()
+            $('#bet-group').show();
         }
         else {
-            $('#bet-group').hide()
+            $('#bet-group').hide();
         }
     },
 
@@ -241,15 +234,15 @@ Poker5 = {
         this.cardsChangeMode = changeMode;
 
         if (changeMode) {
-            $('#change-cards-cmd').show()
+            $('#change-cards-cmd').show();
         }
         else {
-            $('#change-cards-cmd').hide()
+            $('#change-cards-cmd').hide();
         }
     },
 
-    setCard: function(playerId, cardId, rank, suit) {
-        $('.player-' + playerId + ' .card-' + cardId).each(function() {
+    setCard: function(playerId, cardKey, rank, suit) {
+        $('.player[data-id="' + playerId + '"] .card[data-key="' + cardKey + '"]').each(function() {
             $element = $(this);
 
             x = 0;
@@ -299,39 +292,14 @@ Poker5 = {
             $element.css('background-position', x + "px " + y + "px");
             $element.css('background-image', 'url(' + url + ')');
 
-            $element.data('rank', rank)
-            $element.data('suit', suit)
+            $element.data('rank', rank);
+            $element.data('suit', suit);
         })
     }
 }
 
 $(document).ready(function() {
     Poker5.init()
-
-    /*
-    Poker5.setCard(1, 1, 13, 2);
-    Poker5.setCard(1, 2, 12, 2);
-    Poker5.setCard(1, 3, 11, 2);
-    Poker5.setCard(1, 4, 10, 2);
-    Poker5.setCard(1, 5, 9, 2);
-
-    Poker5.setCard(2, 1, 1, 3);
-    Poker5.setCard(2, 2, 1, 2);
-    Poker5.setCard(2, 3, 1, 1);
-    Poker5.setCard(2, 4, 1, 0);
-    Poker5.setCard(2, 5, 9, 2);
-    $('.player-2').css('opacity', 0.5)
-
-    Poker5.setCard(3, 1, 7, 2);
-    Poker5.setCard(3, 2, 8, 2);
-    Poker5.setCard(3, 3, 9, 3);
-    Poker5.setCard(3, 4, 10, 1);
-    Poker5.setCard(3, 5, 11, 1);
-    $('.player-4').css('opacity', 0.5)
-
-    // Simulate Player 4 fold
-    $('.player-4 .card').css('opacity', 0.5);
-    */
 })
 
 
