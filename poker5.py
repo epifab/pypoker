@@ -12,6 +12,9 @@ app.debug = True
 
 sockets = Sockets(app)
 
+server = ServerWebSocket(app.logger)
+gevent.spawn(server.start)
+
 names = [
     "Leonard",
     "Michael",
@@ -64,8 +67,3 @@ def poker5(ws):
     while not ws.closed:
         # Keep the websocket alive
         gevent.sleep(0.1)
-
-
-if __name__ == '__main__':
-    server = ServerWebSocket(app.logger)
-    gevent.spawn(server.start)
