@@ -36,6 +36,9 @@ surnames = [
     "Harrison",]
 
 
+players = {}
+
+
 @app.route('/')
 def hello():
     global names, surnames
@@ -52,19 +55,20 @@ def hello():
 @sockets.route('/poker5')
 def poker5(ws):
     player = server.get_player(session['player-id'])
+    channel = WebSocketChannel(ws)
     if not player:
         player = PlayerServer(
-            channel=WebSocketChannel(ws),
+            channel=channel,
             id=session['player-id'],
             name=session['player-name'],
             money=session['player-money'])
         server.register(player)
     else:
-        player.update_channel(WebSocketChannel(ws))
+        player.update_channel(channel)
+
     while not ws.closed:
-        # Sleep to prevent *constant* context-switches.
+        # Keep the websocket alive
         gevent.sleep(0.1)
 
-
-#if __name__ == '__main__':
-#    app.run()
+# if __name__ == '__main__':
+#     app.run()

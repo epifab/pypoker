@@ -41,6 +41,9 @@ class Game:
         self._min_opening_scores = [score_detector.get_score([Card(r, 0), Card(r, 1)]) for r in [11, 12, 13, 14]]
         self._logger = logger if logger else logging
 
+    def get_id(self):
+        return self._id
+
     def play_hand(self):
         """Play a single hand."""
         while True:

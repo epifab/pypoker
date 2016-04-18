@@ -26,7 +26,6 @@ class PlayerServer(Player):
     def disconnect(self):
         """Disconnect the client"""
         try:
-            self.try_send_message({"msg_id": "disconnect"})
             self._channel.close()
         except:
             pass
@@ -45,7 +44,7 @@ class PlayerServer(Player):
                 "score": self.get_score().dto()})
 
         except ChannelError as e:
-            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
 
     def change_cards(self):
@@ -78,10 +77,14 @@ class PlayerServer(Player):
             except (TypeError, IndexError):
                 raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
-        except (ChannelError, MessageFormatError, MessageTimeout) as e:
-            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
+        except (ChannelError, MessageFormatError) as e:
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
-            return self._cards, []
+
+        except MessageTimeout as e:
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+
+        return [], []
 
     def bet(self, min_bet=0.0, max_bet=0.0, opening=False):
         """Bet handling.
@@ -126,17 +129,21 @@ class PlayerServer(Player):
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
 
-        except (ChannelError, MessageFormatError, MessageTimeout) as e:
-            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
+        except (ChannelError, MessageFormatError) as e:
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
-            return -1
+
+        except MessageTimeout as e:
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
+
+        return -1
 
     def try_send_message(self, message):
         try:
             self.send_message(message)
             return True
         except ChannelError as e:
-            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
+            self._logger.error("Player {}: {}".format(self.get_id(), e.args[0]))
             self._error = e
             return False
 
