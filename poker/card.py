@@ -47,17 +47,20 @@ class Card:
         return self._value
 
     @staticmethod
-    def format_cards(cards):
-        lines = [""] * 7
-        for card in cards:
-            lines[0] += "+-------+"
-            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
-            lines[2] += "|       |"
-            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
-            lines[4] += "|       |"
-            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
-            lines[6] += "+-------+"
-        return "\n".join(lines)
+    def format_cards(cards, inline=False):
+        if inline:
+            return ", ".join([Card.RANKS[c.get_rank()] + " " + Card.SUITS[c.get_suit()] for c in cards])
+        else:
+            lines = [""] * 7
+            for card in cards:
+                lines[0] += "+-------+"
+                lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
+                lines[2] += "|       |"
+                lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
+                lines[4] += "|       |"
+                lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
+                lines[6] += "+-------+"
+            return "\n".join(lines)
 
     def dto(self):
         return self.get_rank(), self.get_suit()

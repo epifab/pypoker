@@ -1,6 +1,6 @@
 from poker import *
 import logging
-import uuid
+import random, string
 import socket
 import sys
 import time
@@ -207,11 +207,11 @@ class GameClientConsole:
                     print("Time is up!")
 
             elif message["msg_id"] == "set-cards":
-                self._player.set_cards(
-                    [Card(rank, suit) for rank, suit in message["cards"]],
-                    Score(
-                        message["score"]["category"],
-                        [Card(rank, suit) for rank, suit in message["score"]["cards"]]))
+                cards = [Card(rank, suit) for rank, suit in message["cards"]]
+                score = Score(message["score"]["category"],
+                              [Card(rank, suit) for rank, suit in message["score"]["cards"]])
+                self._player.set_cards(cards, score)
+                print(Card.format_cards(cards))
 
             elif message["msg_id"] == "change-cards":
                 try:
@@ -260,7 +260,7 @@ class GameClientConsole:
 
         elif message["phase"] == Game.PHASE_OPENING_BET or message["phase"] == Game.PHASE_FINAL_BET:
             player_name = message["players"][message["player"]]["name"]
-            if message["bet_type"] == "RAISE":
+            if message["bet_type"] == "raise":
                 print("Player '{}' bet ${:,.2f} RAISE".format(player_name, message["bet"], message["bet_type"]))
             else:
                 print("Player '{}' {}".format(player_name, message["bet_type"]))
@@ -293,7 +293,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG if 'DEBUG' in os.environ else logging.INFO)
     logger = logging.getLogger()
 
-    player_id = str(uuid.uuid4())
+    player_id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
+
     player_name = sys.argv[1]
 
     host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]

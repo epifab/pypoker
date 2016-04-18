@@ -1,12 +1,13 @@
 from . import Game, GameError, ScoreDetector, Deck
 import logging
 import threading
-import uuid
+import random
+import string
 
 
 class Server:
     def __init__(self, logger=None):
-        self._id = str(uuid.uuid4())
+        self._id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
         self._lobby = []
         self._room_size = 2
         self._lock = threading.Lock()
@@ -22,19 +23,17 @@ class Server:
         return None
 
     def join_lobby(self, player):
-        player.try_send_message({"msg_id": "connect", "server": self._id})
-
-        if player.get_error():
+        if not player.try_send_message({"msg_id": "connect", "server": self._id}):
             return
 
         self._lock.acquire()
 
         try:
             # Clean-up the lobby
-            self._lobby = [p for p in self._lobby if not p.get_error()]
+            self._lobby = [p for p in self._lobby if p.try_send_message({"msg_id": "ping"})]
 
             self._lobby.append(player)
-            self._logger.info("Player {} has joined the lobby.".format(player.get_id()))
+            self._logger.info(">>{} player {} has joined the lobby.".format(self._id, player.get_id()))
 
             for x in self._lobby:
                 x.try_send_message({
@@ -58,20 +57,12 @@ class Server:
 
     def play_game(self, game, players):
         try:
-            self._logger.info("Starting game {}...".format(game.get_id()))
+            self._logger.info(">>{} starting game {}...".format(self._id, game.get_id()))
 
             game.broadcast()
+            game.play_game()
 
-            abort_game = False
-
-            while not abort_game:
-                try:
-                    game.play_hand()
-                    abort_game = game.get_players_in_error()
-                except GameError:
-                    abort_game = True
-
-            self._logger.info("Aborting game {}...".format(game.get_id()))
+            self._logger.info(">>" + self._id + " aborting game {}...".format(game.get_id()))
 
             for player in players:
                 # Try to send the player a notification
@@ -79,18 +70,19 @@ class Server:
                 self.join_lobby(player)
         except:
             # Something terrible happened
-            self._logger.exception("Unexpected error happened.")
+            self._logger.exception(">>" + self._id + " unexpected error happened")
             for player in players:
                 player.disconnect()
             raise
 
     def start(self):
+        self._logger.info(">>" + self._id + " running")
         for player in self.new_players():
             try:
                 # Player successfully connected: joining the lobby
-                self._logger.info("Player {} '{}' CONNECTED".format(player.get_id(), player.get_name()))
+                self._logger.info(">>" + self._id + " player {} '{}' connected".format(player.get_id(), player.get_name()))
                 self.join_lobby(player)
             except:
                 # Close bad connections and ignore the connection
-                self._logger.exception("Bad connection")
+                self._logger.exception(">>" + self._id + " bad connection")
                 pass

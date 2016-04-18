@@ -93,7 +93,7 @@ class Score:
             except IndexError:
                 # cards1 is longer than cards2
                 return 1
-        return 0 if len(cards1) == len(cards2) else -1 # cards2 is longer than cards1
+        return 0 if len(cards1) == len(cards2) else -1  # cards2 is longer than cards1
 
     @staticmethod
     def _straight_is_min(straight_sequence):
@@ -104,10 +104,8 @@ class Score:
         return straight_sequence[0].get_rank() == 14
 
     def __str__(self):
-        return Card.format_cards(self._cards) + "\n" + Score.CATEGORIES[self.get_category()]
+        return Card.format_cards(self._cards, inline=True) + " (" + Score.CATEGORIES[self.get_category()] + ")"
 
     def dto(self):
-        return {
-            "category": self.get_category(),
-            "cards": [card.dto() for card in self.get_cards()]
-        }
+        return {"category": self.get_category(),
+                "cards": [card.dto() for card in self.get_cards()]}

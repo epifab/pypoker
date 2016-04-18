@@ -34,9 +34,9 @@ class SocketChannel(Channel):
         except:
             raise ChannelError("Unable to send data to the remote host")
 
-    def _recv(self, size, time_timeout):
+    def _recv(self, size, timeout):
         message = b''
-        while not time_timeout or time.time() < time_timeout:
+        while not timeout or time.time() < timeout:
             try:
                 message += self._socket.recv(size)
                 if len(message) >= size:
@@ -65,13 +65,11 @@ class SocketChannel(Channel):
         raise MessageTimeout("Timed out")
 
     def recv_message(self, timeout=None):
-        time_timeout = None if not timeout else time.time() + timeout
-
         # Read the json message size
-        msg_len = self._recv_message_len(time_timeout)
+        msg_len = self._recv_message_len(timeout)
 
         # Read and decode the json message
-        encoded = self._recv(msg_len, time_timeout)
+        encoded = self._recv(msg_len, timeout)
         serialized = encoded.decode("utf-8")
 
         self._logger.debug("JSON(?) message receive from {}: {}".format(self._address, serialized))

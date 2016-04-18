@@ -117,17 +117,17 @@ Poker5 = {
             case 'final-bet':
                 player = message.players[message.player];
                 switch (message.bet_type) {
-                    case 'FOLD':
+                    case 'fold':
                         this.log(player.name + ": FOLD");
                         break;
-                    case 'PASS':
+                    case 'pass':
                         this.log(player.name + ": PASS");
                         break;
-                    case 'CHECK':
+                    case 'check':
                         this.log(player.name + ": CHECK");
                         break;
-                    case 'CALL':
-                    case 'RAISE':
+                    case 'call':
+                    case 'raise':
                         this.log(player.name + ": BET $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")");
                         break;
                 }
