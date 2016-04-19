@@ -10,6 +10,11 @@ class ScoreDetector:
         score, cards = self.detect_score(cards)
         return Score(score, cards)
 
+    @staticmethod
+    def merge_sequence(sequence1, sequence2):
+        merged = sequence1 + [c for c in sequence2 if c not in sequence1]
+        return merged
+
     def detect_score(self, cards):
         """Detects the highest score in the list of cards.
         Returns a tuple (score, cards) where score is an integer (see Score class) and cards is a list of cards sorted
@@ -19,27 +24,25 @@ class ScoreDetector:
         will produce the following output:
             (Score.DOUBLE_PAIR, [J of hearts, J of diamonds, 10 of hearts, 10 of clubs, Aof clubs])"""
 
-        def merge_sequence(sequence1, sequence2): return sequence1 + [c for c in sequence2 if c not in sequence1]
-
         # Sort the list of cards in a descending order
         cards = sorted(cards, key=int, reverse=True)
 
         # Straight flush
         straight_flush = ScoreDetector._get_straight_flush(cards, self._lowest_rank)
         if straight_flush:
-            return Score.STRAIGHT_FLUSH, merge_sequence(straight_flush, cards)
+            return Score.STRAIGHT_FLUSH, ScoreDetector.merge_sequence(straight_flush, cards)
 
-        # Makes a dictionary keyed by rank and valued by list of cards of the same rank
+        # Makes a dictionary keyed by r and valued by list of cards of the same r
         ranks = collections.defaultdict(list)
         for card in cards:
             ranks[card.get_rank()].append(card)
 
         # List of four of a kind ranks
-        four_oak_rank = sorted([rank for (rank, cards) in ranks.items() if len(cards) == 4], reverse=True)
+        four_oak_rank = sorted([r for (r, c) in ranks.items() if len(c) == 4], reverse=True)
 
         # Four of a kind
         if four_oak_rank:
-            return Score.FOUR_OF_A_KIND, merge_sequence(ranks[four_oak_rank[0]], cards)
+            return Score.FOUR_OF_A_KIND, ScoreDetector.merge_sequence(ranks[four_oak_rank[0]], cards)
 
         # Flush
         flush = ScoreDetector._get_flush(cards)
@@ -47,29 +50,29 @@ class ScoreDetector:
             return Score.FLUSH, flush
 
         # List of three of a kind and pair ranks
-        three_oak_ranks = sorted([rank for (rank, cards) in ranks.items() if len(cards) == 3], reverse=True)
-        pair_ranks = sorted([rank for (rank, cards) in ranks.items() if len(cards) == 2], reverse=True)
+        three_oak_ranks = sorted([r for (r, c) in ranks.items() if len(c) == 3], reverse=True)
+        pair_ranks = sorted([r for (r, c) in ranks.items() if len(c) == 2], reverse=True)
 
         # Full house
         if three_oak_ranks and pair_ranks:
-            return Score.FULL_HOUSE, merge_sequence(ranks[three_oak_ranks[0]] + ranks[pair_ranks[0]], cards)
+            return Score.FULL_HOUSE, ScoreDetector.merge_sequence(ranks[three_oak_ranks[0]] + ranks[pair_ranks[0]], cards)
 
         # Straight
         straight = ScoreDetector._get_straight(cards, self._lowest_rank)
         if straight:
-            return Score.STRAIGHT, merge_sequence(straight, cards)
+            return Score.STRAIGHT, ScoreDetector.merge_sequence(straight, cards)
 
         # Three of a kind
         if three_oak_ranks:
-            return Score.THREE_OF_A_KIND, merge_sequence(ranks[three_oak_ranks[0]], cards)
+            return Score.THREE_OF_A_KIND, ScoreDetector.merge_sequence(ranks[three_oak_ranks[0]], cards)
 
         # Double pair
         if len(pair_ranks) > 1:
-            return Score.DOUBLE_PAIR, merge_sequence(ranks[pair_ranks[0]] + ranks[pair_ranks[1]], cards)
+            return Score.DOUBLE_PAIR, ScoreDetector.merge_sequence(ranks[pair_ranks[0]] + ranks[pair_ranks[1]], cards)
 
         # Pair
         if pair_ranks:
-            return Score.PAIR, merge_sequence(ranks[pair_ranks[0]], cards)
+            return Score.PAIR, ScoreDetector.merge_sequence(ranks[pair_ranks[0]], cards)
 
         return Score.HIGHEST_CARD, cards
 
