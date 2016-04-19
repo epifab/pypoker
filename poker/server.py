@@ -33,7 +33,7 @@ class Server:
             self._lobby = [p for p in self._lobby if p.try_send_message({"msg_id": "ping"})]
 
             self._lobby.append(player)
-            self._logger.info(">>{} player {} has joined the lobby.".format(self._id, player.get_id()))
+            self._logger.info("SERVER({}) player {} has joined the lobby.".format(self._id, player.get_id()))
 
             for x in self._lobby:
                 x.try_send_message({
@@ -57,12 +57,10 @@ class Server:
 
     def play_game(self, game, players):
         try:
-            self._logger.info(">>{} starting game {}...".format(self._id, game.get_id()))
+            self._logger.info("SERVER({}) starting game {}".format(self._id, game.get_id()))
 
             game.broadcast()
             game.play_game()
-
-            self._logger.info(">>" + self._id + " aborting game {}...".format(game.get_id()))
 
             for player in players:
                 # Try to send the player a notification
@@ -70,19 +68,25 @@ class Server:
                 self.join_lobby(player)
         except:
             # Something terrible happened
-            self._logger.exception(">>" + self._id + " unexpected error happened")
+            self._logger.exception("SERVER({}) unhandled game exception for game {}".format(self._id, game.get_id()))
             for player in players:
                 player.disconnect()
             raise
+        finally:
+            self._logger.info("SERVER({}) terminated game {}".format(self._id, game.get_id()))
 
     def start(self):
-        self._logger.info(">>" + self._id + " running")
-        for player in self.new_players():
-            try:
-                # Player successfully connected: joining the lobby
-                self._logger.info(">>" + self._id + " player {} '{}' connected".format(player.get_id(), player.get_name()))
-                self.join_lobby(player)
-            except:
-                # Close bad connections and ignore the connection
-                self._logger.exception(">>" + self._id + " bad connection")
-                pass
+        self._logger.info("SERVER({}) running".format(self._id))
+        try:
+            for player in self.new_players():
+                try:
+                    # Player successfully connected: joining the lobby
+                    self._logger.info("SERVER({}) player {} connected".format(
+                                      self._id, player.get_id(), player.get_name()))
+                    self.join_lobby(player)
+                except:
+                    # Close bad connections and ignore the connection
+                    self._logger.exception("SERVER({}) bad connection".format(self._id))
+                    pass
+        finally:
+            self._logger.info("SERVER({}) terminating".format(self._id))

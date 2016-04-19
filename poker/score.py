@@ -1,6 +1,3 @@
-from . import Card
-
-
 class Score:
     HIGHEST_CARD = 0
     PAIR = 1
@@ -104,7 +101,7 @@ class Score:
         return straight_sequence[0].get_rank() == 14
 
     def __str__(self):
-        return Card.format_cards(self._cards, inline=True) + " (" + Score.CATEGORIES[self.get_category()] + ")"
+        return str(self._cards) + " (" + Score.CATEGORIES[self.get_category()] + ")"
 
     def dto(self):
         return {"category": self.get_category(),
