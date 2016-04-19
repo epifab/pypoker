@@ -119,7 +119,13 @@ class Game:
             # Distribute cards
             cards = self._deck.get_cards(5)
             score = self._score_detector.get_score(cards)
-            player.set_cards(cards, score)
+            self._logger.info(" GAME({}) score detection {} :: {}".format(self._id, str(cards), str(score)))
+            try:
+                player.set_cards(cards, score)
+            except ChannelError as e:
+                self._logger.info(" GAME({}) player {} error: {}".format(self._id, player.get_id(), e.args[0]))
+                self._players_in_error.append(player)
+
         self.broadcast()
 
     def _opening_bet_round(self):
@@ -254,13 +260,19 @@ class Game:
                     self._deck.add_discards(discards)
                     cards = [card for card in player.get_cards() if card not in discards] + new_cards
                     score = self._score_detector.get_score(cards)
+                    self._logger.info(" GAME({}) score detection {} :: {}".format(self._id, str(cards), str(score)))
                     player.set_cards(cards, score)
 
                 self._logger.info(" GAME({}) player {} changed {} cards"
                                   .format(self._id, player.get_id(), len(discards)))
                 self.broadcast({"player": player_key, "num_cards": len(discards)})
 
-            except (ChannelError, MessageFormatError) as e:
+            except ChannelError as e:
+                self._logger.info(" GAME({}) player {} error: {}".format(self._id, player.get_id(), e.args[0]))
+                self.broadcast({"player": player_key, "num_cards": 0})
+                self._players_in_error.append(player)
+
+            except MessageFormatError as e:
                 self._logger.info(" GAME({}) player {} error: {}".format(self._id, player.get_id(), e.args[0]))
                 self.broadcast({"player": player_key, "num_cards": 0})
                 player.try_send_message({"msg_id": "error", "error": e.args[0]})
@@ -296,7 +308,11 @@ class Game:
         try:
             return player.bet(min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
 
-        except (ChannelError, MessageFormatError) as e:
+        except ChannelError as e:
+            self._logger.info(" GAME({}) player {} error: {}".format(self._id, player.get_id(), e.args[0]))
+            self._players_in_error.append(player)
+
+        except MessageFormatError as e:
             self._logger.info(" GAME({}) player {} error: {}".format(self._id, player.get_id(), e.args[0]))
             player.try_send_message({"msg_id": "error", "error": e.args[0]})
             self._players_in_error.append(player)
