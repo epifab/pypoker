@@ -33,20 +33,27 @@ class WebSocketChannel(Channel):
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
 
+        if self._ws.closed:
+            raise ChannelError("Unable to send data to the remote host (not connected)")
         try:
-            # Sends the message
             self._ws.send(msg_encoded)
         except:
             raise ChannelError("Unable to send data to the remote host")
 
     def recv_message(self, timeout=None):
         # @todo Implement a proper timeout
+
+        if self._ws.closed:
+            raise ChannelError("Unable to receive data from the remote host (not connected)")
+
         try:
             message = self._ws.receive()
         except:
             raise ChannelError("Unable to receive data from the remote host")
         else:
-            if not message or (timeout and time.time() > timeout):
+            if not message:
+                raise ChannelError("Unable to receive data from the remote host (message was empty)")
+            if (timeout and time.time() > timeout):
                 raise MessageTimeout("Timed out")
             try:
                 # Deserialize and return the message

@@ -4,8 +4,6 @@ import time
 
 
 class PlayerServer(Player):
-    USER_ACTION_TIMEOUT = 30
-
     def __init__(self, channel, id, name, money, logger=None):
         Player.__init__(self, id=id, name=name, money=money)
         self._channel = channel
@@ -63,7 +61,6 @@ class PlayerServer(Player):
 
         except (TypeError, IndexError):
             raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
-
 
     def bet(self, min_bet=0.0, max_bet=0.0, opening=False, timeout=None):
         """Bet handling.
