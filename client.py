@@ -164,25 +164,7 @@ class GameClientConsole:
         while True:
             message = self._player.recv_message()
 
-            if message["msg_id"] == "new-game":
-                print()
-                print("#" * 80)
-                print()
-                print("NEW GAME")
-                print()
-                print("#" * 80)
-                print()
-
-            if message["msg_id"] == "game-over":
-                print()
-                print("#" * 80)
-                print()
-                print("GAME OVER")
-                print()
-                print("#" * 80)
-                print()
-
-            elif message["msg_id"] == "disconnect":
+            if message["msg_id"] == "disconnect":
                 print()
                 print("#" * 80)
                 print()
@@ -251,25 +233,43 @@ class GameClientConsole:
         print()
         print("~" * 45)
 
-        if message["phase"] == Game.PHASE_CARDS_ASSIGNMENT:
+        if message["event"] == "new-game":
+            print()
+            print("#" * 80)
+            print()
+            print("NEW GAME")
+            print()
+            print("#" * 80)
+            print()
+
+        elif message["event"] == "game-over":
+            print()
+            print("#" * 80)
+            print()
+            print("GAME OVER")
+            print()
+            print("#" * 80)
+            print()
+
+        elif message["event"] == "cards-assignment":
             print("NEW HAND")
             print()
             print("~" * 45)
             for player in message["players"]:
                 self._print_player(player)
 
-        elif message["phase"] == Game.PHASE_OPENING_BET or message["phase"] == Game.PHASE_FINAL_BET:
+        elif message["event"] == "bet":
             player_name = message["players"][message["player"]]["name"]
             if message["bet_type"] == "raise":
                 print("Player '{}' bet ${:,.2f} RAISE".format(player_name, message["bet"], message["bet_type"]))
             else:
                 print("Player '{}' {}".format(player_name, message["bet_type"]))
 
-        elif message["phase"] == Game.PHASE_CARDS_CHANGE:
+        elif message["event"] == "cards-change":
             player_name = message["players"][message["player"]]["name"]
             print("Player '{}' changed {} cards".format(player_name, message["num_cards"]))
 
-        if message["phase"] == Game.PHASE_WINNER_DESIGNATION:
+        elif message["event"] == "winner-designation":
             for player in message["players"]:
                 self._print_player(player)
 

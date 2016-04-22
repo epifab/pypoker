@@ -34,3 +34,6 @@ class Player:
         """Assigns a list of cards to the player"""
         self._cards = cards
         self._score = score
+
+    def __str__(self):
+        return "player " + self._id
