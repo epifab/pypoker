@@ -16,12 +16,15 @@ class ServerWebSocket(Server):
     def register(self, player):
         self._register_player_lock.acquire()
         try:
+            self._logger.debug("{}: {} already registered".format(self, player))
             if player.get_id() in self._players:
+                self._logger.debug("{}: {} already registered".format(self, player))
                 player.try_send_message({
                     'msg_id': 'error',
                     'error': 'Looks like you are already connected to this server'})
                 return False
             else:
+                self._logger.info("{}: registering {}".format(self, player))
                 self._players[player.get_id()] = player
                 self._new_players.append(player)
                 return True
@@ -31,9 +34,11 @@ class ServerWebSocket(Server):
     def unregister(self, player_id):
         self._register_player_lock.acquire()
         try:
+            self._logger.debug("{}: attempting to unregister player {}".format(self, player_id))
             if player_id in self._players:
+                self._logger.debug("{}: un-registering {}".format(self, self._players[player_id]))
                 del self._players[player_id]
-            self._new_players = [player for player in self._new_players if player.get_id() != player_id]
+                self._new_players = [player for player in self._new_players if player.get_id() != player_id]
         finally:
             self._register_player_lock.release()
 
@@ -55,7 +60,7 @@ class WebSocketChannel(Channel):
         self._logger = logger if logger else logging
 
     def close(self):
-        pass
+        self._ws.close()
 
     def send_message(self, message):
         # Encode the message
