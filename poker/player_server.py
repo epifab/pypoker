@@ -6,7 +6,7 @@ import time
 class PlayerServer(Player):
     def __init__(self, channel, id, name, money, logger=None):
         Player.__init__(self, id=id, name=name, money=money)
-        self.channel = channel
+        self._channel = channel
         self._logger = logger if logger else logging
 
     def dto(self, with_score=False):
@@ -19,9 +19,12 @@ class PlayerServer(Player):
     def disconnect(self):
         """Disconnect the client"""
         try:
-            self.channel.close()
+            self._channel.close()
         except:
             pass
+
+    def update_channel(self, channel):
+        self._channel = channel
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -106,7 +109,7 @@ class PlayerServer(Player):
             return False
 
     def send_message(self, message):
-        return self.channel.send_message(message)
+        return self._channel.send_message(message)
 
     def recv_message(self, timeout=None):
-        return self.channel.recv_message(timeout)
+        return self._channel.recv_message(timeout)

@@ -10,35 +10,14 @@ class ServerWebSocket(Server):
     def __init__(self, logger=None):
         Server.__init__(self, logger)
         self._new_players = []
-        self._players = {}
         self._register_player_lock = threading.Lock()
 
     def register(self, player):
         self._register_player_lock.acquire()
         try:
-            self._logger.debug("{}: {} already registered".format(self, player))
-            if player.get_id() in self._players:
-                self._logger.debug("{}: {} already registered".format(self, player))
-                player.try_send_message({
-                    'msg_id': 'error',
-                    'error': 'Looks like you are already connected to this server'})
-                return False
-            else:
-                self._logger.info("{}: registering {}".format(self, player))
-                self._players[player.get_id()] = player
-                self._new_players.append(player)
-                return True
-        finally:
-            self._register_player_lock.release()
-
-    def unregister(self, player_id):
-        self._register_player_lock.acquire()
-        try:
-            self._logger.debug("{}: attempting to unregister player {}".format(self, player_id))
-            if player_id in self._players:
-                self._logger.debug("{}: un-registering {}".format(self, self._players[player_id]))
-                del self._players[player_id]
-                self._new_players = [player for player in self._new_players if player.get_id() != player_id]
+            # Removes other instances of this player
+            self._new_players = [p for p in self._new_players if p.get_id() != player.get_id()]
+            self._new_players.append(player)
         finally:
             self._register_player_lock.release()
 

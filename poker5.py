@@ -52,21 +52,17 @@ def hello():
 
 @sockets.route('/poker5')
 def poker5(ws):
-    channel = WebSocketChannel(ws)
-
     player = PlayerServer(
-        channel=channel,
+        channel=WebSocketChannel(ws),
         id=session['player-id'],
         name=session['player-name'],
         money=session['player-money'])
 
-    if server.register(player):
-        try:
-            while not ws.closed:
-                # Keep the websocket alive
-                gevent.sleep(0.1)
-        finally:
-            server.unregister(session['player-id'])
+    server.register(player)
+
+    while not ws.closed:
+        # Keep the websocket alive
+        gevent.sleep(0.1)
 
 
 if __name__ == '__main__':
