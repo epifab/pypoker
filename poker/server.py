@@ -7,7 +7,7 @@ import string
 
 class Server:
     def __init__(self, logger=None):
-        self._id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
+        self._id = ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(5))
         self._lobby = []
         self._players = []
         self._room_size = 2

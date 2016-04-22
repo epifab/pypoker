@@ -9,18 +9,22 @@ import gevent
 class ServerWebSocket(Server):
     def __init__(self, logger=None):
         Server.__init__(self, logger)
-        self._new_players = {}
-        self._players = []
+        self._new_players = []
+        self._players = {}
         self._register_player_lock = threading.Lock()
 
     def register(self, player):
         self._register_player_lock.acquire()
         try:
-            if player.id in self._players:
-                player.try_send_message({'msg_id': 'error',
-                                         'error': 'Looks like you are already connected to this server'})
+            if player.get_id() in self._players:
+                player.try_send_message({
+                    'msg_id': 'error',
+                    'error': 'Looks like you are already connected to this server'})
+                return False
             else:
-                self._new_players[player.id] = player
+                self._players[player.get_id()] = player
+                self._new_players.append(player)
+                return True
         finally:
             self._register_player_lock.release()
 
@@ -29,19 +33,19 @@ class ServerWebSocket(Server):
         try:
             if player_id in self._players:
                 del self._players[player_id]
+            self._new_players = [player for player in self._new_players if player.get_id() != player_id]
         finally:
             self._register_player_lock.release()
 
-    def _get_player(self, id):
-        for player in self._players:
-            if player.get_id() == id:
-                return player
-        return None
-
     def new_players(self):
         while True:
-            if self._new_players:
-                yield self._new_players.pop()
+            self._register_player_lock.acquire()
+            try:
+                if self._new_players:
+                    yield self._new_players.pop()
+            finally:
+                self._register_player_lock.release()
+
             gevent.sleep(0.1)
 
 

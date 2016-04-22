@@ -60,13 +60,13 @@ def poker5(ws):
         name=session['player-name'],
         money=session['player-money'])
 
-    server.register(player)
-
-    while not ws.closed:
-        # Keep the websocket alive
-        gevent.sleep(0.1)
-
-    server.unregister(session['player-id'])
+    if server.register(player):
+        try:
+            while not ws.closed:
+                # Keep the websocket alive
+                gevent.sleep(0.1)
+        finally:
+            server.unregister(session['player-id'])
 
 
 if __name__ == '__main__':

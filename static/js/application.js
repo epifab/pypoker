@@ -63,7 +63,7 @@ Poker5 = {
             }
         };
 
-        $('#player-control .card').click(function() {
+        $('#current-player .card').click(function() {
             if (Poker5.cardsChangeMode) {
                 $(this).toggleClass('selected');
             }
@@ -71,7 +71,7 @@ Poker5 = {
 
         $('#change-cards-cmd').click(function() {
             discards = [];
-            $('#player-control .card.selected').each(function() {
+            $('#current-player .card.selected').each(function() {
                 discards.push($(this).data('key'))
             });
             Poker5.socket.send(JSON.stringify({
@@ -81,12 +81,12 @@ Poker5 = {
             Poker5.setCardsChangeMode(false);
         });
 
-        $('#fold-cmd').click(function() {
+        $('#fold-cmd, #no-bet-cmd').click(function() {
             Poker5.socket.send(JSON.stringify({
                 'msg_id': 'bet',
                 'bet': -1
             }));
-            Poker5.setBetMode(false);
+            Poker5.disableBetMode();
         });
 
         $('#bet-cmd').click(function() {
@@ -94,46 +94,42 @@ Poker5 = {
                 'msg_id': 'bet',
                 'bet': $('#bet-input').val()
             }));
-            Poker5.setBetMode(false);
+            Poker5.disableBetMode();
         });
 
         this.setCardsChangeMode(false);
-        this.setBetMode(false);
+        this.disableBetMode();
     },
 
     onGameUpdate: function(message) {
-        if (message.phase == 'new-game') {
-            this.initGame(message);
-        }
         this.updateGame(message);
 
-        switch (message.phase) {
+        switch (message.event) {
             case 'new-game':
                 break;
             case 'cards-assignment':
                 this.log('New hand');
                 break;
-            case 'opening-bet':
-            case 'final-bet':
+            case 'bet':
                 player = message.players[message.player];
                 switch (message.bet_type) {
                     case 'fold':
-                        this.log(player.name + ": FOLD");
-                        break;
                     case 'pass':
-                        this.log(player.name + ": PASS");
-                        break;
                     case 'check':
-                        this.log(player.name + ": CHECK");
+                        this.log(player.name + " " + message.bet_type);
                         break;
                     case 'call':
+                        this.log(player.name + " call ($" + parseInt(message.bet) + ".00)");
                     case 'raise':
-                        this.log(player.name + ": BET $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")");
+                        this.log(player.name + " raise by $" + parseInt(message.raise) + ".00 ($" + parseInt(message.bet) + ".00");
                         break;
                 }
                 break;
             case 'cards-change':
                 Poker5.log("Player " + message.players[message.player].name + " changed " + message.num_cards + " cards.");
+                break;
+            case 'player-action':
+                Poker5.enablePlayerAction(message.players[message.player], message.timeout);
                 break;
             case 'winner-designation':
                 Poker5.log("Player " + message.players[message.player].name + " won!");
@@ -155,7 +151,7 @@ Poker5 = {
 
     onTimeout: function(message) {
         Poker5.log('Time is up!');
-        Poker5.setBetMode(false);
+        Poker5.disableBetMode();
         Poker5.setCardsChangeMode(false);
     },
 
@@ -166,7 +162,7 @@ Poker5 = {
     onSetCards: function(message) {
         for (cardKey in message.cards) {
             Poker5.setCard(
-                $('#player-control').data('id'),
+                $('#current-player').data('id'),
                 cardKey,
                 message.cards[cardKey][0],
                 message.cards[cardKey][1]);
@@ -174,7 +170,7 @@ Poker5 = {
     },
 
     onBet: function(message) {
-        Poker5.setBetMode(true);
+        Poker5.enableBetMode(message);
     },
 
     onChangeCards: function(message) {
@@ -196,16 +192,21 @@ Poker5 = {
                 + '<div class="card small pull-left" data-key="3"></div>'
                 + '<div class="card small pull-left" data-key="4"></div>'
                 + '</div>'
+                + '<div class="timer"></div>'
                 + '<div class="player-info">'
-                + '<span class="player-name">' + player.name + '</span>'
-                + ' - '
-                + '<span class="player-money">$' + parseInt(player.money) + '.00</span>'
+                + '<p class="player-name">' + player.name + '</p>'
+                + '<p class="player-money">$' + parseInt(player.money) + '.00</p>'
                 + '</div>'
+                + '<div class="clearfix"></div>'
                 + '</div>');
         }
     },
 
     updateGame: function(message) {
+        if (message.event == "new-game") {
+            this.initGame(message);
+        }
+
         for (key in message.players) {
             player = message.players[key]
             if (player.score) {
@@ -217,6 +218,12 @@ Poker5 = {
                         player.score.cards[cardKey][1]);
                 }
             }
+            else if (player.id != $('#current-player').data('id')) {
+                $('.player[data-id="' + player.id + '"] .card').each(function() {
+                    $(this).css('background-position', '');
+                    $(this).css('background-image', '');
+                });
+            }
             $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money) + ".00");
 
             if (player.alive) {
@@ -225,36 +232,75 @@ Poker5 = {
             else {
                 $('.player[data-id="' + player.id + '"]').css('opacity', 50);
             }
-
-            if (key == message.player) {
-                $('.player[data-id="' + player.id + '"]').addClass('selected');
-            }
-            else {
-                $('.player[data-id="' + player.id + '"]').removeClass('selected');
-            }
         }
     },
 
-    setBetMode: function(betMode) {
-        this.betMode = betMode;
+    enablePlayerAction: function(playerId, timeout) {
+        $timer = $('.player[data-id="' + playerId + '"] .timer');
+        $timer.data('date', timeout);
+        $timer.TimeCircles({
+            start: true,
+            count_past_zero: false,
+            time: {
+                Days: { show: false },
+                Hours: { show: false },
+                Minutes: { show: false },
+                Seconds: { show: true }
+            }
+        });
+    },
 
-        if (betMode) {
-            $('#bet-group').show();
+    disablePlayerAction: function() {
+        $('.timer').hide();
+    },
+
+    enableBetMode: function(message) {
+        this.betMode = true;
+
+        if (message.max_bet == -1) {
+            $('#fold-cmd-wrapper').hide();
+            $('#bet-input-wrapper').hide();
+            $('#bet-cmd-wrapper').hide();
+            $('#no-bet-cmd-wrapper').show();
         }
+
         else {
-            $('#bet-group').hide();
+            $('#bet-input').attr('data-slider-min', message.min_bet);
+            $('#bet-input').attr('data-slider-max', message.max_bet);
+            $('#bet-input').attr('data-slider-value', message.min_bet);
+            $('#bet-input').slider({
+                formatter: function(value) {
+                    if (value == 0) {
+                        $('#bet-cmd').attr("value", "Check");
+                    }
+                    else {
+                        $('#bet-cmd').attr("value", "$" + parseInt(value) + ".00");
+                    }
+                    $('#bet-input').val(value);
+                }
+            });
+            $('#fold-cmd-wrapper').show();
+            $('#bet-input-wrapper').show();
+            $('#bet-cmd-wrapper').show();
+            $('#no-bet-cmd-wrapper').hide();
         }
+
+        $('#bet-controls').show();
+    },
+
+    disableBetMode: function() {
+        $('#bet-controls').hide();
     },
 
     setCardsChangeMode: function(changeMode) {
         this.cardsChangeMode = changeMode;
 
         if (changeMode) {
-            $('#change-cards-cmd').show();
+            $('#change-cards-controls').show();
         }
         else {
-            $('#change-cards-cmd').hide();
-            $('#player-control .card.selected').removeClass('selected');
+            $('#change-cards-controls').hide();
+            $('#current-player .card.selected').removeClass('selected');
         }
     },
 
@@ -308,9 +354,6 @@ Poker5 = {
 
             $element.css('background-position', x + "px " + y + "px");
             $element.css('background-image', 'url(' + url + ')');
-
-            $element.data('rank', rank);
-            $element.data('suit', suit);
         })
     }
 }

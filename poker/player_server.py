@@ -99,7 +99,7 @@ class PlayerServer(Player):
             return bet
 
         except ValueError:
-            raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(bet))
+            raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
 
     def try_send_message(self, message):
         try:

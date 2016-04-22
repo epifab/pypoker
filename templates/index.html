@@ -3,12 +3,14 @@
 <head>
     <title>Python Games</title>
     <link href="static/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link href="static/css/bootstrap-slider.min.css" rel="stylesheet" media="screen">
+    <link href="static/css/TimeCircles.css" rel="stylesheet" media="screen">
     <link href="static/css/application.css" rel="stylesheet" media="screen">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 <div class="container">
-    <div class="jumbotron">
+    <div class="jumbotron hidden-xs">
         <h1><span class="py">Py</span>Poker game demo</h1>
         <hr/>
         <p>The code lives <a href="https://github.com/epifab/pypoker">on GitHub</a>.</p>
@@ -23,7 +25,7 @@
 
             <div id="pot"></div>
 
-            <div id="player-control" class="player" data-id="{{ id }}">
+            <div id="current-player" class="player" data-id="{{ id }}">
                 <div class="cards row">
                     <div class="card medium pull-left" data-key="0"></div>
                     <div class="card medium pull-left" data-key="1"></div>
@@ -31,22 +33,36 @@
                     <div class="card medium pull-left" data-key="3"></div>
                     <div class="card medium pull-left" data-key="4"></div>
                 </div>
-                <div class="player-info">
-                    <span class="player-name">{{ name }} (you)</span>
-                    -
-                    <span class="player-money">{{ "${:,.2f}".format(money) }}</span>
-                </div>
-                <div class="form-inline">
-                    <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
-                    <div id="bet-group">
-                        <span class="btn btn-danger" id="fold-cmd">Fold</span>
-                        <div class="form-group">
-                            <input id="bet-input" type="text" class="form-control" placeholder="Your bet"/>
+
+                <div class="row">
+                    <div class="timer"></div>
+
+                    <div class="player-info">
+                        <p class="player-name">{{ name }} (you)</p>
+                        <p class="player-money">{{ "${:,.2f}".format(money) }}</p>
+                    </div>
+
+                    <div id="bet-controls" class="controls">
+                        <div id="fold-cmd-wrapper">
+                            <input type="button" id="fold-cmd" class="btn btn-danger" value="Fold" />
                         </div>
-                        <span class="btn btn-primary" id="bet-cmd">Bet!</span>
+                        <div id="bet-input-wrapper">
+                            <input id="bet-input" type="hidden" class="slider"
+                                   data-slider-id="bet-input"
+                                   data-slider-step="1"/>
+                        </div>
+                        <div id="bet-cmd-wrapper">
+                            <input type="button" id="bet-cmd" class="btn btn-primary" value="Check" />
+                        </div>
+                        <div id="no-bet-cmd-wrapper">
+                            <input type="button" id="no-bet-cmd" class="btn btn-primary" value="Unable to open" />
+                        </div>
+                    </div>
+
+                    <div id="change-cards-controls" class="controls">
+                        <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -54,8 +70,12 @@
     </div>
 </div>
 
+
 <script type="text/javascript" src="static/js/jquery-2.0.3.min.js"></script>
+<script type="text/javascript" src="static/js/bootstrap-slider.min.js"></script>
 <script type="text/javascript" src="static/js/reconnecting-websocket.min.js"></script>
+<script type="text/javascript" src="static/js/TimeCircles.js"></script>
 <script type="text/javascript" src="static/js/application.js"></script>
+
 </body>
 </html>
