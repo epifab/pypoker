@@ -225,7 +225,8 @@ class Game:
                 self.broadcast({
                     "event": "player-action",
                     "player": player_key,
-                    "timeout": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
+                    "timeout": self.CHANGE_CARDS_TIMEOUT,
+                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
 
                 # Ask remote player to change cards
                 _, discards = player.change_cards(timeout=timeout)
@@ -286,14 +287,15 @@ class Game:
             self.broadcast({
                 "event": "player-action",
                 "player": player_key,
-                "timeout": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
+                "timeout": self.BET_TIMEOUT,
+                "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
 
             bet = player.bet(min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
 
             if not bet:
                 bet_type = "check"
             elif bet == min_bet:
-                bet_type = "call"
+                bet_type = "open" if opening else "call"
             elif bet > min_bet:
                 bet_type = "raise"
 
@@ -322,7 +324,6 @@ class Game:
         self.broadcast({
             "event": "bet",
             "bet": bet,
-            "raise": None if bet_type != "raise" else bet - min_bet,
             "bet_type": bet_type,
             "player": player_key})
 

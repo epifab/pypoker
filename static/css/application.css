@@ -45,6 +45,11 @@ h1 .py {
     float: left;
 }
 
+#players .player .timer {
+    width: 100px;
+    float: left;
+}
+
 .card {
     float: left;
     margin: 1px;
@@ -81,11 +86,6 @@ and (max-device-width: 480px) {
 
     #poker-table {
         padding: 0px;
-    }
-
-    #game-log {
-        overflow: scroll;
-        height: 130px;
     }
 
     #current-player {

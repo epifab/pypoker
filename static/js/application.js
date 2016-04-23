@@ -6,7 +6,11 @@ Poker5 = {
     cardsChangeMode: true,
 
     log: function(text) {
-        $('#game-log').append($('<p></p>').text(text))
+        $('#game-log').append($('<p></p>').text(text));
+    },
+
+    clearLogs: function() {
+        $('#game-log').empty();
     },
 
     init: function() {
@@ -108,9 +112,11 @@ Poker5 = {
             case 'new-game':
                 break;
             case 'cards-assignment':
+                this.clearLogs();
                 this.log('New hand');
                 break;
             case 'bet':
+                this.disablePlayerAction();
                 player = message.players[message.player];
                 switch (message.bet_type) {
                     case 'fold':
@@ -118,18 +124,19 @@ Poker5 = {
                     case 'check':
                         this.log(player.name + " " + message.bet_type);
                         break;
+                    case 'open':
                     case 'call':
-                        this.log(player.name + " call ($" + parseInt(message.bet) + ".00)");
                     case 'raise':
-                        this.log(player.name + " raise by $" + parseInt(message.raise) + ".00 ($" + parseInt(message.bet) + ".00");
+                        this.log(player.name + " bet $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")");
                         break;
                 }
                 break;
             case 'cards-change':
+                this.disablePlayerAction();
                 Poker5.log("Player " + message.players[message.player].name + " changed " + message.num_cards + " cards.");
                 break;
             case 'player-action':
-                Poker5.enablePlayerAction(message.players[message.player], message.timeout);
+                Poker5.enablePlayerAction(message.players[message.player].id, message.timeout);
                 break;
             case 'winner-designation':
                 Poker5.log("Player " + message.players[message.player].name + " won!");
@@ -159,8 +166,10 @@ Poker5 = {
         switch (message.event) {
             case 'player-added':
                 this.log(message.player.name + " joined the lobby");
+                break;
             case 'player-removed':
                 this.log(message.player.name + " left the lobby");
+                break;
         }
     },
 
@@ -241,9 +250,9 @@ Poker5 = {
     },
 
     enablePlayerAction: function(playerId, timeout) {
-        $timer = $('.player[data-id="' + playerId + '"] .timer');
-        $timer.data('date', timeout);
-        $timer.TimeCircles({
+        $timers = $('.player[data-id="' + playerId + '"] .timer');
+        $timers.data('timer', timeout);
+        $timers.TimeCircles({
             start: true,
             count_past_zero: false,
             time: {
@@ -253,10 +262,25 @@ Poker5 = {
                 Seconds: { show: true }
             }
         });
+        $timers.addClass('active');
+        $timers.show();
     },
 
     disablePlayerAction: function() {
-        $('.timer').hide();
+        $activeTimers = $('.timer.active');
+        $activeTimers.TimeCircles().destroy();
+        $activeTimers.removeClass('active');
+        $activeTimers.hide();
+    },
+
+    sliderHandler: function(value) {
+        if (value == 0) {
+            $('#bet-cmd').attr("value", "Check");
+        }
+        else {
+            $('#bet-cmd').attr("value", "$" + parseInt(value) + ".00");
+        }
+        $('#bet-input').val(value);
     },
 
     enableBetMode: function(message) {
@@ -270,20 +294,15 @@ Poker5 = {
         }
 
         else {
-            $('#bet-input').attr('data-slider-min', message.min_bet);
-            $('#bet-input').attr('data-slider-max', message.max_bet);
-            $('#bet-input').attr('data-slider-value', message.min_bet);
+            // Set-up slider
             $('#bet-input').slider({
-                formatter: function(value) {
-                    if (value == 0) {
-                        $('#bet-cmd').attr("value", "Check");
-                    }
-                    else {
-                        $('#bet-cmd').attr("value", "$" + parseInt(value) + ".00");
-                    }
-                    $('#bet-input').val(value);
-                }
+                'min': parseInt(message.min_bet),
+                'max': parseInt(message.max_bet),
+                'value': parseInt(message.min_bet),
+                'formatter': this.sliderHandler
             });
+            this.sliderHandler(message.min_bet);
+
             $('#fold-cmd-wrapper').show();
             $('#bet-input-wrapper').show();
             $('#bet-cmd-wrapper').show();
