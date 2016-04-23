@@ -9,9 +9,8 @@ class Server:
     def __init__(self, logger=None):
         self._id = ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(5))
         self._lobby = []
-        self._players = []
         self._room_size = 2
-        self._lock = threading.Lock()
+        self._lobby_lock = threading.Lock()
         self._logger = logger if logger else logging
 
     def __str__(self):
@@ -20,25 +19,33 @@ class Server:
     def new_players(self):
         raise NotImplementedError
 
+    def _broadcast(self, message):
+        for player in self._lobby:
+            player.try_send_message(message)
+
     def _join_lobby(self, player):
         if not player.try_send_message({"msg_id": "connect", "server": self._id}):
             return
 
-        self._lock.acquire()
+        self._lobby_lock.acquire()
 
         try:
             # Clean-up the lobby
-            self._lobby = [p for p in self._lobby if p.try_send_message({"msg_id": "ping"})]
+            new_lobby = []
+
+            for p in self._lobby:
+                if p.get_id() == player.get_id() or not p.try_send_message({"msg_id": "ping"}):
+                    self._logger.info("{}: {} left the lobby".format(self, p))
+                    self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": p.dto()})
+                    p.disconnect()
+                else:
+                    new_lobby.append(p)
+
+            self._lobby = new_lobby
 
             self._lobby.append(player)
             self._logger.info("{}: {} has joined the lobby".format(self, player))
-
-            for x in self._lobby:
-                x.try_send_message({
-                    'msg_id': 'join-lobby',
-                    'players': [p.dto() for p in self._lobby],
-                    'player': player.dto()
-                })
+            self._broadcast({"msg_id": "lobby-update", "event": "player-added", "player": player.dto()})
 
             if len(self._lobby) >= self._room_size:
                 lowest_rank = 11 - len(self._lobby)
@@ -51,7 +58,7 @@ class Server:
                 thread.start()
                 self._lobby = []
         finally:
-            self._lock.release()
+            self._lobby_lock.release()
 
     def _play_game(self, game, players):
         try:
@@ -61,8 +68,6 @@ class Server:
 
             for player in players:
                 # Try to send the player a notification
-                player.try_send_message({"msg_id": "game-status", "status": 0})
-                self._players.append(player)
                 self._join_lobby(player)
         except:
             # Something terrible happened

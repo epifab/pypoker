@@ -10,26 +10,14 @@ class ServerWebSocket(Server):
     def __init__(self, logger=None):
         Server.__init__(self, logger)
         self._new_players = []
-        self._register_player_lock = threading.Lock()
 
     def register(self, player):
-        self._register_player_lock.acquire()
-        try:
-            # Removes other instances of this player
-            self._new_players = [p for p in self._new_players if p.get_id() != player.get_id()]
-            self._new_players.append(player)
-        finally:
-            self._register_player_lock.release()
+        self._new_players.append(player)
 
     def new_players(self):
         while True:
-            self._register_player_lock.acquire()
-            try:
-                if self._new_players:
-                    yield self._new_players.pop()
-            finally:
-                self._register_player_lock.release()
-
+            if self._new_players:
+                yield self._new_players.pop()
             gevent.sleep(0.1)
 
 

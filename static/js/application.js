@@ -39,8 +39,8 @@ Poker5 = {
                 case 'disconnect':
                     Poker5.onDisconnect(data);
                     break;
-                case 'join-lobby':
-                    Poker5.onJoinLobby(data);
+                case 'lobby-update':
+                    Poker5.onLobbyUpdate(data);
                     break;
                 case 'set-cards':
                     Poker5.onSetCards(data);
@@ -155,8 +155,13 @@ Poker5 = {
         Poker5.setCardsChangeMode(false);
     },
 
-    onJoinLobby: function(message) {
-        this.log(message.player.name + " has joined the lobby (" + message.players.length + " players waiting to play)");
+    onLobbyUpdate: function(message) {
+        switch (message.event) {
+            case 'player-added':
+                this.log(message.player.name + " joined the lobby");
+            case 'player-removed':
+                this.log(message.player.name + " left the lobby");
+        }
     },
 
     onSetCards: function(message) {
