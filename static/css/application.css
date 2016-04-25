@@ -2,7 +2,7 @@ h1 .py {
     color: #66C;
 }
 
-.poker-table {
+#main {
     background-color: #354b1c;
     width: 100%;
     padding: 20px;
@@ -19,36 +19,65 @@ h1 .py {
     margin-bottom: 20px;
 }
 
+
+
+/*****************************************************
+  Players
+
+ *****************************************************/
+
 #players .player {
-    background-color: #333;
-    margin-bottom: 20px;
-    padding: 20px;
-}
-
-#players .player .cards {
-    margin-left: 0px;
-}
-
-#players p, #current-player p {
-    margin: 0px;
-}
-
-#current-player .btn, #current-player .slider {
-    width: 200px;
-    padding: 10px;
-    margin: 5px 0px;
-}
-
-#current-player .timer {
-    width: 150px;
-    margin-left: 10px;
     float: left;
+    width: 100px;
+    height: 100px;
+    border-radius: 100px;
+    text-align: center;
+    padding: 10px 5px 5px 5px;
+    margin: 5px 15px 0px 15px;
+    background-color: #333;
+    position: relative;
+}
+
+#players .player.current {
+    background-color: #2377c6;
 }
 
 #players .player .timer {
-    width: 100px;
+    position: absolute;
+    top: -35px;
+    left: -35px;
+    width: 170px;
     float: left;
 }
+
+#players .player .bet {
+    position: absolute;
+    bottom: -45px;
+    text-align: center;
+    width: 100px;
+    left: 0px;
+    background-color: #194996;
+    padding: 5px;
+    border-radius: 20px;
+}
+
+#players .player .timer .textDiv_Seconds {
+    display: none;
+}
+
+#players .player .cards {
+    display: none;
+}
+
+#players .player .player-info p {
+    margin: 0px;
+}
+
+
+/*****************************************************
+  Cards
+
+ *****************************************************/
 
 .card {
     float: left;
@@ -59,17 +88,78 @@ h1 .py {
 .card.small {
     width: 45px;
     height: 75px;
-    background-image: url(../images/card-back-small.jpg);
+    background-image: url(../images/card-back-small.png);
 }
 
 .card.medium {
     width: 75px;
     height: 125px;
-    background-image: url(../images/card-back.jpg);
+    background-image: url(../images/card-back.png);
 }
 
-#current-player .card.selected {
+.card.selected {
     margin-top: -20px;
+}
+
+
+/*****************************************************
+  Table
+
+ *****************************************************/
+
+#table {
+    width: 100%;
+    height: 130px;
+    border-radius: 50px;
+    border: 2px solid #222;
+    clear: both;
+    background-color: #333;
+    padding: 30px;
+}
+
+#table #pot {
+    background-image: url(../images/chips.png);
+    background-repeat: no-repeat;
+    padding-left: 85px;
+    padding-top: 20px;
+    font-size: 20pt;
+    height: 100px;
+}
+
+
+/*****************************************************
+  Current player
+
+ *****************************************************/
+
+#current-player {
+    clear: both;
+    margin-top: 15px;
+}
+
+#current-player .cards {
+    margin: 10px 0px 0px 25px;
+}
+
+#current-player .cards .card {
+    margin-left: -25px;
+    cursor: pointer;
+}
+
+
+/*****************************************************
+  Current player controls
+
+ *****************************************************/
+
+#player-controls .btn, #player-controls .slider {
+    width: 250px;
+    padding: 10px;
+    margin: 5px 0px;
+}
+
+#player-controls .slider .tooltip {
+    display: none;
 }
 
 @media only screen
@@ -84,29 +174,8 @@ and (max-device-width: 480px) {
         padding-right: 0px;
     }
 
-    #poker-table {
-        padding: 0px;
-    }
-
-    #current-player {
-        clear: both;
-        margin-top: 30px;
-    }
-
-    #current-player .cards {
-        margin-left: 30px;
-    }
-
-    #current-player .card {
-        margin-left: -30px;
-        cursor: pointer;
-    }
-
-    #current-player .player {
-        margin-top: 20px;
-    }
-
     #current-player .player-info {
+        display: none;
         margin-top: 25px;
         margin-bottom: 25px;
     }
@@ -124,48 +193,15 @@ and (max-device-width: 480px) {
         margin-right: 10px;
     }
 
-    #players .timer h4, #current-player .timer h4 {
-        display: none;
-    }
-
-    #players .cards {
-        display: none;
-    }
-
-    #players .player {
-        clear: both;
+    #players {
         padding: 0px;
     }
 
-    #players .player .cards {
-        margin-left: auto;
-        margin-right: auto;
-    }
-    #players .player .timer {
-        width: 50px;
-        float: left;
-    }
-    #players .player .player-info {
-        padding: 10px 0px;
-    }
-    #players .player .player-name,
-    #players .player .player-money {
-        margin: 0px;
-    }
-
     #game-log {
-        background-color: #333;
         border: 0px;
         width: 100%;
         margin: 0px;
         clear: both;
         padding: 10px;
-        height: 130px;
-    }
-
-    #players .player {
-        background-color: #333;
-        padding: 10px;
-        margin: 4px 0px;
     }
 }

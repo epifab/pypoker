@@ -8,6 +8,7 @@
     <link href="static/css/application.css" rel="stylesheet" media="screen">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
 <body>
 <div class="container">
     <div class="jumbotron hidden-xs">
@@ -16,57 +17,49 @@
         <p>The code lives <a href="https://github.com/epifab/pypoker">on GitHub</a>.</p>
     </div>
 
-    <div class="poker-table">
-        <div class="col-md-4" id="players"></div>
+    <div id="main">
 
-        <div class="col-md-8">
+        <div id="players"></div>
 
-            <div id="game-log" class="row"></div>
-
+        <div id="table">
             <div id="pot"></div>
+        </div>
 
-            <div id="current-player" class="player" data-id="{{ id }}">
-                <div class="cards row">
-                    <div class="card medium pull-left" data-key="0"></div>
-                    <div class="card medium pull-left" data-key="1"></div>
-                    <div class="card medium pull-left" data-key="2"></div>
-                    <div class="card medium pull-left" data-key="3"></div>
-                    <div class="card medium pull-left" data-key="4"></div>
+        <div id="current-player" class="player" data-id="{{ id }}">
+            <div class="cards">
+                <div class="card medium pull-left" data-key="0"></div>
+                <div class="card medium pull-left" data-key="1"></div>
+                <div class="card medium pull-left" data-key="2"></div>
+                <div class="card medium pull-left" data-key="3"></div>
+                <div class="card medium pull-left" data-key="4"></div>
+                <div class="clearfix"></div>
+            </div>
+
+            <div id="player-controls">
+                <div id="bet-controls" class="controls">
+                    <div id="fold-cmd-wrapper">
+                        <input type="button" id="fold-cmd" class="btn btn-danger" value="Fold" />
+                    </div>
+                    <div id="bet-input-wrapper">
+                        <input id="bet-input" type="hidden" class="slider"
+                               data-slider-id="bet-input"
+                               data-slider-step="1"/>
+                    </div>
+                    <div id="bet-cmd-wrapper">
+                        <input type="button" id="bet-cmd" class="btn btn-primary" value="Check" />
+                    </div>
+                    <div id="no-bet-cmd-wrapper">
+                        <input type="button" id="no-bet-cmd" class="btn btn-primary" value="Unable to open" />
+                    </div>
                 </div>
 
-                <div class="row">
-                    <div class="timer"></div>
-
-                    <div class="player-info">
-                        <p class="player-name">{{ name }} (you)</p>
-                        <p class="player-money">{{ "${:,.2f}".format(money) }}</p>
-                    </div>
-
-                    <div id="bet-controls" class="controls">
-                        <div id="fold-cmd-wrapper">
-                            <input type="button" id="fold-cmd" class="btn btn-danger" value="Fold" />
-                        </div>
-                        <div id="bet-input-wrapper">
-                            <input id="bet-input" type="hidden" class="slider"
-                                   data-slider-id="bet-input"
-                                   data-slider-step="1"/>
-                        </div>
-                        <div id="bet-cmd-wrapper">
-                            <input type="button" id="bet-cmd" class="btn btn-primary" value="Check" />
-                        </div>
-                        <div id="no-bet-cmd-wrapper">
-                            <input type="button" id="no-bet-cmd" class="btn btn-primary" value="Unable to open" />
-                        </div>
-                    </div>
-
-                    <div id="change-cards-controls" class="controls">
-                        <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
-                    </div>
+                <div id="change-cards-controls" class="controls">
+                    <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
                 </div>
             </div>
         </div>
 
-        <div class="clearfix"></div>
+        <div id="game-log"></div>
     </div>
 </div>
 

@@ -21,7 +21,8 @@ Poker5 = {
             var ws_scheme = "ws://"
         }
 
-        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
+        this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
+//        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
             Poker5.log('Connected :)');
@@ -111,6 +112,8 @@ Poker5 = {
         switch (message.event) {
             case 'new-game':
                 break;
+            case 'game-over':
+                break;
             case 'cards-assignment':
                 this.clearLogs();
                 this.log('New hand');
@@ -127,7 +130,7 @@ Poker5 = {
                     case 'open':
                     case 'call':
                     case 'raise':
-                        this.log(player.name + " bet $" + parseInt(message.bet) + ".00 (" + message.bet_type + ")");
+                        this.log(player.name + " bet $" + parseInt(message.bet) + " (" + message.bet_type + ")");
                         break;
                 }
                 break;
@@ -197,8 +200,13 @@ Poker5 = {
         for (key in message.players) {
             player = message.players[key];
 
+            playerClass = 'player';
+            if (player.id == $('#current-player').data('id')) {
+                playerClass += ' current';
+            }
+
             $('#players').append(
-                '<div class="player" data-id="' + player.id + '">'
+                '<div class="' + playerClass + '" data-id="' + player.id + '">'
                 + '<div class="cards row">'
                 + '<div class="card small pull-left" data-key="0"></div>'
                 + '<div class="card small pull-left" data-key="1"></div>'
@@ -206,12 +214,12 @@ Poker5 = {
                 + '<div class="card small pull-left" data-key="3"></div>'
                 + '<div class="card small pull-left" data-key="4"></div>'
                 + '</div>'
-                + '<div class="timer"></div>'
                 + '<div class="player-info">'
                 + '<p class="player-name">' + player.name + '</p>'
-                + '<p class="player-money">$' + parseInt(player.money) + '.00</p>'
+                + '<p class="player-money">$' + parseInt(player.money) + '</p>'
                 + '</div>'
-                + '<div class="clearfix"></div>'
+                + '<div class="timer"></div>'
+                + '<div class="bet"></div>'
                 + '</div>');
         }
     },
@@ -220,6 +228,8 @@ Poker5 = {
         if (message.event == "new-game") {
             this.initGame(message);
         }
+
+        $('#pot').text("$" + parseInt(message.pot));
 
         for (key in message.players) {
             player = message.players[key]
@@ -238,7 +248,8 @@ Poker5 = {
                     $(this).css('background-image', '');
                 });
             }
-            $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money) + ".00");
+            $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money));
+            $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
             if (player.alive) {
                 $('.player[data-id="' + player.id + '"]').css('opacity', 100);
@@ -253,24 +264,25 @@ Poker5 = {
         $timers = $('.player[data-id="' + playerId + '"] .timer');
         $timers.data('timer', timeout);
         $timers.TimeCircles({
-            start: true,
-            count_past_zero: false,
-            time: {
-                Days: { show: false },
-                Hours: { show: false },
-                Minutes: { show: false },
-                Seconds: { show: true }
+            "start": true,
+            "animation": "smooth",
+            "bg_width": 1,
+            "fg_width": 0.05,
+            "count_past_zero": false,
+            "time": {
+                "Days": { show: false },
+                "Hours": { show: false },
+                "Minutes": { show: false },
+                "Seconds": { show: true }
             }
         });
         $timers.addClass('active');
-        $timers.show();
     },
 
     disablePlayerAction: function() {
         $activeTimers = $('.timer.active');
         $activeTimers.TimeCircles().destroy();
         $activeTimers.removeClass('active');
-        $activeTimers.hide();
     },
 
     sliderHandler: function(value) {
@@ -278,7 +290,7 @@ Poker5 = {
             $('#bet-cmd').attr("value", "Check");
         }
         else {
-            $('#bet-cmd').attr("value", "$" + parseInt(value) + ".00");
+            $('#bet-cmd').attr("value", "$" + parseInt(value));
         }
         $('#bet-input').val(value);
     },
@@ -336,12 +348,12 @@ Poker5 = {
             y = 0;
 
             if ($element.hasClass('small')) {
-                url = "static/images/cards-small.jpg";
+                url = "static/images/cards-small.png";
                 width = 45;
                 height = 75;
             }
             else {
-                url = "static/images/cards.jpg";
+                url = "static/images/cards.png";
                 width = 75;
                 height = 125;
             }
@@ -382,39 +394,31 @@ Poker5 = {
     }
 }
 
+function getTestGameMessage() {
+    return {
+        "msg_id": "game-update",
+        "event": "new-game",
+        "players": [
+            {"id": "leonard", "name": "Leonard", "money": 10000.0, "alive": true , "bet": 0.0},
+            {"id": "michael", "name": "Michael", "money": 10000.0, "alive": true, "bet": 0.0},
+            {"id": $('#current-player').data('id'), "name": "You", "money": 10000.0, "alive": true, "bet": 0.0},
+            {"id": "charles", "name": "Charles", "money": 10000.0, "alive": true, "bet": 0.0}
+        ],
+        "pot": 0.0
+    }
+}
+
 $(document).ready(function() {
     Poker5.init()
+    // Tests
+//    message = getTestGameMessage();
+//    Poker5.onGameUpdate(message);
+//    message.players[0].money = 9900;
+//    message.players[1].money = 9900;
+//    message.players[2].money = 9900;
+//    message.players[3].money = 9900;
+//    message.pot = 400;
+//    message.event = "cards-assignment";
+//    Poker5.onGameUpdate(message)
 })
 
-
-/*
-var inbox = new ReconnectingWebSocket(ws_scheme + location.host + "/receive");
-var outbox = new ReconnectingWebSocket(ws_scheme + location.host + "/submit");
-
-inbox.onmessage = function(message) {
-  var data = JSON.parse(message.data);
-  $("#chat-text").append("<div class='panel panel-default'><div class='panel-heading'>" + $('<span/>').text(data.handle).html() + "</div><div class='panel-body'>" + $('<span/>').text(data.text).html() + "</div></div>");
-  $("#chat-text").stop().animate({
-    scrollTop: $('#chat-text')[0].scrollHeight
-  }, 800);
-};
-
-inbox.onclose = function(){
-    console.log('inbox closed');
-    this.inbox = new WebSocket(inbox.url);
-
-};
-
-outbox.onclose = function(){
-    console.log('outbox closed');
-    this.outbox = new WebSocket(outbox.url);
-};
-
-$("#input-form").on("submit", function(event) {
-  event.preventDefault();
-  var handle = $("#input-handle")[0].value;
-  var text   = $("#input-text")[0].value;
-  outbox.send(JSON.stringify({ handle: handle, text: text }));
-  $("#input-text")[0].value = "";
-});
-*/

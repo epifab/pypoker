@@ -133,7 +133,7 @@ class Game:
             score = self._score_detector.get_score(cards)
 
             try:
-                player.set_cards(cards, score)
+                player.set_cards(score.get_cards(), score)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
                 self._players_in_error.append(player_key)
@@ -238,7 +238,7 @@ class Game:
                     cards = [card for card in player.get_cards() if card not in discards] + new_cards
                     score = self._score_detector.get_score(cards)
                     # Sending cards to the remote player
-                    player.set_cards(cards, score)
+                    player.set_cards(score.get_cards(), score)
 
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
