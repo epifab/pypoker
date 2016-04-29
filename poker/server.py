@@ -24,7 +24,14 @@ class Server:
             player.try_send_message(message)
 
     def _join_lobby(self, player):
-        if not player.try_send_message({"msg_id": "connect", "server": self._id}):
+        connected = player.try_send_message({
+            "msg_id": "connect",
+            "server": self._id,
+            "player": player.dto()
+        })
+
+        if not connected:
+            self._logger.error("{}: Unable to connect {}".format(self, player))
             return
 
         self._lobby_lock.acquire()

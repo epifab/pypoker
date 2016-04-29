@@ -336,7 +336,7 @@ class Game:
 
     def dto(self):
         game_dto = {
-            "id": self._id,
+            "game": self._id,
             "phase": self._phase,
             "pot": self._pot,
             "dealer": self._dealer_key,
