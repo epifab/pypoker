@@ -9,17 +9,6 @@ h1 .py {
     color: #EED;
 }
 
-#game-log {
-    background-color: #333;
-    border: 0px;
-    width: 100%;
-    margin: 0px;
-    clear: both;
-    padding: 10px;
-    margin-bottom: 20px;
-}
-
-
 
 /*****************************************************
   Players
@@ -28,33 +17,38 @@ h1 .py {
 
 #players .player {
     float: left;
-    width: 100px;
-    height: 100px;
-    border-radius: 100px;
+    width: 110px;
+    height: 200px;
     text-align: center;
     padding: 10px 5px 5px 5px;
     margin: 5px 15px 0px 15px;
-    background-color: #333;
     position: relative;
 }
 
-#players .player.current {
+#players .player .player-info {
+    width: 100px;
+    height: 100px;
+    border-radius: 100px;
+    background-color: #333;
+}
+
+#players .player.current .player-info {
     background-color: #2377c6;
 }
 
 #players .player .timer {
     position: absolute;
-    top: -35px;
-    left: -35px;
+    top: -25px;
+    left: -30px;
     width: 170px;
     float: left;
 }
 
 #players .player .bet {
     position: absolute;
-    bottom: -45px;
+    top: 140px;
     text-align: center;
-    width: 100px;
+    width: 110px;
     left: 0px;
     background-color: #194996;
     padding: 5px;
@@ -65,12 +59,41 @@ h1 .py {
     display: none;
 }
 
-#players .player .cards {
-    display: none;
-}
-
 #players .player .player-info p {
     margin: 0px;
+}
+
+#players .player .cards {
+    position: absolute;
+    top: 65px;
+    left: 0px;
+    width: 110px;
+    z-index: 999;
+}
+
+#players .player .cards .category {
+    background-color: #333;
+}
+
+#players .card {
+    font-weight: bold;
+    width: 20px;
+    padding: 3px;
+    height: 40px;
+    background-color: #FFF;
+    margin: 0px 1px 0px 1px;
+}
+
+#players .card .suit {
+    margin-top: -8px;
+    font-size: 15pt;
+}
+
+#players .card[data-suit="hearts"], #players .card[data-suit="diams"] {
+    color: #F00;
+}
+#players .card[data-suit="clubs"], #players .card[data-suit="spades"] {
+    color: #000;
 }
 
 
@@ -109,21 +132,37 @@ h1 .py {
 
 #table {
     width: 100%;
-    height: 130px;
     border-radius: 50px;
     border: 2px solid #222;
     clear: both;
     background-color: #333;
-    padding: 30px;
+    padding: 10px 5px 10px 5px;
+}
+
+#table .row {
+    margin-left: 0px;
+    margin-right: 0px;
 }
 
 #table #pot {
-    background-image: url(../images/chips.png);
+    background-image: url(../images/chip-100.png);
     background-repeat: no-repeat;
-    padding-left: 85px;
-    padding-top: 20px;
-    font-size: 20pt;
     height: 100px;
+    width: 100px;
+    padding: 40px 0px;
+    text-align: center;
+}
+
+#game-log {
+    height: 200px;
+    background-color: #333;
+    overflow: auto;
+    width: 100%;
+    margin: 10px 0px;
+}
+
+#game-log p {
+    margin: 5px 10px;
 }
 
 
@@ -138,7 +177,18 @@ h1 .py {
 }
 
 #current-player .cards {
-    margin: 10px 0px 0px 25px;
+    margin: 10px -25px 0px 25px;
+    position: relative;
+}
+
+#current-player .cards .category {
+    clear: both;
+    width: 280px;
+    text-align: center;
+    background-color: #333;
+    padding: 20px;
+    border-radius: 20px;
+    margin-left: -25px;
 }
 
 #current-player .cards .card {
@@ -153,7 +203,7 @@ h1 .py {
  *****************************************************/
 
 #player-controls .btn, #player-controls .slider {
-    width: 250px;
+    width: 280px;
     padding: 10px;
     margin: 5px 0px;
 }
@@ -195,13 +245,5 @@ and (max-device-width: 480px) {
 
     #players {
         padding: 0px;
-    }
-
-    #game-log {
-        border: 0px;
-        width: 100%;
-        margin: 0px;
-        clear: both;
-        padding: 10px;
     }
 }

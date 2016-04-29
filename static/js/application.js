@@ -5,12 +5,24 @@ Poker5 = {
 
     cardsChangeMode: true,
 
-    log: function(text) {
-        $('#game-log').append($('<p></p>').text(text));
+    scoreCategories: {
+        0: "Highest card",
+        1: "Pair",
+        2: "Double pair",
+        3: "Three of a kind",
+        4: "Straight",
+        5: "Full house",
+        6: "Flush",
+        7: "Four of a kind",
+        8: "Straight flush"
     },
 
-    clearLogs: function() {
-        $('#game-log').empty();
+    log: function(text) {
+        log = $('<p></p>');
+        log.text(text);
+        pane = $('#game-log').data('jsp');
+        pane.getContentPane().prepend(log);
+        pane.reinitialise();
     },
 
     init: function() {
@@ -21,8 +33,8 @@ Poker5 = {
             var ws_scheme = "ws://"
         }
 
-        this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
-//        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
+        // this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
+        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
             Poker5.log('Connected :)');
@@ -38,6 +50,9 @@ Poker5 = {
             console.log(data);
 
             switch (data.msg_id) {
+                case 'ping':
+                    Poker5.socket.send(JSON.stringify({'msg_id': 'ping'}));
+                    break;
                 case 'connect':
                     Poker5.onConnect(data);
                     break;
@@ -49,12 +64,6 @@ Poker5 = {
                     break;
                 case 'set-cards':
                     Poker5.onSetCards(data);
-                    break;
-                case 'change-cards':
-                    Poker5.onChangeCards(data);
-                    break;
-                case 'bet':
-                    Poker5.onBet(data);
                     break;
                 case 'game-update':
                     Poker5.onGameUpdate(data);
@@ -104,6 +113,8 @@ Poker5 = {
 
         this.setCardsChangeMode(false);
         this.disableBetMode();
+
+        $('#game-log').jScrollPane({'showArrows': true});
     },
 
     onGameUpdate: function(message) {
@@ -115,11 +126,9 @@ Poker5 = {
             case 'game-over':
                 break;
             case 'cards-assignment':
-                this.clearLogs();
                 this.log('New hand');
                 break;
             case 'bet':
-                this.disablePlayerAction();
                 player = message.players[message.player];
                 switch (message.bet_type) {
                     case 'fold':
@@ -135,20 +144,20 @@ Poker5 = {
                 }
                 break;
             case 'cards-change':
-                this.disablePlayerAction();
-                Poker5.log("Player " + message.players[message.player].name + " changed " + message.num_cards + " cards.");
+                Poker5.log(message.players[message.player].name + " changed " + message.num_cards + " cards.");
                 break;
             case 'player-action':
-                Poker5.enablePlayerAction(message.players[message.player].id, message.timeout);
+                Poker5.onPlayerAction(message);
                 break;
             case 'winner-designation':
-                Poker5.log("Player " + message.players[message.player].name + " won!");
+                Poker5.log(message.players[message.player].name + " won!");
                 break;
         }
     },
 
     onConnect: function(message) {
         this.log("Connection established with poker5 server: " + message.server);
+        $('#current-player').data('id', message.player.id);
     },
 
     onDisconnect: function(message) {
@@ -179,11 +188,11 @@ Poker5 = {
     onSetCards: function(message) {
         for (cardKey in message.cards) {
             Poker5.setCard(
-                $('#current-player').data('id'),
                 cardKey,
                 message.cards[cardKey][0],
                 message.cards[cardKey][1]);
         }
+        $('#current-player .cards .category').text(Poker5.scoreCategories[message.score.category]);
     },
 
     onBet: function(message) {
@@ -207,13 +216,7 @@ Poker5 = {
 
             $('#players').append(
                 '<div class="' + playerClass + '" data-id="' + player.id + '">'
-                + '<div class="cards row">'
-                + '<div class="card small pull-left" data-key="0"></div>'
-                + '<div class="card small pull-left" data-key="1"></div>'
-                + '<div class="card small pull-left" data-key="2"></div>'
-                + '<div class="card small pull-left" data-key="3"></div>'
-                + '<div class="card small pull-left" data-key="4"></div>'
-                + '</div>'
+                + '<div class="cards"></div>'
                 + '<div class="player-info">'
                 + '<p class="player-name">' + player.name + '</p>'
                 + '<p class="player-money">$' + parseInt(player.money) + '</p>'
@@ -229,25 +232,61 @@ Poker5 = {
             this.initGame(message);
         }
 
-        $('#pot').text("$" + parseInt(message.pot));
+        $('#pot').text(parseInt(message.pot));
 
         for (key in message.players) {
             player = message.players[key]
+            $cards = $('#players .player[data-id="' + player.id + '"] .cards');
+            $cards.empty();
+
             if (player.score) {
                 for (cardKey in player.score.cards) {
-                    Poker5.setCard(
-                        player.id,
-                        cardKey,
-                        player.score.cards[cardKey][0],
-                        player.score.cards[cardKey][1]);
+                    card = player.score.cards[cardKey];
+
+                    switch (card[0]) {
+                        case 11:
+                            rank = 'J';
+                            break;
+                        case 12:
+                            rank = 'Q';
+                            break;
+                        case 13:
+                            rank = 'K';
+                            break;
+                        case 1:
+                        case 14:
+                            rank = 'A';
+                            break;
+                        default:
+                            rank = card[0];
+                    }
+
+                    switch (card[1]) {
+                        case 3:
+                            suit = "hearts";
+                            break;
+                        case 2:
+                            suit = "diams";
+                            break;
+                        case 1:
+                            suit = "clubs";
+                            break;
+                        default:
+                            suit = "spades";
+                            break;
+                    }
+
+                    $cards.append(
+                        '<div class="card text" data-suit="' + suit + '">'
+                        + '<div class="rank">' + rank + '</div>'
+                        + '<div class="suit">&' + suit + ';</div>'
+                        + '</div>'
+                    );
                 }
+
+                $cards.append('<div class="category">' + Poker5.scoreCategories[player.score.category] + "</div>")
             }
-            else if (player.id != $('#current-player').data('id')) {
-                $('.player[data-id="' + player.id + '"] .card').each(function() {
-                    $(this).css('background-position', '');
-                    $(this).css('background-image', '');
-                });
-            }
+
             $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money));
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
@@ -258,11 +297,29 @@ Poker5 = {
                 $('.player[data-id="' + player.id + '"]').css('opacity', 50);
             }
         }
+
+        // Reset timers
+        $activeTimers = $('.timer.active');
+        $activeTimers.TimeCircles().destroy();
+        $activeTimers.removeClass('active');
     },
 
-    enablePlayerAction: function(playerId, timeout) {
+    onPlayerAction: function(message) {
+        playerId = message.players[message.player].id;
+        if (playerId == $('#current-player').data('id')) {
+            // Action required to the current player
+            switch (message.action) {
+                case 'bet':
+                    this.onBet(message);
+                    break;
+                case 'change-cards':
+                    this.onChangeCards(message);
+                    break;
+            }
+        }
+
         $timers = $('.player[data-id="' + playerId + '"] .timer');
-        $timers.data('timer', timeout);
+        $timers.data('timer', message.timeout);
         $timers.TimeCircles({
             "start": true,
             "animation": "smooth",
@@ -277,12 +334,6 @@ Poker5 = {
             }
         });
         $timers.addClass('active');
-    },
-
-    disablePlayerAction: function() {
-        $activeTimers = $('.timer.active');
-        $activeTimers.TimeCircles().destroy();
-        $activeTimers.removeClass('active');
     },
 
     sliderHandler: function(value) {
@@ -313,7 +364,7 @@ Poker5 = {
                 'value': parseInt(message.min_bet),
                 'formatter': this.sliderHandler
             });
-            this.sliderHandler(message.min_bet);
+            $('#bet-input').slider('setValue', parseInt(message.min_bet));
 
             $('#fold-cmd-wrapper').show();
             $('#bet-input-wrapper').show();
@@ -340,85 +391,134 @@ Poker5 = {
         }
     },
 
-    setCard: function(playerId, cardKey, rank, suit) {
-        $('.player[data-id="' + playerId + '"] .card[data-key="' + cardKey + '"]').each(function() {
-            $element = $(this);
+    setCard: function(cardKey, rank, suit) {
+        $card = $('#current-player .card[data-key="' + cardKey + '"]');
 
-            x = 0;
-            y = 0;
+        x = 0;
+        y = 0;
 
-            if ($element.hasClass('small')) {
-                url = "static/images/cards-small.png";
-                width = 45;
-                height = 75;
-            }
-            else {
-                url = "static/images/cards.png";
-                width = 75;
-                height = 125;
-            }
+        if ($card.hasClass('small')) {
+            url = "static/images/cards-small.png";
+            width = 45;
+            height = 75;
+        }
+        else {
+            url = "static/images/cards.png";
+            width = 75;
+            height = 125;
+        }
 
-            switch (suit) {
-                case 0:
-                    // Spades
-                    x -= width;
-                    y -= height;
-                    break;
-                case 1:
-                    // Clubs
-                    y -= height;
-                    break;
-                case 2:
-                    // Diamonds
-                    x -= width;
-                    break;
-                case 3:
-                    // Hearts
-                    break;
-                default:
-                    throw "Invalid suit";
-            }
+        switch (suit) {
+            case 0:
+                // Spades
+                x -= width;
+                y -= height;
+                break;
+            case 1:
+                // Clubs
+                y -= height;
+                break;
+            case 2:
+                // Diamonds
+                x -= width;
+                break;
+            case 3:
+                // Hearts
+                break;
+            default:
+                throw "Invalid suit";
+        }
 
-            if (rank == 14) {
-                rank = 1;
-            }
-            else if (rank < 1 || rank > 13) {
-                throw "Invalid rank";
-            }
+        if (rank == 14) {
+            rank = 1;
+        }
+        else if (rank < 1 || rank > 13) {
+            throw "Invalid rank";
+        }
 
-            x -= (rank - 1) * 2 * width;
+        x -= (rank - 1) * 2 * width;
 
-            $element.css('background-position', x + "px " + y + "px");
-            $element.css('background-image', 'url(' + url + ')');
-        })
-    }
-}
-
-function getTestGameMessage() {
-    return {
-        "msg_id": "game-update",
-        "event": "new-game",
-        "players": [
-            {"id": "leonard", "name": "Leonard", "money": 10000.0, "alive": true , "bet": 0.0},
-            {"id": "michael", "name": "Michael", "money": 10000.0, "alive": true, "bet": 0.0},
-            {"id": $('#current-player').data('id'), "name": "You", "money": 10000.0, "alive": true, "bet": 0.0},
-            {"id": "charles", "name": "Charles", "money": 10000.0, "alive": true, "bet": 0.0}
-        ],
-        "pot": 0.0
+        $card.css('background-position', x + "px " + y + "px");
+        $card.css('background-image', 'url(' + url + ')');
     }
 }
 
 $(document).ready(function() {
     Poker5.init()
     // Tests
-//    message = getTestGameMessage();
-//    Poker5.onGameUpdate(message);
-//    message.players[0].money = 9900;
-//    message.players[1].money = 9900;
-//    message.players[2].money = 9900;
-//    message.players[3].money = 9900;
-//    message.pot = 400;
-//    message.event = "cards-assignment";
-//    Poker5.onGameUpdate(message)
+//    Poker5.onConnect({
+//        "msg_id": "connect",
+//        "server": "server-123",
+//        "player": {
+//            "id": "12345-67890-abcde-fghij",
+//            "name": "John Doe",
+//            "money": 1000
+//        }
+//    });
+//
+//    Poker5.onGameUpdate({
+//        "msg_id": "game-update",
+//        "game": "game-123",
+//        "event": "new-game",
+//        "players": [
+//            {
+//                "id": "23456-67890-abcde-fghij",
+//                "name": "Jim Morrison",
+//                "money": 1000,
+//                "alive": true,
+//                "bet": 0
+//            },
+//            {
+//                "id": "12345-67890-abcde-fghij",
+//                "name": "John Doe",
+//                "money": 1000,
+//                "alive": true,
+//                "bet": 0
+//            }
+//        ],
+//        "pot": 0
+//    });
+//
+//    Poker5.onSetCards({
+//        "msg_id": "set-cards",
+//        "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]],
+//        "score": {
+//            "category": 7,
+//            "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]]
+//        }
+//    });
+//
+//    Poker5.onGameUpdate({
+//        "msg_id": "game-update",
+//        "player": 0,
+//        "timeout": 60,
+//        "game": "game-123",
+//        "event": "player-action",
+//        "players": [
+//            {
+//                "id": "23456-67890-abcde-fghij",
+//                "name": "Jim Morrison",
+//                "money": 1600,
+//                "alive": true,
+//                "bet": 0,
+//                "score": {
+//                    "cards": [[14, 3], [14, 2], [14, 1], [14, 0], [9, 2]],
+//                    "category": 7
+//                }
+//            },
+//            {
+//                "id": "12345-67890-abcde-fghij",
+//                "name": "John Doe",
+//                "money": 400,
+//                "alive": true,
+//                "bet": 0,
+//                "score": {
+//                    "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]],
+//                    "category": 7
+//                }
+//            }
+//        ],
+//        "pot": 0
+//    });
 })
 
