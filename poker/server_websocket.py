@@ -39,7 +39,7 @@ class MessageReceiver:
         if self.error:
             raise ChannelError("Unable to receive data from the remote host")
         elif not self.message:
-            raise TimeoutError("Timed out")
+            raise MessageTimeout("Timed out")
         return self.message
 
 
