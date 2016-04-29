@@ -1,7 +1,6 @@
 from poker import Channel, ChannelError, MessageFormatError, MessageTimeout, Server
 import logging
 import json
-import threading
 import time
 import gevent
 
@@ -21,6 +20,29 @@ class ServerWebSocket(Server):
             gevent.sleep(0.1)
 
 
+class MessageReceiver:
+    def __init__(self, ws, timeout):
+        self.ws = ws
+        self.timeout = timeout
+        self.message = None
+        self.error = False
+
+    def _receive(self):
+        try:
+            self.message = self.ws.receive()
+        except:
+            self.error = True
+
+    def receive(self):
+        thread = gevent.spawn(self._receive)
+        thread.join(int(self.timeout - time.time()))
+        if self.error:
+            raise ChannelError("Unable to receive data from the remote host")
+        elif not self.message:
+            raise TimeoutError("Timed out")
+        return self.message
+
+
 class WebSocketChannel(Channel):
     def __init__(self, ws, logger=None):
         self._ws = ws
@@ -30,12 +52,13 @@ class WebSocketChannel(Channel):
         self._ws.close()
 
     def send_message(self, message):
+        if self._ws.closed:
+            raise ChannelError("Unable to send data to the remote host (not connected)")
+
         # Encode the message
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
 
-        if self._ws.closed:
-            raise ChannelError("Unable to send data to the remote host (not connected)")
         try:
             self._ws.send(msg_encoded)
         except:
@@ -47,18 +70,13 @@ class WebSocketChannel(Channel):
         if self._ws.closed:
             raise ChannelError("Unable to receive data from the remote host (not connected)")
 
+        message = MessageReceiver(self._ws, timeout).receive()
+
+        if not message:
+            raise ChannelError("Unable to receive data from the remote host (message was empty)")
         try:
-            message = self._ws.receive()
-        except:
-            raise ChannelError("Unable to receive data from the remote host")
-        else:
-            if not message:
-                raise ChannelError("Unable to receive data from the remote host (message was empty)")
-            if (timeout and time.time() > timeout):
-                raise MessageTimeout("Timed out")
-            try:
-                # Deserialize and return the message
-                return json.loads(message)
-            except ValueError:
-                # Invalid json
-                raise MessageFormatError(desc="Unable to decode the JSON message")
+            # Deserialize and return the message
+            return json.loads(message)
+        except ValueError:
+            # Invalid json
+            raise MessageFormatError(desc="Unable to decode the JSON message")
