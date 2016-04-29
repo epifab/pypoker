@@ -176,17 +176,25 @@ class GameClientConsole:
 
             elif message["msg_id"] == "game-update":
                 self._print_game_update(message)
+                if message["event"] == "player-action":
+                    action_player = message["players"][message["player"]]
 
-            elif message["msg_id"] == "bet":
-                try:
-                    timeout_epoch = int(calendar.timegm(time.strptime(message["timeout"], "%Y-%m-%d %H:%M:%S+0000")))
-                    self._player.bet(
-                        min_bet=message["min_bet"],
-                        max_bet=message["max_bet"],
-                        opening=message["opening"],
-                        timeout_epoch=timeout_epoch)
-                except TimeoutError:
-                    print("Time is up!")
+                    if action_player["id"] == self._player.get_id():
+                        timeout_epoch = time.time() + message["timeout"]
+
+                        try:
+                            if message["action"] == "bet":
+                                self._player.bet(
+                                    min_bet=message["min_bet"],
+                                    max_bet=message["max_bet"],
+                                    opening=message["opening"],
+                                    timeout_epoch=timeout_epoch)
+                            elif message["action"] == "change-cards":
+                                self._player.change_cards(timeout_epoch)
+                        except TimeoutError:
+                            print("Time is up!")
+                    else:
+                        print("Waiting for {}...".format(action_player["name"]))
 
             elif message["msg_id"] == "set-cards":
                 cards = [Card(rank, suit) for rank, suit in message["cards"]]
@@ -194,13 +202,6 @@ class GameClientConsole:
                               [Card(rank, suit) for rank, suit in message["score"]["cards"]])
                 self._player.set_cards(cards, score)
                 print(Card.format_cards(cards))
-
-            elif message["msg_id"] == "change-cards":
-                try:
-                    timeout_epoch = int(calendar.timegm(time.strptime(message["timeout"], "%Y-%m-%d %H:%M:%S+0000")))
-                    self._player.change_cards(timeout_epoch)
-                except TimeoutError:
-                    print("Time is up!")
 
     def _print_player(self, player):
         print("Player '{}'\n Cash: ${:,.2f}\n Bets: ${:,.2f}".format(

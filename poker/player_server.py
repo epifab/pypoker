@@ -38,11 +38,12 @@ class PlayerServer(Player):
     def change_cards(self, timeout=None):
         """Gives players the opportunity to change some of their cards.
         Returns a tuple: (discard card ids, discards)."""
-        self.send_message({
-            "msg_id": "change-cards",
-            "timeout": None if not timeout else time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
-
-        message = self.recv_message(timeout=timeout)
+        while True:
+            message = self.recv_message(timeout=timeout)
+            if "msg_id" not in message:
+                raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
+            if message["msg_id"] != "ping":
+                break
 
         MessageFormatError.validate_msg_id(message, "change-cards")
 
@@ -72,7 +73,13 @@ class PlayerServer(Player):
             "max_bet": max_bet,
             "opening": opening})
 
-        message = self.recv_message(timeout=timeout)
+        while True:
+            message = self.recv_message(timeout=timeout)
+            if "msg_id" not in message:
+                raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
+            if message["msg_id"] != "ping":
+                # Ignore ping messages
+                break
 
         MessageFormatError.validate_msg_id(message, "bet")
 
@@ -100,6 +107,13 @@ class PlayerServer(Player):
 
         except ValueError:
             raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
+
+    def ping(self):
+        try:
+            self.send_message({"msg_id": "ping"})
+            return True
+        except ChannelError:
+            return False
 
     def try_send_message(self, message):
         try:

@@ -224,6 +224,7 @@ class Game:
                 self._logger.info("{}: {} changing cards...".format(self, player))
                 self.broadcast({
                     "event": "player-action",
+                    "action": "change-cards",
                     "player": player_key,
                     "timeout": self.CHANGE_CARDS_TIMEOUT,
                     "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
@@ -286,6 +287,10 @@ class Game:
             self._logger.info("{}: {} betting...".format(self, player))
             self.broadcast({
                 "event": "player-action",
+                "action": "bet",
+                "min_bet": min_bet,
+                "max_bet": max_bet,
+                "opening": opening,
                 "player": player_key,
                 "timeout": self.BET_TIMEOUT,
                 "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})

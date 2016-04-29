@@ -34,7 +34,7 @@ class Server:
             new_lobby = []
 
             for p in self._lobby:
-                if p.get_id() == player.get_id() or not p.try_send_message({"msg_id": "ping"}):
+                if p.get_id() == player.get_id() or not p.ping():
                     self._logger.info("{}: {} left the lobby".format(self, p))
                     self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": p.dto()})
                     p.disconnect()
