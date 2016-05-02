@@ -320,10 +320,10 @@ Poker5 = {
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
             if (player.alive) {
-                $('.player[data-id="' + player.id + '"]').css('opacity', 100);
+                $('.player[data-id="' + player.id + '"]').css('opacity', 1);
             }
             else {
-                $('.player[data-id="' + player.id + '"]').css('opacity', 50);
+                $('.player[data-id="' + player.id + '"]').css('opacity', 0.5);
             }
         }
 
