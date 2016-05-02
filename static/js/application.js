@@ -192,7 +192,7 @@ Poker5 = {
     },
 
     onLobbyUpdate: function(message) {
-        player = message.players[message.player];
+        player = message.player;
         playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
 
         switch (message.event) {

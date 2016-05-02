@@ -366,4 +366,4 @@ class Game:
 class TimeoutGenerator:
     @staticmethod
     def generate(seconds):
-        return time.time() + seconds
+        return time.time() + seconds + 2  # Added a couple of extra seconds to deal with network overhead
