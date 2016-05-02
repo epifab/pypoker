@@ -16,34 +16,60 @@ sockets = Sockets(app)
 server = ServerWebSocket(app.logger)
 gevent.spawn(server.start)
 
+# Poker champions: https://en.wikipedia.org/wiki/List_of_World_Series_of_Poker_Main_Event_champions
 names = [
-    "Leonard",
-    "Michael",
-    "Fab",
-    "Charles",
-    "Jim",
-    "Jimy",
-    "John",
-    "Paul",
-    "George",]
-
-surnames = [
-    "Morrison",
-    "Hendrix",
-    "Lennon",
-    "McCartney",
-    "Harrison",]
-
+    "Johnny Moss",
+    "Thomas Preston",
+    "Walter Pearson",
+    "Brian Roberts",
+    "Doyle Brunson",
+    "Bobby Baldwin",
+    "Hal Fowler",
+    "Stu Ungar",
+    "Jack Straus",
+    "Tom McEvoy",
+    "Jack Keller",
+    "Bill Smith",
+    "Barry Johnston",
+    "Johnny Chan",
+    "Phil Hellmuth",
+    "Mansour Matloubi",
+    "Brad Daugherty",
+    "Hamid Dastmalchi",
+    "Jim Bechtel",
+    "Russ Hamilton",
+    "Dan Harrington",
+    "Huck Seed",
+    "Stu Ungar",
+    "Scotty Nguyen",
+    "Noel Furlong",
+    "Chris Ferguson",
+    "Carlos Mortensen",
+    "Robert Varkonyi",
+    "Chris Moneymaker",
+    "Greg Raymer",
+    "Joe Hachem",
+    "Jamie Gold",
+    "Jerry Yang",
+    "Peter Eastgate",
+    "Joe Cada",
+    "Jonathan Duhamel",
+    "Pius Heinz",
+    "Greg Merson",
+    "Ryan Riess",
+    "Martin Jacobson",
+    "Joe McKeehen",
+]
 
 players = {}
 
 
 @app.route('/')
 def hello():
-    global names, surnames
+    global names
     if 'player-id' not in session:
         session['player-id'] = str(uuid.uuid4())
-        session['player-name'] = random.choice(names) + " " + random.choice(surnames)
+        session['player-name'] = random.choice(names)
         session['player-money'] = 1000.00
     return render_template('index.html',
                            id=session['player-id'],
@@ -71,5 +97,5 @@ def poker5(ws):
             last_ping = time.time()
 
 
-# if __name__ == '__main__':
-#     app.run()
+if __name__ == '__main__':
+    app.run()

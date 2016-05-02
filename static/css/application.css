@@ -65,7 +65,7 @@ h1 .py {
 
 #players .player .cards {
     position: absolute;
-    top: 65px;
+    top: 75px;
     left: 0px;
     width: 110px;
     z-index: 999;
@@ -151,6 +151,36 @@ h1 .py {
     width: 100px;
     padding: 40px 0px;
     text-align: center;
+    float: left;
+}
+
+#table #game-status {
+    min-height: 100px;
+    margin-left: 110px;
+}
+
+#table #game-status p {
+    margin: 2px 0px;
+}
+
+#table #game-status p[data-key="1"] {
+    opacity: 0.8;
+}
+
+#table #game-status p[data-key="2"] {
+    opacity: 0.6;
+}
+
+#table #game-status p[data-key="3"] {
+    opacity: 0.4;
+}
+
+#table #game-status p[data-key="4"] {
+    opacity: 0.2;
+}
+
+#game-log {
+    display: none;
 }
 
 #game-log {
@@ -172,6 +202,7 @@ h1 .py {
  *****************************************************/
 
 #current-player {
+    display: none;
     clear: both;
     margin-top: 15px;
 }
@@ -224,26 +255,9 @@ and (max-device-width: 480px) {
         padding-right: 0px;
     }
 
-    #current-player .player-info {
-        display: none;
-        margin-top: 25px;
-        margin-bottom: 25px;
-    }
-
     #current-player .btn, #current-player .slider {
         width: 100%;
         padding: 10px;
         margin-bottom: 12px;
-    }
-
-    #current-player .timer {
-        width: 100px;
-        margin-left: 10px;
-        float: left;
-        margin-right: 10px;
-    }
-
-    #players {
-        padding: 0px;
     }
 }

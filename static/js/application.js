@@ -18,23 +18,24 @@ Poker5 = {
     },
 
     log: function(text) {
-        log = $('<p></p>');
-        log.text(text);
-        pane = $('#game-log').data('jsp');
-        pane.getContentPane().prepend(log);
-        pane.reinitialise();
+        $p0 = $('#game-status p[data-key="0"]');
+        $p1 = $('#game-status p[data-key="1"]');
+        $p2 = $('#game-status p[data-key="2"]');
+        $p3 = $('#game-status p[data-key="3"]');
+        $p4 = $('#game-status p[data-key="4"]');
+
+        $p4.text($p3.text());
+        $p3.text($p2.text());
+        $p2.text($p1.text());
+        $p1.text($p0.text());
+        $p0.text(text);
     },
 
     init: function() {
-        if (window.location.protocol == "https:") {
-            var ws_scheme = "wss://";
-        }
-        else {
-            var ws_scheme = "ws://"
-        }
+        wsScheme = window.location.protocol == "https:" ? "wss://" : "ws://";
 
-        // this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
-        this.socket = new WebSocket(ws_scheme + location.host + "/poker5");
+//        this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
+        this.socket = new WebSocket(wsScheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
             Poker5.log('Connected :)');
@@ -69,10 +70,10 @@ Poker5 = {
                     Poker5.onGameUpdate(data);
                     break;
                 case 'error':
-                    Poker5.log('Error received: ' + data.error)
+                    Poker5.log('Error received: ' + data.error);
                     break;
                 case 'timeout':
-                    Poker5.log('Timed out')
+                    Poker5.log('Timed out');
                     break;
             }
         };
@@ -113,44 +114,60 @@ Poker5 = {
 
         this.setCardsChangeMode(false);
         this.disableBetMode();
-
-        $('#game-log').jScrollPane({'showArrows': true});
     },
 
     onGameUpdate: function(message) {
-        this.updateGame(message);
+        switch (message.event) {
+            case 'new-game':
+                this.initGame(message);
+                break;
+            case 'game-over':
+                this.destroyGame();
+                break;
+            default:
+                this.updateGame(message);
+        }
 
         switch (message.event) {
             case 'new-game':
+                this.log('New game');
                 break;
             case 'game-over':
+                this.destroyGame();
+                this.log('Game over');
                 break;
             case 'cards-assignment':
                 this.log('New hand');
                 break;
             case 'bet':
                 player = message.players[message.player];
+                playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
+
                 switch (message.bet_type) {
                     case 'fold':
                     case 'pass':
                     case 'check':
-                        this.log(player.name + " " + message.bet_type);
+                        this.log(playerName + " " + message.bet_type);
                         break;
                     case 'open':
                     case 'call':
                     case 'raise':
-                        this.log(player.name + " bet $" + parseInt(message.bet) + " (" + message.bet_type + ")");
+                        this.log(playerName + " bet $" + parseInt(message.bet) + " (" + message.bet_type + ")");
                         break;
                 }
                 break;
             case 'cards-change':
-                Poker5.log(message.players[message.player].name + " changed " + message.num_cards + " cards.");
+                player = message.players[message.player];
+                playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
+                this.log(playerName + " changed " + message.num_cards + " cards.");
                 break;
             case 'player-action':
-                Poker5.onPlayerAction(message);
+                this.onPlayerAction(message);
                 break;
             case 'winner-designation':
-                Poker5.log(message.players[message.player].name + " won!");
+                player = message.players[message.player];
+                playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
+                this.log(playerName + " won!");
                 break;
         }
     },
@@ -175,12 +192,15 @@ Poker5 = {
     },
 
     onLobbyUpdate: function(message) {
+        player = message.players[message.player];
+        playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
+
         switch (message.event) {
             case 'player-added':
-                this.log(message.player.name + " joined the lobby");
+                this.log(playerName + " joined the lobby");
                 break;
             case 'player-removed':
-                this.log(message.player.name + " left the lobby");
+                this.log(playerName + " left the lobby");
                 break;
         }
     },
@@ -218,20 +238,27 @@ Poker5 = {
                 '<div class="' + playerClass + '" data-id="' + player.id + '">'
                 + '<div class="cards"></div>'
                 + '<div class="player-info">'
-                + '<p class="player-name">' + player.name + '</p>'
+                + '<p class="player-name">' + (player.id == $('#current-player').data('id') ? 'You' : player.name) + '</p>'
                 + '<p class="player-money">$' + parseInt(player.money) + '</p>'
                 + '</div>'
                 + '<div class="timer"></div>'
                 + '<div class="bet"></div>'
                 + '</div>');
         }
+
+        $('#current-player').show();
+        this.resetCards();
+    },
+
+    destroyGame: function() {
+        $('#players').empty();
+        this.resetControls();
+        this.resetTimers();
+        $('#current-player').hide();
+        $('#pot').empty();
     },
 
     updateGame: function(message) {
-        if (message.event == "new-game") {
-            this.initGame(message);
-        }
-
         $('#pot').text(parseInt(message.pot));
 
         for (key in message.players) {
@@ -298,27 +325,36 @@ Poker5 = {
             }
         }
 
-        // Reset timers
-        $activeTimers = $('.timer.active');
-        $activeTimers.TimeCircles().destroy();
-        $activeTimers.removeClass('active');
+        this.resetControls();
+        this.resetTimers();
     },
 
     onPlayerAction: function(message) {
-        playerId = message.players[message.player].id;
-        if (playerId == $('#current-player').data('id')) {
-            // Action required to the current player
-            switch (message.action) {
-                case 'bet':
+        player = message.players[message.player];
+        isCurrentPlayer = player.id == $('#current-player').data('id');
+
+        switch (message.action) {
+            case 'bet':
+                if (isCurrentPlayer) {
+                    this.log('Your turn to bet');
                     this.onBet(message);
-                    break;
-                case 'change-cards':
+                }
+                else {
+                    this.log('Waiting for ' + player.name + ' to bet...');
+                }
+                break;
+            case 'change-cards':
+                if (isCurrentPlayer) {
+                    this.log('Your turn to change cards');
                     this.onChangeCards(message);
-                    break;
-            }
+                }
+                else {
+                    this.log('Waiting for ' + player.name + ' to change cards...');
+                }
+                break;
         }
 
-        $timers = $('.player[data-id="' + playerId + '"] .timer');
+        $timers = $('.player[data-id="' + player.id + '"] .timer');
         $timers.data('timer', message.timeout);
         $timers.TimeCircles({
             "start": true,
@@ -334,6 +370,19 @@ Poker5 = {
             }
         });
         $timers.addClass('active');
+    },
+
+    resetTimers: function() {
+        // Reset timers
+        $activeTimers = $('.timer.active');
+        $activeTimers.TimeCircles().destroy();
+        $activeTimers.removeClass('active');
+    },
+
+    resetControls: function() {
+        // Reset controls
+        this.setCardsChangeMode(false);
+        this.disableBetMode();
     },
 
     sliderHandler: function(value) {
@@ -440,6 +489,15 @@ Poker5 = {
 
         $card.css('background-position', x + "px " + y + "px");
         $card.css('background-image', 'url(' + url + ')');
+   },
+
+    resetCards: function() {
+        $('#current-player .card').each(function() {
+            $card = $(this);
+            $card.css('background-image', 'url(static/images/card-back.png)');
+            $card.css('background-position', '0px 0px');
+        });
+        $('#current-player .cards .category').empty();
     }
 }
 
