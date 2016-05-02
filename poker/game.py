@@ -271,8 +271,8 @@ class Game:
                 winner_key = player_key
                 self._public_cards_keys.append(player_key)
             else:
+                self._folder_keys.append(player_key)
                 # In a real poker italian game this player is not obligated to show his score
-                pass
             self._logger.info("{}: {} score: {}".format(self, player, player.get_score()))
         return winner_key
 
