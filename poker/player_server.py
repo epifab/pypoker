@@ -108,11 +108,14 @@ class PlayerServer(Player):
         except ValueError:
             raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
 
-    def ping(self):
+    def ping(self, pong=False):
         try:
             self.send_message({"msg_id": "ping"})
+            if pong:
+                self.recv_message(time.time() + 1)
+                MessageFormatError.validate_msg_id("ping")
             return True
-        except ChannelError:
+        except (ChannelError, TimeoutError, MessageFormatError):
             return False
 
     def try_send_message(self, message):
