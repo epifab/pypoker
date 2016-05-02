@@ -112,10 +112,10 @@ class PlayerServer(Player):
         try:
             self.send_message({"msg_id": "ping"})
             if pong:
-                self.recv_message(time.time() + 1)
-                MessageFormatError.validate_msg_id("ping")
+                message = self.recv_message(time.time() + 1)
+                MessageFormatError.validate_msg_id(message, "ping")
             return True
-        except (ChannelError, TimeoutError, MessageFormatError):
+        except (ChannelError, MessageTimeout, MessageFormatError):
             return False
 
     def try_send_message(self, message):

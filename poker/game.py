@@ -1,8 +1,8 @@
-from poker import player
 from . import Card, ChannelError, MessageTimeout, MessageFormatError
 import logging
 import random, string
 import time
+import gevent
 
 
 class GameError(Exception):
@@ -15,8 +15,10 @@ class HandFailException(Exception):
 
 class Game:
     WAIT_AFTER_HAND = 10
-    CHANGE_CARDS_TIMEOUT = 60
-    BET_TIMEOUT = 60
+    WAIT_AFTER_CARDS_ASSIGNMENT = 3
+    WAIT_AFTER_BET = 2
+    CHANGE_CARDS_TIMEOUT = 45
+    BET_TIMEOUT = 45
 
     # Phases
     PHASE_NEW_GAME = "new-game"
@@ -60,9 +62,6 @@ class Game:
         """Play a single hand."""
         while True:
             try:
-                for player_key in self._players_in_error:
-                    self.broadcast({"event": "player-left", "player": player_key})
-
                 # Initialization
                 self._deck.initialize()
                 self._folder_keys = self._players_in_error
@@ -76,20 +75,24 @@ class Game:
                 elif len(alive_player_keys) > 1:
                     # Cards assignment
                     self._assign_cards()
+                    gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
 
                     # Opening
                     player_key = self._opening_bet_round()
+                    gevent.sleep(Game.WAIT_AFTER_BET)
 
                     # 2 or more players alive
                     if len(self._players) - len(self._folder_keys) > 1:
                         self._change_cards()
                         player_key = self._final_bet_round(player_key)
+                        gevent.sleep(Game.WAIT_AFTER_BET)
 
                     # 2 or more players still alive
                     if len(self._players) - len(self._folder_keys) > 1:
                         player_key = self._detect_winner(player_key)
 
                 elif len(alive_player_keys) == 1:
+                    # Only 1 player alive
                     player_key = alive_player_keys[0]
 
                 self._phase = Game.PHASE_WINNER_DESIGNATION
@@ -108,13 +111,15 @@ class Game:
                     "event": "winner-designation",
                     "player": player_key})
 
-                time.sleep(Game.WAIT_AFTER_HAND)
                 break
 
             except HandFailException:
                 # Automatically play another hand if the last has failed
                 self._failed_hands += 1
                 continue
+
+            finally:
+                gevent.sleep(Game.WAIT_AFTER_HAND)
 
     def get_players(self):
         """Returns the list of players"""

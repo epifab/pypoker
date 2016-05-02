@@ -4,6 +4,7 @@ import json
 import logging
 import socket
 import time
+import gevent
 
 
 class SocketChannel(Channel):
@@ -45,7 +46,7 @@ class SocketChannel(Channel):
                 err = e.args[0]
                 if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
                     # Wait for 200 milliseconds
-                    time.sleep(0.2)
+                    gevent.sleep(0.2)
                     continue
                 else:
                     raise ChannelError("Unable to receive data from the remote host")
