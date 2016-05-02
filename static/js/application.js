@@ -217,10 +217,12 @@ Poker5 = {
 
     onBet: function(message) {
         Poker5.enableBetMode(message);
+        $("html, body").animate({ scrollTop: $(document).height() }, "slow");
     },
 
     onChangeCards: function(message) {
         this.setCardsChangeMode(true);
+        $("html, body").animate({ scrollTop: $(document).height() }, "slow");
     },
 
     initGame: function(message) {
