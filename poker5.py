@@ -4,6 +4,7 @@ from flask import Flask, render_template, session
 from flask_sockets import Sockets
 import random
 import uuid
+import time
 from poker import ServerWebSocket, WebSocketChannel, PlayerServer
 
 app = Flask(__name__)
@@ -60,10 +61,15 @@ def poker5(ws):
 
     server.register(player)
 
+    last_ping = time.time()
     while not ws.closed:
         # Keep the websocket alive
         gevent.sleep(0.1)
+        if time.time() > last_ping + 20:
+            # Ping the client every 20 secs to prevent idle connections
+            player.ping()
+            last_ping = time.time()
 
 
-if __name__ == '__main__':
-    app.run()
+# if __name__ == '__main__':
+#     app.run()
