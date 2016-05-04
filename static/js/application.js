@@ -263,8 +263,11 @@ Poker5 = {
     updateGame: function(message) {
         $('#pot').text(parseInt(message.pot));
 
-        for (key in message.players) {
-            player = message.players[key]
+        for (playerKey in message.players) {
+            player = message.players[playerKey]
+
+            $player = $('.player[data-id="' + player.id + '"]');
+
             $cards = $('#players .player[data-id="' + player.id + '"] .cards');
             $cards.empty();
 
@@ -319,11 +322,20 @@ Poker5 = {
             $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money));
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
-            if (player.alive) {
-                $('.player[data-id="' + player.id + '"]').css('opacity', 1);
+            winner = message.event == 'winner-designation' && message.player == playerKey;
+            if (!winner) {
+                $player.removeClass('winner');
             }
             else {
-                $('.player[data-id="' + player.id + '"]').css('opacity', 0.5);
+                $player.addClass('winner');
+            }
+
+            alive = player.alive && (message.event != 'winner-designation' || message.player == playerKey);
+            if (!alive) {
+                $player.addClass('inactive');
+            }
+            else {
+                $player.removeClass('inactive');
             }
         }
 
@@ -416,6 +428,18 @@ Poker5 = {
                 'formatter': this.sliderHandler
             });
             $('#bet-input').slider('setValue', parseInt(message.min_bet));
+
+            // Fold control
+            if (message.opening) {
+                $('#fold-cmd').val('Pass')
+                    .removeClass('btn-danger')
+                    .addClass('btn-warning');
+            }
+            else {
+                $('#fold-cmd').val('Fold')
+                    .addClass('btn-danger')
+                    .removeClass('btn-warning');
+            }
 
             $('#fold-cmd-wrapper').show();
             $('#bet-input-wrapper').show();

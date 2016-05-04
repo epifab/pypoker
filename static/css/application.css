@@ -25,11 +25,32 @@ h1 .py {
     position: relative;
 }
 
+#players .player-info {
+    position: absolute;
+    top: 10px;
+    left: 5px;
+}
+
+#players .player.inactive {
+    opacity: 0.5;
+}
+
+#players .player.winner .player-info {
+    left: -5px;
+    top: -10px;
+    width: 120px;
+    height: 120px;
+    color: #FFF;
+    font-weight: bold;
+    font-size: 14pt;
+}
+
 #players .player .player-info {
     width: 100px;
     height: 100px;
     border-radius: 100px;
     background-color: #333;
+    z-index: 10;
 }
 
 #players .player.current .player-info {
@@ -68,7 +89,7 @@ h1 .py {
     top: 75px;
     left: 0px;
     width: 110px;
-    z-index: 999;
+    z-index: 20;
 }
 
 #players .player .cards .category {
@@ -243,11 +264,24 @@ h1 .py {
     display: none;
 }
 
+
+
+
+/*****************************************************
+  Mobile
+
+ *****************************************************/
+
+
 @media only screen
 and (min-device-width: 200px)
 and (max-device-width: 480px) {
     body {
         background-color: #354b1c;
+    }
+
+    #header {
+        display: none;
     }
 
     .container {

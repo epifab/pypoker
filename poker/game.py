@@ -84,6 +84,7 @@ class Game:
                     # 2 or more players alive
                     if len(self._players) - len(self._folder_keys) > 1:
                         self._change_cards()
+                        gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
                         player_key = self._final_bet_round(player_key)
                         gevent.sleep(Game.WAIT_AFTER_BET)
 
@@ -141,7 +142,7 @@ class Game:
                 player.set_cards(score.get_cards(), score)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                self._players_in_error.append(player_key)
+                self._add_faulty_player(player_key)
 
         self.broadcast({"event": "cards-assignment"})
 
@@ -167,13 +168,14 @@ class Game:
         self._phase = Game.PHASE_FINAL_BET
         return self._bet_round(best_player_key)
 
-    def _bet_round(self, player_key, opening_bet=0.0):
+    def _bet_round(self, player_key, opening_bet=None):
         """Do a bet round. Returns the id of the player who made the strongest bet first.
-        If opening_bet is specified, player_key is assumed to have made the opening bet already."""
+        If opening_bet is specified, player_key is assumed to have made the opening bet already
+        and the round will start from the player next to him."""
 
-        # Should never happen...
+        # Not too fun if nobody is playing
         if len(self._players) == len(self._folder_keys):
-            return -1
+            raise GameError("No players to gamble")
 
         bets = [0.0] * len(self._players)
         best_player_key = -1
@@ -186,29 +188,38 @@ class Game:
 
         while player_key != best_player_key:
             # Exclude folders
-            if player_key not in self._folder_keys:
-                # Only one player left, break and do not ask for a bet
-                if len(self._players) - len(self._folder_keys) == 1:
-                    best_player_key = player_key
-                    break
+            if player_key in self._folder_keys:
+                continue
 
-                # Two or more players still alive
-                # Works out the minimum bet for the current player
-                min_partial_bet = 0.0 if best_player_key == -1 else bets[best_player_key] - bets[player_key]
+            # Only one player left, break and do not ask for a bet
+            if len(self._players) - len(self._folder_keys) == 1:
+                best_player_key = player_key
+                break
 
-                # Bet
-                current_bet, bet_type = self._bet(player_key=player_key, min_bet=min_partial_bet, max_bet=self._pot)
+            # Two or more players still alive
+            # Works out the minimum bet for the current player
+            min_partial_bet = 0.0 if best_player_key == -1 else bets[best_player_key] - bets[player_key]
 
-                if current_bet != -1:
-                    bets[player_key] += current_bet
+            # Bet
+            current_bet, bet_type = self._bet(player_key=player_key, min_bet=min_partial_bet, max_bet=self._pot)
 
-                if current_bet > min_partial_bet or best_player_key == -1:
+            if current_bet != -1:
+                bets[player_key] += current_bet
+
+                if bet_type == 'raise' or bet_type == 'open':
                     best_player_key = player_key
 
             # Next player
             player_key = (player_key + 1) % len(self._players)
 
         return best_player_key
+
+    def _add_faulty_player(self, player_key, exception):
+        self._logger.info("{}: {} error: {}".format(self, self._players[player_key], exception.args[0]))
+        self._players[player_key].try_send_message({"msg_id": "error", "error": exception.args[0]})
+        self._folder_keys.append(player_key)
+        self._players_in_error.append(player_key)
+        self.broadcast({"msg_id": "dead-player", "player": player_key})
 
     def _players_round(self, start_id=0):
         """Iterate through a list of players who did not fold."""
@@ -246,18 +257,8 @@ class Game:
                     # Sending cards to the remote player
                     player.set_cards(score.get_cards(), score)
 
-            except ChannelError as e:
-                self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                self._players_in_error.append(player_key)
-
-            except MessageFormatError as e:
-                self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                player.try_send_message({"msg_id": "error", "error": e.args[0]})
-                self._players_in_error.append(player_key)
-
-            except MessageTimeout as e:
-                self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                player.try_send_message({"msg_id": "timeout"})
+            except (ChannelError, MessageFormatError, MessageTimeout) as e:
+                self._add_faulty_player(player_key, e)
 
             finally:
                 self._logger.info("{}: {} changed {} cards".format(self, player, len(discards)))
@@ -302,33 +303,30 @@ class Game:
 
             bet = player.bet(min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
 
-            if not bet:
-                bet_type = "check"
-            elif bet == min_bet:
-                bet_type = "open" if opening else "call"
-            elif bet > min_bet:
-                bet_type = "raise"
+            if bet == -1:
+                if opening:
+                    bet_type = "pass"
+                else:
+                    self._folder_keys.append(player_key)
+                    bet_type = "fold"
 
-            if bet > 0:
+            elif not bet:
+                bet_type = "check"
+
+            else:
                 player.set_money(player.get_money() - bet)
                 self._pot += bet
                 self._bets[player_key] += bet
 
-        except ChannelError as e:
-            self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-            self._players_in_error.append(player_key)
+                if opening:
+                    bet_type = "open"
+                elif bet == min_bet:
+                    bet_type = "call"
+                else:
+                    bet_type = "raise"
 
-        except MessageFormatError as e:
-            self._logger.info("{} {} error: {}".format(self, player, e.args[0]))
-            player.try_send_message({"msg_id": "error", "error": e.args[0]})
-            self._players_in_error.append(player_key)
-
-        except MessageTimeout as e:
-            self._logger.info("{}: {} timed out".format(self, player))
-            player.try_send_message({"msg_id": "timeout"})
-
-        if bet_type == "fold":
-            self._folder_keys.append(player_key)
+        except (ChannelError, MessageFormatError, MessageTimeout) as e:
+            self._add_faulty_player(player_key, e)
 
         self._logger.info("{}: {} bet: {} ({})".format(self, player, bet, bet_type))
         self.broadcast({

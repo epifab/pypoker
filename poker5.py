@@ -95,7 +95,7 @@ def poker5(ws):
             # Ping the client every 20 secs to prevent idle connections
             player.ping()
             last_ping = time.time()
-    app.logger.info("Dropping connection with player {}".format(player))
+    app.logger.info("Dropping connection with {}".format(player))
 
 
 if __name__ == '__main__':

@@ -116,7 +116,7 @@ class PlayerServer(Player):
                 MessageFormatError.validate_msg_id(message, expected="ping")
             return True
         except (ChannelError, MessageTimeout, MessageFormatError) as e:
-            self._logger.error("unable to ping {}: {}".format(self, e))
+            self._logger.error("Unable to ping {}: {}".format(self, e))
             self.disconnect()
             return False
 
