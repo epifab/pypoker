@@ -13,10 +13,16 @@ class DeadHandException(Exception):
     pass
 
 
+class WinnerDetection(Exception):
+    pass
+
+
 class Game:
-    WAIT_AFTER_HAND = 10
-    WAIT_AFTER_CARDS_ASSIGNMENT = 3
-    WAIT_AFTER_BET = 2
+    WAIT_AFTER_HAND = 6
+    WAIT_AFTER_CARDS_ASSIGNMENT = 1
+    WAIT_AFTER_OPENING_BET = 0
+    WAIT_AFTER_CARDS_CHANGE = 0
+    WAIT_AFTER_FINAL_BET = 2
 
     CHANGE_CARDS_TIMEOUT = 45
     BET_TIMEOUT = 45
@@ -69,37 +75,33 @@ class Game:
                 self._folder_keys = list(self._players_in_error)
                 self._public_cards_keys = []
 
-                alive_player_keys = [k for (k, _) in enumerate(self._players) if k not in self._folder_keys]
+                # Cards assignment
+                self._assign_cards()
+                self._check_active_players()
+                gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
 
-                if len(alive_player_keys) == 0:
-                    raise GameError("Every player left the table")
+                # Opening bet round
+                player_key = self._opening_bet_round()
+                self._check_active_players()
+                gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
 
-                elif len(alive_player_keys) > 1:
-                    # Cards assignment
-                    self._assign_cards()
-                    gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
+                # Cards change
+                self._change_cards()
+                self._check_active_players()
+                gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
 
-                    # Opening
-                    player_key = self._opening_bet_round()
-                    gevent.sleep(Game.WAIT_AFTER_BET)
+                # Final bet round
+                player_key = self._final_bet_round(player_key)
+                self._check_active_players()
+                gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
 
-                    # 2 or more players alive
-                    if len(self._players) - len(self._folder_keys) > 1:
-                        self._change_cards()
-                        gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
-                        player_key = self._final_bet_round(player_key)
-                        gevent.sleep(Game.WAIT_AFTER_BET)
+                # Winner detection
+                self._detect_winner(player_key)
 
-                    # 2 or more players still alive
-                    if len(self._players) - len(self._folder_keys) > 1:
-                        player_key = self._detect_winner(player_key)
-
-                elif len(alive_player_keys) == 1:
-                    # Only 1 player alive
-                    player_key = alive_player_keys[0]
-
+            except WinnerDetection as e:
+                winner_key = e.args[0]
                 # Winner and hand finalization
-                winner = self._players[player_key]
+                winner = self._players[winner_key]
                 winner.set_money(winner.get_money() + self._pot)
 
                 # Re-initialize pot, bets and move to the next dealer
@@ -111,7 +113,7 @@ class Game:
                 self._logger.info("{}: {} won".format(self, winner))
                 self.broadcast({
                     "event": Game.Event.winner_designation,
-                    "player": player_key})
+                    "player": winner_key})
                 break
 
             except DeadHandException:
@@ -127,6 +129,13 @@ class Game:
     def get_players(self):
         """Returns the list of players"""
         return self._players
+
+    def _check_active_players(self):
+        active_player_keys = [k for (k, _) in enumerate(self._players) if k not in self._folder_keys]
+        if len(active_player_keys) == 0:
+            raise GameError("No active players")
+        elif len(active_player_keys) == 1:
+            raise WinnerDetection(active_player_keys[0])
 
     def _assign_cards(self):
         # Assign cards
@@ -163,7 +172,7 @@ class Game:
 
         # Nobody opened
         self._folder_keys = [k for (k, _) in enumerate(self._players)]
-        raise DeadHandException
+        raise DeadHandException()
 
     def _final_bet_round(self, best_player_key):
         return self._bet_round(best_player_key)
@@ -172,10 +181,6 @@ class Game:
         """Do a bet round. Returns the id of the player who made the strongest bet first.
         If opening_bet is specified, player_key is assumed to have made the opening bet already
         and the round will start from the player next to him."""
-
-        # Not too fun if nobody is playing
-        if len(self._players) == len(self._folder_keys):
-            raise GameError("No players to gamble")
 
         bets = [0.0] * len(self._players)
         best_player_key = -1
@@ -192,9 +197,9 @@ class Game:
                 continue
 
             # Only one player left, break and do not ask for a bet
+            # This can happen if during a bet round everybody fold and only the last player was left
             if len(self._players) - len(self._folder_keys) == 1:
-                best_player_key = player_key
-                break
+                return player_key
 
             # Two or more players still alive
             # Works out the minimum bet for the current player
@@ -279,7 +284,7 @@ class Game:
                 self._folder_keys.append(player_key)
                 # In a real poker italian game this player is not obligated to show his score
             self._logger.info("{}: {} score: {}".format(self, player, player.get_score()))
-        return winner_key
+        raise WinnerDetection(winner_key)
 
     def _bet(self, player_key, min_bet=0.0, max_bet=-1, opening=False):
         bet = -1
