@@ -64,7 +64,7 @@ class Game:
             try:
                 # Initialization
                 self._deck.initialize()
-                self._folder_keys = self._players_in_error
+                self._folder_keys = list(self._players_in_error)
                 self._public_cards_keys = []
 
                 alive_player_keys = [k for (k, _) in enumerate(self._players) if k not in self._folder_keys]
