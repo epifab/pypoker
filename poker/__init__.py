@@ -1,7 +1,7 @@
 from .card import Card
 from .deck import Deck
 from .channel import Channel, MessageTimeout, MessageFormatError, ChannelError
-from .game import Game, GameError, HandFailException
+from .game import Game, GameError
 from .socket_channel import SocketChannel
 from .player import Player
 from .player_server import PlayerServer
