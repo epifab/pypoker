@@ -107,16 +107,17 @@ class Game:
                 self._bets = [0.0] * len(self._players)
                 self._dealer_key = (self._dealer_key + 1) % len(self._players)
 
+                self._dead_hands = 0
                 self._logger.info("{}: {} won".format(self, winner))
                 self.broadcast({
                     "event": Game.Event.winner_designation,
                     "player": player_key})
-
                 break
 
             except DeadHandException:
                 # Automatically play another hand if the last has failed
                 self._dead_hands += 1
+                self._logger.info("{}: dead hand".format(self))
                 self.broadcast({"event": Game.Event.dead_hand})
                 continue
 
@@ -142,7 +143,7 @@ class Game:
                 player.set_cards(score.get_cards(), score)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                self._add_faulty_player(player_key)
+                self._add_faulty_player(player_key, e)
 
         self.broadcast({"event": "cards-assignment"})
 
@@ -205,7 +206,7 @@ class Game:
             if current_bet != -1:
                 bets[player_key] += current_bet
 
-                if bet_type == 'raise' or bet_type == 'open':
+                if best_player_key == -1 or bet_type == 'raise':
                     best_player_key = player_key
 
             # Next player
