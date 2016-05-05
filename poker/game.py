@@ -161,6 +161,7 @@ class Game:
                 return self._bet_round(player_key, opening_bet=bet)
 
         # Nobody opened
+        self._folder_keys = [k for (k, _) in enumerate(self._players)]
         raise DeadHandException
 
     def _final_bet_round(self, best_player_key):
