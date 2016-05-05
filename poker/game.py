@@ -9,7 +9,7 @@ class GameError(Exception):
     pass
 
 
-class HandFailException(Exception):
+class DeadHandException(Exception):
     pass
 
 
@@ -17,16 +17,19 @@ class Game:
     WAIT_AFTER_HAND = 10
     WAIT_AFTER_CARDS_ASSIGNMENT = 3
     WAIT_AFTER_BET = 2
+
     CHANGE_CARDS_TIMEOUT = 45
     BET_TIMEOUT = 45
 
-    # Phases
-    PHASE_NEW_GAME = "new-game"
-    PHASE_CARDS_ASSIGNMENT = "cards-assignment"
-    PHASE_OPENING_BET = "opening-bet"
-    PHASE_CARDS_CHANGE = "cards-change"
-    PHASE_FINAL_BET = "final-bet"
-    PHASE_WINNER_DESIGNATION = "winner-designation"
+    class Event:
+        new_game = "new-game"
+        game_over = "game-over"
+        cards_assignment = "cards-assignment"
+        player_action = "player-action"
+        bet = "bet"
+        cards_change = "cards-change"
+        dead_hand = "dead-hand"
+        winner_designation = "winner-designation"
 
     def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
         self._id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
@@ -34,8 +37,7 @@ class Game:
         self._deck = deck
         self._score_detector = score_detector
         self._stake = stake
-        self._phase = Game.PHASE_NEW_GAME
-        self._failed_hands = 0
+        self._dead_hands = 0
         self._dealer_key = 0
         self._folder_keys = []
         self._public_cards_keys = []
@@ -50,13 +52,13 @@ class Game:
         return "game " + self._id
 
     def play_game(self):
-        self.broadcast({"event": "new-game"})
+        self.broadcast({"event": Game.Event.new_game})
         while not self._players_in_error:
             try:
                 self.play_hand()
             except GameError:
                 break
-        self.broadcast({"event": "game-over"})
+        self.broadcast({"event": Game.Event.game_over})
 
     def play_hand(self):
         """Play a single hand."""
@@ -96,8 +98,6 @@ class Game:
                     # Only 1 player alive
                     player_key = alive_player_keys[0]
 
-                self._phase = Game.PHASE_WINNER_DESIGNATION
-
                 # Winner and hand finalization
                 winner = self._players[player_key]
                 winner.set_money(winner.get_money() + self._pot)
@@ -109,14 +109,15 @@ class Game:
 
                 self._logger.info("{}: {} won".format(self, winner))
                 self.broadcast({
-                    "event": "winner-designation",
+                    "event": Game.Event.winner_designation,
                     "player": player_key})
 
                 break
 
-            except HandFailException:
+            except DeadHandException:
                 # Automatically play another hand if the last has failed
-                self._failed_hands += 1
+                self._dead_hands += 1
+                self.broadcast({"event": Game.Event.dead_hand})
                 continue
 
             finally:
@@ -127,7 +128,6 @@ class Game:
         return self._players
 
     def _assign_cards(self):
-        self._phase = Game.PHASE_CARDS_ASSIGNMENT
         # Assign cards
         for player_key, player in self._players_round(self._dealer_key):
             # Collect stakes
@@ -147,9 +147,8 @@ class Game:
         self.broadcast({"event": "cards-assignment"})
 
     def _opening_bet_round(self):
-        self._phase = Game.PHASE_OPENING_BET
         # Define the minimum score to open
-        min_opening_score = self._min_opening_scores[self._failed_hands % len(self._min_opening_scores)]
+        min_opening_score = self._min_opening_scores[self._dead_hands % len(self._min_opening_scores)]
 
         # Bet round
         for player_key, player in self._players_round(self._dealer_key):
@@ -162,10 +161,9 @@ class Game:
                 return self._bet_round(player_key, opening_bet=bet)
 
         # Nobody opened
-        raise HandFailException
+        raise DeadHandException
 
     def _final_bet_round(self, best_player_key):
-        self._phase = Game.PHASE_FINAL_BET
         return self._bet_round(best_player_key)
 
     def _bet_round(self, player_key, opening_bet=None):
@@ -230,7 +228,6 @@ class Game:
         raise StopIteration
 
     def _change_cards(self):
-        self._phase = Game.PHASE_CARDS_CHANGE
         # Change cards
         for player_key, player in self._players_round(self._dealer_key):
             discards = []
@@ -340,7 +337,6 @@ class Game:
     def dto(self):
         game_dto = {
             "game": self._id,
-            "phase": self._phase,
             "pot": self._pot,
             "dealer": self._dealer_key,
             "players": []}
