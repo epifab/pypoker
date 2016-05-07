@@ -39,7 +39,7 @@ class Player:
         """Assigns a list of cards to the player"""
         self._cards = cards
         self._score = score
-        self._allowed_to_open = True if not min_opening_score else min_opening_score.cmp(self.get_score()) >= 0
+        self._allowed_to_open = not min_opening_score or self.get_score().cmp(min_opening_score) >= 0
 
     def __str__(self):
         return "player " + self._id

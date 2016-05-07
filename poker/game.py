@@ -68,61 +68,60 @@ class Game:
 
     def play_hand(self):
         """Play a single hand."""
-        while True:
-            try:
-                # Initialization
-                self._deck.initialize()
-                self._folder_keys = list(self._players_in_error)
-                self._public_cards_keys = []
+        try:
+            # Initialization
+            self._deck.initialize()
+            self._folder_keys = list(self._players_in_error)
+            self._public_cards_keys = []
 
-                self._check_active_players()
+            self._check_active_players()
 
-                # Cards assignment
-                self._assign_cards()
-                gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
+            # Cards assignment
+            self._assign_cards()
+            gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
 
-                # Opening bet round
-                player_key = self._opening_bet_round()
-                gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
+            # Opening bet round
+            player_key = self._opening_bet_round()
+            gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
 
-                # Cards change
-                self._change_cards()
-                gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
+            # Cards change
+            self._change_cards()
+            gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
 
-                # Final bet round
-                player_key = self._final_bet_round(player_key)
-                gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
+            # Final bet round
+            player_key = self._final_bet_round(player_key)
+            gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
 
-                # Winner detection
-                self._detect_winner(player_key)
+            # Winner detection
+            self._detect_winner(player_key)
 
-            except WinnerDetection as e:
-                winner_key = e.args[0]
-                # Winner and hand finalization
-                winner = self._players[winner_key]
-                winner.set_money(winner.get_money() + self._pot)
+        except WinnerDetection as e:
+            winner_key = e.args[0]
+            # Winner and hand finalization
+            winner = self._players[winner_key]
+            winner.set_money(winner.get_money() + self._pot)
 
-                # Re-initialize pot, bets and move to the next dealer
-                self._pot = 0.0
-                self._bets = [0.0] * len(self._players)
-                self._dealer_key = (self._dealer_key + 1) % len(self._players)
+            # Re-initialize pot, bets and move to the next dealer
+            self._pot = 0.0
+            self._bets = [0.0] * len(self._players)
+            self._dealer_key = (self._dealer_key + 1) % len(self._players)
 
-                self._dead_hands = 0
-                self._logger.info("{}: {} won".format(self, winner))
-                self.broadcast({
-                    "event": Game.Event.winner_designation,
-                    "player": winner_key})
-                break
+            self._dead_hands = 0
+            self._logger.info("{}: {} won".format(self, winner))
+            self.broadcast({
+                "event": Game.Event.winner_designation,
+                "player": winner_key})
 
-            except DeadHandException:
-                # Automatically play another hand if the last has failed
-                self._dead_hands += 1
-                self._logger.info("{}: dead hand".format(self))
-                self.broadcast({"event": Game.Event.dead_hand})
-                continue
+            gevent.sleep(Game.WAIT_AFTER_HAND)
 
-            finally:
-                gevent.sleep(Game.WAIT_AFTER_HAND)
+        except DeadHandException:
+            # Automatically play another hand if the last has failed
+            self._dead_hands += 1
+            self._logger.info("{}: dead hand".format(self))
+            self.broadcast({"event": Game.Event.dead_hand})
+
+            gevent.sleep(Game.WAIT_AFTER_HAND)
+            self._play_hand()
 
     def get_players(self):
         """Returns the list of players"""
