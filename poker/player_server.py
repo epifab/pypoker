@@ -26,14 +26,17 @@ class PlayerServer(Player):
     def update_channel(self, channel):
         self._channel = channel
 
-    def set_cards(self, cards, score):
+    def set_cards(self, cards, score, min_opening_score):
         """Assigns a list of cards to the player"""
         Player.set_cards(self, cards, score)
+        self._allowed_to_open = min_opening_score.cmp(self.get_score()) >= 0
 
         self.send_message({
             "msg_id": "set-cards",
             "cards": [c.dto() for c in self._cards],
-            "score": self.get_score().dto()})
+            "score": self.get_score().dto(),
+            "allowed_to_open": self._allowed_to_open
+        })
 
     def change_cards(self, timeout=None):
         """Gives players the opportunity to change some of their cards.

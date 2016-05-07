@@ -79,23 +79,29 @@ def hello():
 
 @sockets.route('/poker5')
 def poker5(ws):
-    player = PlayerServer(
-        channel=WebSocketChannel(ws),
-        id=session['player-id'],
-        name=session['player-name'],
-        money=session['player-money'])
+    channel = WebSocketChannel(ws)
+    if 'player-id' not in session:
+        channel.send_message({"msg_id": "error", "error": "Unrecognized user"})
+        channel.close()
 
-    server.register(player)
+    else:
+        player = PlayerServer(
+            channel=channel,
+            id=session['player-id'],
+            name=session['player-name'],
+            money=session['player-money'])
 
-    last_ping = time.time()
-    while not ws.closed:
-        # Keep the websocket alive
-        gevent.sleep(0.1)
-        if time.time() > last_ping + 20:
-            # Ping the client every 20 secs to prevent idle connections
-            player.ping()
-            last_ping = time.time()
-    app.logger.info("Dropping connection with {}".format(player))
+        server.register(player)
+
+        last_ping = time.time()
+        while not ws.closed:
+            # Keep the websocket alive
+            gevent.sleep(0.1)
+            if time.time() > last_ping + 20:
+                # Ping the client every 20 secs to prevent idle connections
+                player.ping()
+                last_ping = time.time()
+        app.logger.info("Dropping connection with {}".format(player))
 
 
 if __name__ == '__main__':

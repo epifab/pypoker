@@ -213,6 +213,7 @@ Poker5 = {
                 message.cards[cardKey][1]);
         }
         $('#current-player .cards .category').text(Poker5.scoreCategories[message.score.category]);
+        $('#current-player').data('allowed-to-open', message.allowed_to_open)
     },
 
     onBet: function(message) {
@@ -412,14 +413,7 @@ Poker5 = {
     enableBetMode: function(message) {
         this.betMode = true;
 
-        if (message.max_bet == -1) {
-            $('#fold-cmd-wrapper').hide();
-            $('#bet-input-wrapper').hide();
-            $('#bet-cmd-wrapper').hide();
-            $('#no-bet-cmd-wrapper').show();
-        }
-
-        else {
+        if (!message.opening || $('#current-player').data('allowed-to-open')) {
             // Set-up slider
             $('#bet-input').slider({
                 'min': parseInt(message.min_bet),
@@ -445,6 +439,13 @@ Poker5 = {
             $('#bet-input-wrapper').show();
             $('#bet-cmd-wrapper').show();
             $('#no-bet-cmd-wrapper').hide();
+        }
+
+        else {
+            $('#fold-cmd-wrapper').hide();
+            $('#bet-input-wrapper').hide();
+            $('#bet-cmd-wrapper').hide();
+            $('#no-bet-cmd-wrapper').show();
         }
 
         $('#bet-controls').show();

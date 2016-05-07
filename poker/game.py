@@ -75,24 +75,22 @@ class Game:
                 self._folder_keys = list(self._players_in_error)
                 self._public_cards_keys = []
 
+                self._check_active_players()
+
                 # Cards assignment
                 self._assign_cards()
-                self._check_active_players()
                 gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
 
                 # Opening bet round
                 player_key = self._opening_bet_round()
-                self._check_active_players()
                 gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
 
                 # Cards change
                 self._change_cards()
-                self._check_active_players()
                 gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
 
                 # Final bet round
                 player_key = self._final_bet_round(player_key)
-                self._check_active_players()
                 gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
 
                 # Winner detection
@@ -130,14 +128,10 @@ class Game:
         """Returns the list of players"""
         return self._players
 
-    def _check_active_players(self):
-        active_player_keys = [k for (k, _) in enumerate(self._players) if k not in self._folder_keys]
-        if len(active_player_keys) == 0:
-            raise GameError("No active players")
-        elif len(active_player_keys) == 1:
-            raise WinnerDetection(active_player_keys[0])
-
     def _assign_cards(self):
+        # Define the minimum score to open
+        min_opening_score = self._min_opening_scores[self._dead_hands % len(self._min_opening_scores)]
+
         # Assign cards
         for player_key, player in self._players_round(self._dealer_key):
             # Collect stakes
@@ -149,7 +143,7 @@ class Game:
             score = self._score_detector.get_score(cards)
 
             try:
-                player.set_cards(score.get_cards(), score)
+                player.set_cards(score.get_cards(), score, min_opening_score)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
                 self._add_faulty_player(player_key, e)
@@ -157,17 +151,12 @@ class Game:
         self.broadcast({"event": "cards-assignment"})
 
     def _opening_bet_round(self):
-        # Define the minimum score to open
-        min_opening_score = self._min_opening_scores[self._dead_hands % len(self._min_opening_scores)]
-
         # Bet round
         for player_key, player in self._players_round(self._dealer_key):
-            max_bet = -1 if player.get_score().cmp(min_opening_score) < 0 else self._pot
-
             # Ask remote player to bet
-            bet, _ = self._bet(player_key=player_key, min_bet=1.0, max_bet=max_bet, opening=True)
+            bet, _ = self._bet(player_key=player_key, min_bet=1.0, max_bet=self._pot, opening=True)
 
-            if bet != -1:
+            if player.is_allowed_to_open() and bet != -1:
                 return self._bet_round(player_key, opening_bet=bet)
 
         # Nobody opened
@@ -222,9 +211,20 @@ class Game:
     def _add_faulty_player(self, player_key, exception):
         self._logger.info("{}: {} error: {}".format(self, self._players[player_key], exception.args[0]))
         self._players[player_key].try_send_message({"msg_id": "error", "error": exception.args[0]})
-        self._folder_keys.append(player_key)
+        self._add_folder(player_key)
         self._players_in_error.append(player_key)
         self.broadcast({"msg_id": "dead-player", "player": player_key})
+
+    def _add_folder(self, player_key):
+        self._folder_keys.append(player_key)
+        self._check_active_players()
+
+    def _check_active_players(self):
+        active_player_keys = [k for (k, _) in enumerate(self._players) if k not in self._folder_keys]
+        if len(active_player_keys) == 0:
+            raise GameError("No active players")
+        elif len(active_player_keys) == 1:
+            raise WinnerDetection(active_player_keys[0])
 
     def _players_round(self, start_id=0):
         """Iterate through a list of players who did not fold."""
@@ -237,8 +237,6 @@ class Game:
     def _change_cards(self):
         # Change cards
         for player_key, player in self._players_round(self._dealer_key):
-            discards = []
-
             try:
                 timeout = TimeoutGenerator.generate(self.CHANGE_CARDS_TIMEOUT)
                 self._logger.info("{}: {} changing cards...".format(self, player))
@@ -261,15 +259,15 @@ class Game:
                     # Sending cards to the remote player
                     player.set_cards(score.get_cards(), score)
 
-            except (ChannelError, MessageFormatError, MessageTimeout) as e:
-                self._add_faulty_player(player_key, e)
-
-            finally:
                 self._logger.info("{}: {} changed {} cards".format(self, player, len(discards)))
                 self.broadcast({
                     "event": "cards-change",
                     "player": player_key,
                     "num_cards": len(discards)})
+
+            except (ChannelError, MessageFormatError, MessageTimeout) as e:
+                self._add_faulty_player(player_key, e)
+
 
     def _detect_winner(self, best_player_key):
         # Works out the winner
@@ -281,15 +279,11 @@ class Game:
                 winner_key = player_key
                 self._public_cards_keys.append(player_key)
             else:
-                self._folder_keys.append(player_key)
+                self._add_folder(player_key)
                 # In a real poker italian game this player is not obligated to show his score
-            self._logger.info("{}: {} score: {}".format(self, player, player.get_score()))
         raise WinnerDetection(winner_key)
 
     def _bet(self, player_key, min_bet=0.0, max_bet=-1, opening=False):
-        bet = -1
-        bet_type = "pass" if opening else "fold"
-
         try:
             player = self._players[player_key]
             timeout = TimeoutGenerator.generate(self.BET_TIMEOUT)
@@ -306,15 +300,16 @@ class Game:
                 "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
 
             bet = player.bet(min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
+            bet_type = None
 
-            if bet == -1:
-                if opening:
-                    bet_type = "pass"
-                else:
-                    self._folder_keys.append(player_key)
-                    bet_type = "fold"
+            if bet == -1 and opening:
+                bet_type = "pass"
 
-            elif not bet:
+            elif bet == -1:
+                self._add_folder(player_key)
+                bet_type = "fold"
+
+            elif bet == 0:
                 bet_type = "check"
 
             else:
@@ -329,17 +324,19 @@ class Game:
                 else:
                     bet_type = "raise"
 
+            self._logger.info("{}: {} bet: {} ({})".format(self, player, bet, bet_type))
+            self.broadcast({
+                "event": "bet",
+                "bet": bet,
+                "bet_type": bet_type,
+                "player": player_key})
+
+            return bet, bet_type
+
         except (ChannelError, MessageFormatError, MessageTimeout) as e:
             self._add_faulty_player(player_key, e)
+            return -1, "fold"
 
-        self._logger.info("{}: {} bet: {} ({})".format(self, player, bet, bet_type))
-        self.broadcast({
-            "event": "bet",
-            "bet": bet,
-            "bet_type": bet_type,
-            "player": player_key})
-
-        return bet, bet_type
 
     def dto(self):
         game_dto = {
