@@ -203,6 +203,9 @@ class GameClientConsole:
                 self._player.set_cards(cards, score)
                 print(Card.format_cards(cards))
 
+            elif message["msg_id"] == "ping":
+                self._player.send_message({"msg_id": "ping"})
+
     def _print_player(self, player):
         print("Player '{}'\n Cash: ${:,.2f}\n Bets: ${:,.2f}".format(
             player["name"],
