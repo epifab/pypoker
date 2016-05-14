@@ -80,6 +80,7 @@ class Game:
             # Initialization
             self._deck.initialize()
             self._folders = set(self._dead_players)
+            self._players_allowed_to_open = set()
             self._players_showing_cards = set()
 
             self._check_active_players()
