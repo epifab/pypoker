@@ -230,7 +230,7 @@ class Game:
         player.try_send_message({"msg_id": "error", "error": exception.args[0]})
         self._dead_players.add(player_key)
         self.broadcast({"msg_id": "dead-player", "player": player_key})
-        self._add_folder(player)
+        self._add_folder(player_key)
 
     def _add_folder(self, player_key):
         self._folders.add(player_key)
