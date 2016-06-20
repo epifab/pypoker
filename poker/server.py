@@ -1,4 +1,4 @@
-from . import Game, GameError, ScoreDetector, Deck
+from . import Game, ScoreDetector, Deck
 import logging
 import threading
 import random
@@ -23,15 +23,15 @@ class Server:
         for player in self._lobby:
             player.try_send_message(message)
 
-    def _join_lobby(self, player):
-        connected = player.try_send_message({
+    def _join_lobby(self, new_player):
+        connected = new_player.try_send_message({
             "msg_id": "connect",
             "server": self._id,
-            "player": player.dto()
+            "player": new_player.dto()
         })
 
         if not connected:
-            self._logger.error("{}: Unable to connect {}".format(self, player))
+            self._logger.error("{}: Unable to connect {}".format(self, new_player))
             return
 
         self._lobby_lock.acquire()
@@ -39,21 +39,20 @@ class Server:
         try:
             # Clean-up the lobby
             new_lobby = []
-
-            for p in self._lobby:
-                if p.get_id() == player.get_id() or not p.ping(pong=True):
-                    self._logger.info("{}: {} left the lobby".format(self, p))
-                    self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": p.dto()})
-                    p.disconnect()
+            for player in self._lobby:
+                if player.get_id() == new_player.get_id() or not player.ping(pong=True):
+                    self._logger.info("{}: {} left the lobby".format(self, player))
+                    self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": player.dto()})
+                    player.disconnect()
                 else:
-                    new_lobby.append(p)
-
+                    new_lobby.append(player)
             self._lobby = new_lobby
 
-            self._lobby.append(player)
-            self._logger.info("{}: {} has joined the lobby".format(self, player))
-            self._broadcast({"msg_id": "lobby-update", "event": "player-added", "player": player.dto()})
+            self._lobby.append(new_player)
+            self._logger.info("{}: {} has joined the lobby".format(self, new_player))
+            self._broadcast({"msg_id": "lobby-update", "event": "player-added", "player": new_player.dto()})
 
+            # Start a new game
             if len(self._lobby) >= self._room_size:
                 lowest_rank = 11 - len(self._lobby)
                 game = Game(players=self._lobby,
@@ -61,6 +60,9 @@ class Server:
                             score_detector=ScoreDetector(lowest_rank),
                             stake=10.0,
                             logger=self._logger)
+                # Subscribe all players to game events
+                for new_player in self._lobby:
+                    game.subscribe(new_player)
                 thread = threading.Thread(target=Server._play_game, args=(self, game, self._lobby))
                 thread.start()
                 self._lobby = []
@@ -87,6 +89,7 @@ class Server:
 
     def start(self):
         self._logger.info("{}: running".format(self))
+        self.on_start()
         try:
             for player in self.new_players():
                 try:
@@ -99,3 +102,10 @@ class Server:
                     pass
         finally:
             self._logger.info("{}: terminating".format(self))
+            self.on_shutdown()
+
+    def on_start(self):
+        pass
+
+    def on_shutdown(self):
+        pass

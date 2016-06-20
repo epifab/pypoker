@@ -32,10 +32,15 @@ class Game:
         game_over = "game-over"
         cards_assignment = "cards-assignment"
         player_action = "player-action"
+        dead_player = "dead-player",
         bet = "bet"
         cards_change = "cards-change"
         dead_hand = "dead-hand"
         winner_designation = "winner-designation"
+
+    class EventListener:
+        def game_event(self, event, event_data, game_data):
+            raise NotImplemented
 
     def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
         self._id = id(self)
@@ -61,18 +66,26 @@ class Game:
         self._dead_players = set()
         # Pair of J, Q, K, A
         self._min_opening_scores = [score_detector.get_score([Card(r, 0), Card(r, 1)]) for r in [11, 12, 13, 14]]
+        # Event listeners
+        self._event_subscribers = set()
 
     def __str__(self):
         return "game " + str(self._id)
 
+    def subscribe(self, subscriber):
+        self._event_subscribers.add(subscriber)
+
+    def unsubscribe(self, subscriber):
+        self._event_subscribers.remove(subscriber)
+
     def play_game(self):
-        self.broadcast({"event": Game.Event.new_game})
+        self._broadcast(Game.Event.new_game)
         while not self._dead_players:
             try:
                 self.play_hand()
             except GameError:
                 break
-        self.broadcast({"event": Game.Event.game_over})
+        self._broadcast(Game.Event.game_over)
 
     def play_hand(self):
         """Play a single hand."""
@@ -117,9 +130,7 @@ class Game:
 
             self._dead_hands = 0
             self._logger.info("{}: {} won".format(self, winner))
-            self.broadcast({
-                "event": Game.Event.winner_designation,
-                "player": winner_key})
+            self._broadcast(Game.Event.winner_designation, {"player": winner_key})
 
             gevent.sleep(Game.WAIT_AFTER_HAND)
 
@@ -127,7 +138,7 @@ class Game:
             # Automatically play another hand if the last has failed
             self._dead_hands += 1
             self._logger.info("{}: dead hand".format(self))
-            self.broadcast({"event": Game.Event.dead_hand})
+            self._broadcast(Game.Event.dead_hand)
 
             gevent.sleep(Game.WAIT_AFTER_HAND)
             self.play_hand()
@@ -167,7 +178,7 @@ class Game:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
                 self._add_dead_player(player_key, e)
 
-        self.broadcast({"event": Game.Event.cards_assignment, "min_opening_score": min_opening_score.dto()})
+        self._broadcast(Game.Event.cards_assignment, {"min_opening_score": min_opening_score.dto()})
 
     def _opening_bet_round(self):
         # Bet round
@@ -230,7 +241,7 @@ class Game:
         self._logger.info("{}: {} error: {}".format(self, player, exception.args[0]))
         player.try_send_message({"msg_id": "error", "error": exception.args[0]})
         self._dead_players.add(player_key)
-        self.broadcast({"msg_id": "dead-player", "player": player_key})
+        self._broadcast(Game.Event.dead_player, {"player": player_key})
         self._add_folder(player_key)
 
     def _add_folder(self, player_key):
@@ -260,12 +271,15 @@ class Game:
             try:
                 timeout = time.time() + self.CHANGE_CARDS_TIMEOUT + self.TIMEOUT_TOLERANCE
                 self._logger.info("{}: {} changing cards...".format(self, player))
-                self.broadcast({
-                    "event": "player-action",
-                    "action": "change-cards",
-                    "player": player_key,
-                    "timeout": self.CHANGE_CARDS_TIMEOUT,
-                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
+                self._broadcast(
+                    Game.Event.player_action,
+                    {
+                        "action": "change-cards",
+                        "player": player_key,
+                        "timeout": self.CHANGE_CARDS_TIMEOUT,
+                        "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))
+                    }
+                )
 
                 # Ask remote player to change cards
                 _, discards = self._change_player_cards(player, timeout=timeout)
@@ -288,10 +302,7 @@ class Game:
                     })
 
                 self._logger.info("{}: {} changed {} cards".format(self, player, len(discards)))
-                self.broadcast({
-                    "event": "cards-change",
-                    "player": player_key,
-                    "num_cards": len(discards)})
+                self._broadcast(Game.Event.cards_change, {"player": player_key, "num_cards": len(discards)})
 
             except (ChannelError, MessageFormatError, MessageTimeout) as e:
                 self._add_dead_player(player_key, e)
@@ -344,15 +355,18 @@ class Game:
             timeout = time.time() + self.BET_TIMEOUT + self.TIMEOUT_TOLERANCE
 
             self._logger.info("{}: {} betting...".format(self, player))
-            self.broadcast({
-                "event": "player-action",
-                "action": "bet",
-                "min_bet": min_bet,
-                "max_bet": max_bet,
-                "opening": opening,
-                "player": player_key,
-                "timeout": self.BET_TIMEOUT,
-                "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))})
+            self._broadcast(
+                Game.Event.player_action,
+                {
+                    "action": "bet",
+                    "min_bet": min_bet,
+                    "max_bet": max_bet,
+                    "opening": opening,
+                    "player": player_key,
+                    "timeout": self.BET_TIMEOUT,
+                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))
+                }
+            )
 
             bet = self._player_bet(player, min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
             bet_type = None
@@ -375,11 +389,15 @@ class Game:
                     bet_type = "raise"
 
             self._logger.info("{}: {} bet: {} ({})".format(self, player, bet, bet_type))
-            self.broadcast({
-                "event": "bet",
-                "bet": bet,
-                "bet_type": bet_type,
-                "player": player_key})
+            self._broadcast(
+                Game.Event.bet,
+                {
+                    "event": "bet",
+                    "bet": bet,
+                    "bet_type": bet_type,
+                    "player": player_key
+                }
+            )
 
             if bet_type == "fold":
                 self._add_folder(player_key)
@@ -393,13 +411,6 @@ class Game:
     def _player_bet(self, player, min_bet=0.0, max_bet=0.0, opening=False, timeout=None):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
-        player.send_message({
-            "msg_id": "bet",
-            "timeout": None if not timeout else time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout)),
-            "min_bet": min_bet,
-            "max_bet": max_bet,
-            "opening": opening})
-
         while True:
             message = player.recv_message(timeout=timeout)
             if "msg_id" not in message:
@@ -440,7 +451,8 @@ class Game:
             "game": self._id,
             "pot": self._pot,
             "dealer": self._dealer,
-            "players": []}
+            "players": []
+        }
 
         for player_key, player in enumerate(self._players):
             with_score = player_key in self._players_showing_cards
@@ -453,10 +465,8 @@ class Game:
 
         return game_dto
 
-    def broadcast(self, message={}):
-        """Sends a game-update message to every player"""
-        message.update(self.dto())
-        if "msg_id" not in message:
-            message["msg_id"] = "game-update"
-        for player in self._players:
-            player.try_send_message(message)
+    def _broadcast(self, event, message={}):
+        """Broadcast game events"""
+        message["event"] = event
+        for subscriber in self._event_subscribers:
+            subscriber.game_event(event, message, self.dto())
