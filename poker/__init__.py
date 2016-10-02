@@ -1,12 +1,15 @@
 from .card import Card
 from .deck import Deck
-from .channel import Channel, MessageTimeout, MessageFormatError, ChannelError
-from .game import Game, GameError
-from .socket_channel import SocketChannel
-from .player import Player
-from .player_server import PlayerServer
 from .score import Score
 from .score_detector import ScoreDetector
-from .server import Server
-from .server_websocket import ServerWebSocket, WebSocketChannel
-from .server_socket import ServerSocket
+from .channel import Channel, ChannelError, MessageTimeout, MessageFormatError
+from .channel_redis import ChannelRedis, RedisListener, RedisPublisher
+from .channel_socket import ChannelSocket
+from .channel_websocket import ChannelWebSocket
+from .game import Game, GameError
+from .player import Player
+from .player_client import PlayerClient
+from .player_server import PlayerServer
+from .game_server import GameServer
+from .game_server_redis import GameServerRedis
+from .game_server_socket import GameServerSocket

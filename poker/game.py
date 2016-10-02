@@ -1,7 +1,8 @@
 from . import Card, ChannelError, MessageTimeout, MessageFormatError
+import gevent
 import logging
 import time
-import gevent
+import uuid
 
 
 class GameError(Exception):
@@ -32,7 +33,7 @@ class Game:
         game_over = "game-over"
         cards_assignment = "cards-assignment"
         player_action = "player-action"
-        dead_player = "dead-player",
+        dead_player = "dead-player"
         bet = "bet"
         cards_change = "cards-change"
         dead_hand = "dead-hand"
@@ -43,7 +44,7 @@ class Game:
             raise NotImplemented
 
     def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
-        self._id = id(self)
+        self._id = str(uuid.uuid4())
         self._players = players
         self._deck = deck
         self._score_detector = score_detector
@@ -70,7 +71,10 @@ class Game:
         self._event_subscribers = set()
 
     def __str__(self):
-        return "game " + str(self._id)
+        return "game {}".format(self._id)
+
+    def __repr__(self):
+        return self._id
 
     def subscribe(self, subscriber):
         self._event_subscribers.add(subscriber)
@@ -269,7 +273,7 @@ class Game:
     def _change_cards(self):
         for player_key, player in self._players_round(self._dealer):
             try:
-                timeout = time.time() + self.CHANGE_CARDS_TIMEOUT + self.TIMEOUT_TOLERANCE
+                timeout_epoch = time.time() + self.CHANGE_CARDS_TIMEOUT + self.TIMEOUT_TOLERANCE
                 self._logger.info("{}: {} changing cards...".format(self, player))
                 self._broadcast(
                     Game.Event.player_action,
@@ -277,12 +281,12 @@ class Game:
                         "action": "change-cards",
                         "player": player_key,
                         "timeout": self.CHANGE_CARDS_TIMEOUT,
-                        "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))
+                        "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
                     }
                 )
 
                 # Ask remote player to change cards
-                _, discards = self._change_player_cards(player, timeout=timeout)
+                _, discards = self._change_player_cards(player, timeout_epoch=timeout_epoch)
 
                 if discards:
                     # Assign cards to the remote player
@@ -307,15 +311,12 @@ class Game:
             except (ChannelError, MessageFormatError, MessageTimeout) as e:
                 self._add_dead_player(player_key, e)
 
-    def _change_player_cards(self, player, timeout):
+    def _change_player_cards(self, player, timeout_epoch):
         """Gives players the opportunity to change some of their cards.
         Returns a tuple: (discard card ids, discards)."""
-        while True:
-            message = player.recv_message(timeout=timeout)
-            if "msg_id" not in message:
-                raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
-            if message["msg_id"] != "ping":
-                break
+        message = player.recv_message(timeout_epoch=timeout_epoch)
+        if "msg_id" not in message:
+            raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
 
         MessageFormatError.validate_msg_id(message, "change-cards")
 
@@ -352,7 +353,7 @@ class Game:
     def _bet(self, player_key, min_bet=0.0, max_bet=-1, opening=False):
         try:
             player = self._players[player_key]
-            timeout = time.time() + self.BET_TIMEOUT + self.TIMEOUT_TOLERANCE
+            timeout_epoch = time.time() + self.BET_TIMEOUT + self.TIMEOUT_TOLERANCE
 
             self._logger.info("{}: {} betting...".format(self, player))
             self._broadcast(
@@ -364,11 +365,17 @@ class Game:
                     "opening": opening,
                     "player": player_key,
                     "timeout": self.BET_TIMEOUT,
-                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout))
+                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
                 }
             )
 
-            bet = self._player_bet(player, min_bet=min_bet, max_bet=max_bet, opening=opening, timeout=timeout)
+            bet = self._player_bet(
+                player,
+                min_bet=min_bet,
+                max_bet=max_bet,
+                opening=opening,
+                timeout_epoch=timeout_epoch
+            )
             bet_type = None
 
             if bet == -1 and opening:
@@ -408,16 +415,12 @@ class Game:
             self._add_dead_player(player_key, e)
             return -1, "fold"
 
-    def _player_bet(self, player, min_bet=0.0, max_bet=0.0, opening=False, timeout=None):
+    def _player_bet(self, player, min_bet=0.0, max_bet=0.0, opening=False, timeout_epoch=None):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
-        while True:
-            message = player.recv_message(timeout=timeout)
-            if "msg_id" not in message:
-                raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
-            if message["msg_id"] != "ping":
-                # Ignore ping messages
-                break
+        message = player.recv_message(timeout_epoch=timeout_epoch)
+        if "msg_id" not in message:
+            raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
 
         MessageFormatError.validate_msg_id(message, "bet")
 

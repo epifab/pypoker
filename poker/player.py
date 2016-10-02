@@ -36,4 +36,7 @@ class Player:
         self._score = score
 
     def __str__(self):
-        return "player " + self._id
+        return "player {}".format(self._id)
+
+    def __repr__(self):
+        return self._id

@@ -1,18 +1,16 @@
-from . import MessageFormatError, ChannelError, MessageTimeout, Channel
+from poker import Channel, ChannelError, MessageFormatError, MessageTimeout
+import gevent
 import errno
 import json
-import logging
 import socket
 import time
-import gevent
 
 
-class SocketChannel(Channel):
+class ChannelSocket(Channel):
     def __init__(self, socket, address, logger=None):
         self._socket = socket
         self._address = address
         self._socket.setblocking(False)
-        self._logger = logger if logger else logging
 
     def close(self):
         self._socket.close()
@@ -25,8 +23,6 @@ class SocketChannel(Channel):
         msg_len = str(len(msg_encoded)) + "\n"
         msg_len_encoded = msg_len.encode("utf-8")
 
-        self._logger.debug("Sending message to {}: {}".format(self._address, msg_serialized))
-
         try:
             # Sends message length
             self._socket.send(msg_len_encoded)
@@ -35,9 +31,9 @@ class SocketChannel(Channel):
         except:
             raise ChannelError("Unable to send data to the remote host")
 
-    def _recv(self, size, timeout):
+    def _recv(self, size, timeout_epoch):
         message = b''
-        while not timeout or time.time() < timeout:
+        while not timeout_epoch or time.time() < timeout_epoch:
             try:
                 message += self._socket.recv(size)
                 if len(message) >= size:
@@ -65,15 +61,13 @@ class SocketChannel(Channel):
                 message += chr
         raise MessageTimeout("Timed out")
 
-    def recv_message(self, timeout=None):
+    def recv_message(self, timeout_epoch=None):
         # Read the json message size
-        msg_len = self._recv_message_len(timeout)
+        msg_len = self._recv_message_len(timeout_epoch)
 
         # Read and decode the json message
-        encoded = self._recv(msg_len, timeout)
+        encoded = self._recv(msg_len, timeout_epoch)
         serialized = encoded.decode("utf-8")
-
-        self._logger.debug("JSON(?) message receive from {}: {}".format(self._address, serialized))
 
         try:
             # Deserialize and return the message

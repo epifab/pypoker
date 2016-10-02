@@ -1,11 +1,15 @@
 from poker import *
 import logging
 import random, string
-import socket
+import redis
+import signal
 import sys
 import time
 import os
-import calendar
+
+
+class InputTimeout(Exception):
+    pass
 
 
 class PlayerConsole(Player):
@@ -13,10 +17,21 @@ class PlayerConsole(Player):
         Player.__init__(self, id, name, money)
 
     @staticmethod
-    def input(timeout, question=""):
-        # @todo: Implement non blocking IO (with timeout)
-        print("{:.0f} seconds remaining".format(round(timeout)))
-        return input(question)
+    def input(timeout_epoch, question=""):
+        def timeout_handler():
+            raise InputTimeout("Timed out")
+
+        timeout = int(round(timeout_epoch - time.time()))
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout)
+
+        print("{:.0f} seconds remaining".format(timeout))
+        response = raw_input(question)
+
+        signal.alarm(0)
+
+        return response
 
     def change_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
@@ -27,20 +42,19 @@ class PlayerConsole(Player):
         while True:
             try:
                 discard_keys = PlayerConsole.input(
-                    timeout_epoch - time.time(),
+                    timeout_epoch,
                     "Please type a comma separated list of card (1 to 5 from left to right): ")
                 if discard_keys:
                     # Convert the string into a list of unique integers
-                    discard_keys = [int(card_id.strip()) - 1 for card_id in discard_keys.split(",")]
+                    discard_keys = [int(card_id.strip()) - 1 for card_id in str(discard_keys).split(",")]
                     if len(discard_keys) > 4:
                         print("You cannot change more than 4 cards")
                         continue
                     # Works out the new card set
                     discards = [self._cards[key] for key in discard_keys]
-                    remaining_cards = [self._cards[key] for key in range(len(self._cards)) if key not in discard_keys]
                     return discard_keys, discards
                 return [], []
-            except TimeoutError:
+            except InputTimeout:
                 return [], []
             except (ValueError, IndexError):
                 print("One or more invalid card id.")
@@ -53,8 +67,8 @@ class PlayerConsole(Player):
 
         if max_bet == -1:
             try:
-                PlayerConsole.input(timeout_epoch - time.time(), "Not allowed to open. Press enter to continue.")
-            except TimeoutError:
+                PlayerConsole.input(timeout_epoch, "Not allowed to open. Press enter to continue.")
+            except InputTimeout:
                 pass
             finally:
                 return -1
@@ -68,7 +82,7 @@ class PlayerConsole(Player):
             message += " -1 to " + ("skip opening" if opening else "fold") + ": "
 
             try:
-                bet = PlayerConsole.input(timeout_epoch - time.time(), message)
+                bet = PlayerConsole.input(timeout_epoch, message)
 
                 bet = float(bet)
 
@@ -82,7 +96,7 @@ class PlayerConsole(Player):
                 self._money -= bet
                 return bet
 
-            except TimeoutError:
+            except InputTimeout:
                 print("Timed out")
                 return -1
             except (ValueError, TypeError):
@@ -104,19 +118,6 @@ class PlayerClientConsole(PlayerConsole):
     def __init__(self, server, id, name, money):
         PlayerConsole.__init__(self, id=id, name=name, money=money)
         self._server = server
-        self._connect()
-
-    def _connect(self):
-        self.send_message({
-            'msg_id': 'connect',
-            'player': {
-                'id': self.get_id(),
-                'name': self.get_name(),
-                'money': self.get_money()}})
-
-        message = self.recv_message()
-
-        MessageFormatError.validate_msg_id(message, "connect")
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""
@@ -141,9 +142,7 @@ class PlayerClientConsole(PlayerConsole):
         try:
             self.send_message(message)
             return True
-        except ChannelError as e:
-            self._logger.exception("Player {}: {}".format(self.get_id(), e.args[0]))
-            self._error = e
+        except ChannelError:
             return False
 
     def send_message(self, message):
@@ -188,10 +187,11 @@ class GameClientConsole:
                                     min_bet=message["min_bet"],
                                     max_bet=message["max_bet"],
                                     opening=message["opening"],
-                                    timeout_epoch=timeout_epoch)
+                                    timeout_epoch=timeout_epoch
+                                )
                             elif message["action"] == "change-cards":
                                 self._player.change_cards(timeout_epoch)
-                        except TimeoutError:
+                        except InputTimeout:
                             print("Time is up!")
                     else:
                         print("Waiting for {}...".format(action_player["name"]))
@@ -297,20 +297,45 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG if 'DEBUG' in os.environ else logging.INFO)
     logger = logging.getLogger()
 
+    server_id = "VEGAS"
+
     player_id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
-
     player_name = sys.argv[1]
+    player_money = 1000.0
 
-    host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]
-    port = 9000 if "POKER5_PORT" not in os.environ else os.environ["POKER5_PORT"]
-    server_address = (host, port)
+    redis_url = "redis://localhost" if "REDIS_URL" not in os.environ else os.environ["REDIS_URL"]
+    redis = redis.from_url(redis_url)
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(server_address)
-    logger.info("Connection established with the Poker5 server at {}".format(server_address))
+    connection_request = RedisPublisher(redis, "poker5:server:{}".format(server_id))
+    connection_request.send_message({
+        "msg_id": "connect",
+        "player": {
+            "id": player_id,
+            "name": player_name,
+            "money": player_money
+        }
+    })
+
+    server_channel = Chan(
+        RedisMessageReader(redis, "poker5:server-{}:player-{}:R".format(server_id, player_id)),
+        RedisMessageWriter(redis, "poker5:server-{}:player-{}:L".format(server_id, player_id)),
+    )
+
+    connection_response = server_channel.recv_message(time.time() + 1)
+    MessageFormatError.validate_msg_id(connection_response, "connect")
+
+    # host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]
+    # port = 9000 if "POKER5_PORT" not in os.environ else os.environ["POKER5_PORT"]
+    # server_address = (host, port)
+    #
+    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # sock.connect(server_address)
+    # logger.info("Connection established with the Poker5 server at {}".format(server_address))
+    #
+    # server_channel = SocketChannel(sock, server_address)
 
     player = PlayerClientConsole(
-                SocketChannel(socket=sock, address=server_address),
+                server_channel,
                 id=player_id,
                 name=player_name,
                 money=1000)
@@ -322,5 +347,4 @@ if __name__ == "__main__":
     try:
         game.play()
     finally:
-        sock.close()
-        logger.info("Poker5 server at {}: connection closed".format(server_address))
+        logger.info("Poker5 server {}: connection closed".format(server_id))

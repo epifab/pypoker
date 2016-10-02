@@ -1,20 +1,22 @@
 from . import Game, ScoreDetector, Deck
 import logging
 import threading
-import random
-import string
+from uuid import uuid4
 
 
-class Server:
+class GameServer:
     def __init__(self, logger=None):
-        self._id = ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(5))
+        self._id = "VEGAS"  # str(uuid4())
         self._lobby = []
         self._room_size = 2
         self._lobby_lock = threading.Lock()
         self._logger = logger if logger else logging
 
     def __str__(self):
-        return "server " + self._id
+        return "server {}".format(self._id)
+
+    def __repr__(self):
+        return self._id
 
     def new_players(self):
         raise NotImplementedError
@@ -24,24 +26,33 @@ class Server:
             player.try_send_message(message)
 
     def _join_lobby(self, new_player):
-        connected = new_player.try_send_message({
+        self._lobby_lock.acquire()
+
+        self._logger.info("{}: {} joining the lobby".format(self, new_player))
+
+        # Acknowledging the connection
+        new_player.send_message({
             "msg_id": "connect",
             "server": self._id,
             "player": new_player.dto()
         })
 
-        if not connected:
-            self._logger.error("{}: Unable to connect {}".format(self, new_player))
-            return
-
-        self._lobby_lock.acquire()
-
         try:
             # Clean-up the lobby
             new_lobby = []
             for player in self._lobby:
-                if player.get_id() == new_player.get_id() or not player.ping(pong=True):
-                    self._logger.info("{}: {} left the lobby".format(self, player))
+                if player.get_id() == new_player.get_id():
+                    # Player was already in the lobby
+                    self._logger.info("{}: {} already in the lobby")
+                    # Kill the old session
+                    self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": player.dto()})
+                    player.disconnect()
+
+                self._logger.info("{}: ping to player {}".format(self, player))
+                if not player.ping(pong=True):
+                    # Unresponsive
+                    self._logger.info("{}: {} did not respond: kicked out".format(self, player))
+                    # Kill inactive session
                     self._broadcast({"msg_id": "lobby-update", "event": "player-removed", "player": player.dto()})
                     player.disconnect()
                 else:
@@ -63,7 +74,7 @@ class Server:
                 # Subscribe all players to game events
                 for new_player in self._lobby:
                     game.subscribe(new_player)
-                thread = threading.Thread(target=Server._play_game, args=(self, game, self._lobby))
+                thread = threading.Thread(target=GameServer._play_game, args=(self, game, self._lobby))
                 thread.start()
                 self._lobby = []
         finally:
@@ -71,21 +82,16 @@ class Server:
 
     def _play_game(self, game, players):
         try:
-            self._logger.info("{}: starting game {}".format(self, game))
-
+            self._logger.info("{}: starting {}".format(self, game))
             game.play_game()
-
-            for player in players:
-                # Try to send the player a notification
-                self._join_lobby(player)
         except:
-            # Something terrible happened
             self._logger.exception("{}: unhandled game exception for {}".format(self, game))
-            for player in players:
-                player.disconnect()
             raise
         finally:
             self._logger.info("{}: terminated {}".format(self, game))
+            # Sending players back to the lobby
+            for player in players:
+                player.disconnect()
 
     def start(self):
         self._logger.info("{}: running".format(self))

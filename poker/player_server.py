@@ -20,6 +20,7 @@ class PlayerServer(Player, Game.EventListener):
     def disconnect(self):
         """Disconnect the client"""
         try:
+            self.try_send_message({"msg_id": "disconnect"})
             self._channel.close()
         except:
             pass
@@ -31,7 +32,7 @@ class PlayerServer(Player, Game.EventListener):
         try:
             self.send_message({"msg_id": "ping"})
             if pong:
-                message = self.recv_message(timeout=time.time() + 2)
+                message = self.recv_message(timeout_epoch=time.time() + 2)
                 MessageFormatError.validate_msg_id(message, expected="ping")
             return True
         except (ChannelError, MessageTimeout, MessageFormatError) as e:
@@ -43,14 +44,14 @@ class PlayerServer(Player, Game.EventListener):
         try:
             self.send_message(message)
             return True
-        except ChannelError as e:
+        except ChannelError:
             return False
 
     def send_message(self, message):
         return self._channel.send_message(message)
 
-    def recv_message(self, timeout=None):
-        return self._channel.recv_message(timeout)
+    def recv_message(self, timeout_epoch=None):
+        return self._channel.recv_message(timeout_epoch)
 
     def game_event(self, event, event_data, game_data):
         message = {"msg_id": "game-update"}

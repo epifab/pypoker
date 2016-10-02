@@ -1,10 +1,10 @@
-from poker import Server, SocketChannel, MessageFormatError, PlayerServer
+from poker import MessageFormatError, GameServer, PlayerServer, ChannelSocket
 import socket
 
 
-class ServerSocket(Server):
+class GameServerSocket(GameServer):
     def __init__(self, address, logger=None):
-        Server.__init__(self, logger)
+        GameServer.__init__(self, logger)
         self._address = address
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.bind(address)
@@ -14,8 +14,8 @@ class ServerSocket(Server):
         while True:
             client_socket, client_address = self._socket.accept()
             self._logger.info("New socket connection from {}".format(client_address))
-            channel = SocketChannel(socket=client_socket, address=client_address)
-            yield self.connect_player(SocketChannel(socket=client_socket, address=client_address))
+            channel = ChannelSocket(socket=client_socket, address=client_address)
+            yield self.connect_player(channel=channel)
 
     def connect_player(self, channel):
         message = channel.recv_message()
