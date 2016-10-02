@@ -108,12 +108,12 @@ def poker5(ws):
         logger=app.logger
     )
 
-    # try:
-    app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
-    player.connect(MessageQueue(redis), session_id)
-    # except (ChannelError, MessageFormatError, MessageTimeout) as e:
-    #     app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
-    #     raise
+    try:
+        app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
+        player.connect(MessageQueue(redis), session_id)
+    except (ChannelError, MessageFormatError, MessageTimeout) as e:
+        app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
+        raise
 
     def keep_alive():
         last_ping = time.time()

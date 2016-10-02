@@ -7,9 +7,27 @@ The front-end is pure HTML/CSS/Javascript (jQuery).
 
 ### How it works
 
-Clients and server communicate by exchanging JSON messages via a persisted connection (web socket).  
-As soon as two clients are connected to the same server a new game is kicked off.  
-The server broadcasts **game-update** messages to handle every game related event.  
+Architecturally, the application is made of four components.
+- **Backend worker**:
+    - Background process responsible for launching new poker games. When new clients connect, they are moved to a "lobby". As soon as enough clients are waiting in the lobby, a new game is kicked off.
+- **Backend web**:
+    - Handles HTTP requests and communicates to the clients via a persisted connection (web sockets).
+    - Acts as a middle layer by forwarding clients requests to the backend worker and responses to the frontend client.
+- **Frontend**:
+    - Handles end user interactions
+- **Message queuing service**:
+    - The web backend and the worker communicate by pushing and pulling messages to and from a queue. This is done using Redis.
+
+Note: the backend worker and the web application are completely separated. They can be deployed on different servers and scaled independently as the communication only happens via a distributed Redis database.
+
+
+### Communication protocol
+
+As mentioned above, front-end clients communicate to the backend application by  exchanging JSON messages over a persisted HTTP connection using web sockets.
+
+Once a new game is launched, the remote server starts broadcasting **game-update** messages to communicate every game related event to the frontend clients (for instance "player X bet 100 dollars", "player Y changed 3 cards", "player Z won", ...).
+
+Frontend clients will respond to particular messages which indicate that input is required from the end users (for instance a bet or which cards they wish the change).
 
 *game-update* message structure:
 
@@ -38,6 +56,8 @@ The following is a list of possible events with their additional message attribu
     - *min_bet* (only when *action* is "bet")
     - *max_bet* (only when *action* is "bet")
     - *opening* (only when *action* is "bet", true if nobody has bet in the current hand)
+- **dead-player** (a player left the table)
+    - *player* (zero-based index of the *players* list)
 - **bet** (a player bet)
     - *player* (zero-based index of the *players* list)
     - *bet* (the actual bet. -1 if the player folded)
