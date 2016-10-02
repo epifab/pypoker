@@ -1,88 +1,92 @@
 import gevent
-from flask import Flask, render_template, session
+from flask import Flask, render_template, redirect, session, request, url_for
 from flask_sockets import Sockets
-import random
+from flask_oauthlib.client import OAuth, OAuthException
 import redis
 import uuid
 import os
 import time
-from poker import PlayerClient, \
-    ChannelWebSocket, ChannelRedis, MessageQueue, \
-    ChannelError, MessageFormatError, MessageTimeout
+from poker import PlayerClient, ChannelWebSocket, ChannelRedis, \
+    MessageQueue, ChannelError, MessageFormatError, MessageTimeout
+
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '!!_-pyp0k3r-_!!'
+app.config["SECRET_KEY"] = "!!_-pyp0k3r-_!!"
 app.debug = True
 
 sockets = Sockets(app)
+oauth = OAuth(app)
 
-redis_url = "redis://localhost" if "REDIS_URL" not in os.environ else os.environ["REDIS_URL"]
+redis_url = os.environ["REDIS_URL"]
 redis = redis.from_url(redis_url)
 
-# Poker champions: https://en.wikipedia.org/wiki/List_of_World_Series_of_Poker_Main_Event_champions
-names = [
-    "Johnny Moss",
-    "Thomas Preston",
-    "Walter Pearson",
-    "Brian Roberts",
-    "Doyle Brunson",
-    "Bobby Baldwin",
-    "Hal Fowler",
-    "Stu Ungar",
-    "Jack Straus",
-    "Tom McEvoy",
-    "Jack Keller",
-    "Bill Smith",
-    "Barry Johnston",
-    "Johnny Chan",
-    "Phil Hellmuth",
-    "Mansour Matloubi",
-    "Brad Daugherty",
-    "Hamid Dastmalchi",
-    "Jim Bechtel",
-    "Russ Hamilton",
-    "Dan Harrington",
-    "Huck Seed",
-    "Stu Ungar",
-    "Scotty Nguyen",
-    "Noel Furlong",
-    "Chris Ferguson",
-    "Carlos Mortensen",
-    "Robert Varkonyi",
-    "Chris Moneymaker",
-    "Greg Raymer",
-    "Joe Hachem",
-    "Jamie Gold",
-    "Jerry Yang",
-    "Peter Eastgate",
-    "Joe Cada",
-    "Jonathan Duhamel",
-    "Pius Heinz",
-    "Greg Merson",
-    "Ryan Riess",
-    "Martin Jacobson",
-    "Joe McKeehen",
-]
+facebook = oauth.remote_app(
+    "facebook",
+    consumer_key=os.environ["FACEBOOK_APP_ID"],
+    consumer_secret=os.environ["FACEBOOK_APP_SECRET"],
+    request_token_params={"scope": "email"},
+    base_url="https://graph.facebook.com",
+    request_token_url=None,
+    access_token_url="/oauth/access_token",
+    access_token_method="GET",
+    authorize_url="https://www.facebook.com/dialog/oauth"
+)
 
 
-@app.route('/')
-def hello():
-    global names
-    if 'player-id' not in session:
-        session['player-id'] = str(uuid.uuid4())
-        session['player-name'] = random.choice(names)
-        session['player-money'] = 1000.00
-    return render_template('index.html',
-                           id=session['player-id'],
-                           name=session['player-name'],
-                           money=session['player-money'])
+@app.route("/")
+def index():
+    if "oauth-token" not in session:
+        return redirect(url_for("login"))
+
+    user = facebook.get("/me?fields=name,email")
+
+    session["player-id"] = user.data["id"]
+    session["player-name"] = user.data["name"]
+    session["player-money"] = 1000
+
+    return render_template("index.html",
+                           id=session["player-id"],
+                           name=session["player-name"],
+                           money=session["player-money"])
 
 
-@sockets.route('/poker5')
+@app.route("/login")
+def login():
+    callback = url_for(
+        "facebook_authorized",
+        next=request.args.get("next") or request.referrer or None,
+        _external=True
+    )
+    return facebook.authorize(callback=callback)
+
+
+@app.route("/login/authorized")
+def facebook_authorized():
+    response = facebook.authorized_response()
+
+    if response is None:
+        return "Access denied: reason={} error={}".format(
+            request.args["error_reason"],
+            request.args["error_description"]
+        )
+
+    if isinstance(response, OAuthException):
+        return "Access denied: %s".format(response.message)
+
+    session["oauth-token"] = (response["access_token"], "")
+    return redirect("/")
+
+
+@facebook.tokengetter
+def get_facebook_oauth_token():
+    return session.get("oauth-token")
+
+
+@sockets.route("/poker5")
 def poker5(ws):
     client_channel = ChannelWebSocket(ws)
 
-    if 'player-id' not in session:
+    if "player-id" not in session:
         client_channel.send_message({"msg_id": "error", "error": "Unrecognized user"})
         client_channel.close()
         return
