@@ -1,5 +1,5 @@
 from . import GameServer, PlayerServer, \
-    ChannelError, RedisListener, ChannelRedis, MessageFormatError
+    ChannelError, MessageQueue, ChannelRedis, MessageFormatError
 
 
 class ChannelRedisWrapper(ChannelRedis):
@@ -14,14 +14,13 @@ class GameServerRedis(GameServer):
     def __init__(self, redis, logger=None):
         GameServer.__init__(self, logger)
         self._redis = redis
-        self._connections_listener = RedisListener(redis, "poker5:server:{}".format(self._id))
-
-    def on_shutdown(self):
-        self._connections_listener.close()
+        self._message_queue = MessageQueue(redis)
+        self._connection_channel = "poker5:lobby"
 
     def new_players(self):
         while True:
-            message = self._connections_listener.recv_message()
+            # Receiving connection requests
+            message = self._message_queue.pop(self._connection_channel)
 
             MessageFormatError.validate_msg_id(message, "connect")
 
@@ -57,13 +56,20 @@ class GameServerRedis(GameServer):
             player = PlayerServer(
                 channel=ChannelRedisWrapper(
                     self._redis,
-                    "poker5:server-{}:player-{}:session-{}:I".format(self._id, player_id, session_id),
-                    "poker5:server-{}:player-{}:session-{}:O".format(self._id, player_id, session_id)
+                    "poker5:player-{}:session-{}:I".format(player_id, session_id),
+                    "poker5:player-{}:session-{}:O".format(player_id, session_id)
                 ),
                 id=player_id,
                 name=player_name,
                 money=player_money,
                 logger=self._logger
             )
+
+            # Acknowledging the connection
+            player.send_message({
+                "msg_id": "connect",
+                "server": self._id,
+                "player": player.dto()
+            })
 
             yield player

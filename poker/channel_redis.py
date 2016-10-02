@@ -63,16 +63,19 @@ class RedisPublisher():
 #         self._publisher.send_message(message)
 
 
-class ChannelRedis(Channel):
-    def __init__(self, redis, channel_in, channel_out):
+class MessageQueue:
+    def __init__(self, redis):
         self._redis = redis
-        self._channel_in = channel_in
-        self._channel_out = channel_out
-        redis.delete(self._channel_in)
 
-    def recv_message(self, timeout_epoch=None):
+    def push(self, name, message):
+        msg_serialized = json.dumps(message)
+        msg_encoded = msg_serialized.encode("utf-8")
+        self._redis.lpush(name, msg_encoded)
+        self._redis.expire(name, 5)
+
+    def pop(self, name, timeout_epoch=None):
         response = self._redis.brpop(
-            [self._channel_in],
+            [name],
             timeout=int(round(timeout_epoch - time.time())) if timeout_epoch else 0
         )
         if response is None:
@@ -84,9 +87,15 @@ class ChannelRedis(Channel):
             # Invalid json
             raise MessageFormatError(desc="Unable to decode the JSON message")
 
+
+class ChannelRedis(MessageQueue, Channel):
+    def __init__(self, redis, channel_in, channel_out):
+        MessageQueue.__init__(self, redis)
+        self._channel_in = channel_in
+        self._channel_out = channel_out
+
     def send_message(self, message):
-        # Encode the message
-        msg_serialized = json.dumps(message)
-        msg_encoded = msg_serialized.encode("utf-8")
-        self._redis.lpush(self._channel_out, msg_encoded)
-        self._redis.expire(self._channel_out, 5)
+        self.push(self._channel_out, message)
+
+    def recv_message(self, timeout_epoch=None):
+        return self.pop(self._channel_in, timeout_epoch)

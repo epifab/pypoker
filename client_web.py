@@ -7,7 +7,7 @@ import uuid
 import os
 import time
 from poker import PlayerClient, \
-    ChannelWebSocket, ChannelRedis, RedisPublisher, \
+    ChannelWebSocket, ChannelRedis, MessageQueue, \
     ChannelError, MessageFormatError, MessageTimeout
 
 app = Flask(__name__)
@@ -80,8 +80,8 @@ def hello():
 
 @sockets.route('/poker5')
 def poker5(ws):
-    server_id = "VEGAS"
-    client_channel = ChannelWebSocket(ws, app.logger)
+    client_channel = ChannelWebSocket(ws)
+
     if 'player-id' not in session:
         client_channel.send_message({"msg_id": "error", "error": "Unrecognized user"})
         client_channel.close()
@@ -95,37 +95,25 @@ def poker5(ws):
 
     server_channel = ChannelRedis(
         redis,
-        "poker5:server-{}:player-{}:session-{}:O".format(server_id, player_id, session_id),
-        "poker5:server-{}:player-{}:session-{}:I".format(server_id, player_id, session_id)
+        "poker5:player-{}:session-{}:O".format(player_id, session_id),
+        "poker5:player-{}:session-{}:I".format(player_id, session_id)
     )
 
-    connection_channel = RedisPublisher(redis, "poker5:server:{}".format(server_id))
+    player = PlayerClient(
+        server_channel=server_channel,
+        client_channel=client_channel,
+        id=player_id,
+        name=player_name,
+        money=player_money,
+        logger=app.logger
+    )
 
-    connection_channel.send_message({
-        "msg_id": "connect",
-        "player": {
-            "id": player_id,
-            "name": player_name,
-            "money": player_money
-        },
-        "session_id": session_id
-    })
-
-    app.logger.info("Connecting player {} to server {}...".format(player_id, server_id))
-
-    try:
-        player = PlayerClient(
-            server_channel=server_channel,
-            client_channel=client_channel,
-            id=player_id,
-            name=player_name,
-            money=player_money
-        )
-        app.logger.info("Player {} connected to server {}".format(player_id, server_id))
-
-    except (ChannelError, MessageFormatError, MessageTimeout) as e:
-        app.logger.error("Unable to connect player {} to server {}: {}".format(player_id, server_id, e.args[0]))
-        return
+    # try:
+    app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
+    player.connect(MessageQueue(redis), session_id)
+    # except (ChannelError, MessageFormatError, MessageTimeout) as e:
+    #     app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
+    #     raise
 
     def keep_alive():
         last_ping = time.time()
@@ -137,13 +125,12 @@ def poker5(ws):
                 player.send_message_client({"msg_id": "keep_alive"})
                 last_ping = time.time()
 
-    # Keep websocket open
-    gevent.spawn(keep_alive)
-
     try:
+        # Keep websocket open
+        gevent.spawn(keep_alive)
         player.play()
     except (ChannelError, MessageFormatError, MessageTimeout) as e:
-        app.logger.error("Terminating player {} connection to server {}: {}".format(player_id, server_id, e.args[0]))
+        app.logger.error("Terminating player {} connection: {}".format(player_id, e.args[0]))
     finally:
         app.logger.info("Dropping connection with {}".format(player))
         player.disconnect()

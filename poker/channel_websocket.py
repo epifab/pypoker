@@ -5,7 +5,7 @@ import time
 
 
 class ChannelWebSocket(Channel):
-    def __init__(self, ws, logger=None):
+    def __init__(self, ws):
         self._ws = ws
 
     def close(self):

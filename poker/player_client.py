@@ -12,6 +12,39 @@ class PlayerClient(Player):
         self._client_channel = client_channel
         self._logger = logger if logger else logging
 
+    def connect(self, message_queue, session_id):
+        message_queue.push(
+            "poker5:lobby",
+            {
+                "msg_id": "connect",
+                "player": {
+                    "id": self.get_id(),
+                    "name": self.get_name(),
+                    "money": self.get_money()
+                },
+                "session_id": session_id
+            }
+        )
+
+        connection_message = self._server_channel.recv_message(time.time() + 5)  # 5 seconds
+
+        # Validating message id
+        MessageFormatError.validate_msg_id(connection_message, "connect")
+
+        self._logger.info(str(connection_message))
+
+        try:
+            server_id = str(connection_message["server"])
+        except IndexError:
+            raise MessageFormatError(attribute="server", desc="Missing attribute")
+        except ValueError:
+            raise MessageFormatError(attribute="server", desc="Invalid server id")
+
+        self._logger.info("Player {} connected to server     {}".format(self.get_id(), server_id))
+
+        # Forwarding connection message to the client
+        self._client_channel.send_message(connection_message)
+
     def disconnect(self):
         try:
             self._server_channel.send_message({"msg_id": "disconnect"})

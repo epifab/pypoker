@@ -6,7 +6,7 @@ from uuid import uuid4
 
 class GameServer:
     def __init__(self, logger=None):
-        self._id = "VEGAS"  # str(uuid4())
+        self._id = str(uuid4())
         self._lobby = []
         self._room_size = 2
         self._lobby_lock = threading.Lock()
@@ -29,13 +29,6 @@ class GameServer:
         self._lobby_lock.acquire()
 
         self._logger.info("{}: {} joining the lobby".format(self, new_player))
-
-        # Acknowledging the connection
-        new_player.send_message({
-            "msg_id": "connect",
-            "server": self._id,
-            "player": new_player.dto()
-        })
 
         try:
             # Clean-up the lobby
