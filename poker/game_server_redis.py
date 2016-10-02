@@ -68,7 +68,7 @@ class GameServerRedis(GameServer):
             # Acknowledging the connection
             player.send_message({
                 "msg_id": "connect",
-                "server": self._id,
+                "server_id": self._id,
                 "player": player.dto()
             })
 

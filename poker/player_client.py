@@ -31,16 +31,9 @@ class PlayerClient(Player):
         # Validating message id
         MessageFormatError.validate_msg_id(connection_message, "connect")
 
-        self._logger.info(str(connection_message))
+        server_id = str(connection_message["server_id"])
 
-        try:
-            server_id = str(connection_message["server"])
-        except IndexError:
-            raise MessageFormatError(attribute="server", desc="Missing attribute")
-        except ValueError:
-            raise MessageFormatError(attribute="server", desc="Invalid server id")
-
-        self._logger.info("Player {} connected to server     {}".format(self.get_id(), server_id))
+        self._logger.info("Player {} connected to server {}".format(self.get_id(), server_id))
 
         # Forwarding connection message to the client
         self._client_channel.send_message(connection_message)
@@ -83,8 +76,6 @@ class PlayerClient(Player):
                 self.send_message_client(message)
 
                 if message["msg_id"] == "disconnect":
-                    self._server_channel.close()
-                    self._client_channel.close()
                     break
 
                 client_action_needed = message["msg_id"] == "ping" or \
