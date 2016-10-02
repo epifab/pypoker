@@ -34,7 +34,6 @@ Poker5 = {
     init: function() {
         wsScheme = window.location.protocol == "https:" ? "wss://" : "ws://";
 
-//        this.socket = new WebSocket("wss://pypoker.herokuapp.com/poker5");
         this.socket = new WebSocket(wsScheme + location.host + "/poker5");
 
         this.socket.onopen = function() {
@@ -164,6 +163,10 @@ Poker5 = {
             case 'player-action':
                 this.onPlayerAction(message);
                 break;
+            case 'dead-player':
+                player = message.players[message.player];
+                this.log(player.name + " left.")
+                break;
             case 'winner-designation':
                 player = message.players[message.player];
                 playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
@@ -173,7 +176,7 @@ Poker5 = {
     },
 
     onConnect: function(message) {
-        this.log("Connection established with poker5 server: " + message.server);
+        this.log("Connection established with poker5 server: " + message.server_id);
         $('#current-player').data('id', message.player.id);
     },
 
