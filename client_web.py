@@ -2,6 +2,7 @@ import gevent
 from flask import Flask, render_template, redirect, session, request, url_for
 from flask_sockets import Sockets
 from flask_oauthlib.client import OAuth, OAuthException
+import random
 import redis
 import uuid
 import os
@@ -35,22 +36,25 @@ facebook = oauth.remote_app(
 
 @app.route("/")
 def index():
-    if "oauth-token" not in session:
-        return redirect(url_for("login"))
-
-    user = facebook.get("/me?fields=name,email")
-
-    session["player-id"] = user.data["id"]
-    session["player-name"] = user.data["name"]
-    session["player-money"] = 1000
+    if "player-id" not in session:
+        return render_template("index.html", template="login.html")
 
     return render_template("index.html",
-                           id=session["player-id"],
-                           name=session["player-name"],
-                           money=session["player-money"])
+                           template="game.html",
+                           player_id=session["player-id"],
+                           player_name=session["player-name"],
+                           player_money=session["player-money"])
 
 
-@app.route("/login")
+@app.route("/test-login")
+def test_login():
+    session["player-id"] = str(uuid.uuid4())
+    session["player-name"] = get_random_name()
+    session["player-money"] = 1000
+    return redirect(url_for("index"))
+
+
+@app.route("/facebook-login")
 def login():
     callback = url_for(
         "facebook_authorized",
@@ -60,7 +64,7 @@ def login():
     return facebook.authorize(callback=callback)
 
 
-@app.route("/login/authorized")
+@app.route("/facebook-login/authorized")
 def facebook_authorized():
     response = facebook.authorized_response()
 
@@ -74,7 +78,14 @@ def facebook_authorized():
         return "Access denied: {}".format(response.message)
 
     session["oauth-token"] = (response["access_token"], "")
-    return redirect("/")
+
+    user = facebook.get("/me?fields=name,email")
+
+    session["player-id"] = user.data["id"]
+    session["player-name"] = user.data["name"]
+    session["player-money"] = 1000
+
+    return redirect(url_for("index"))
 
 
 @facebook.tokengetter
@@ -138,3 +149,51 @@ def poker5(ws):
     finally:
         app.logger.info("Dropping connection with {}".format(player))
         player.disconnect()
+
+
+def get_random_name():
+    # Poker champions: https://en.wikipedia.org/wiki/List_of_World_Series_of_Poker_Main_Event_champions
+    names = [
+        "Johnny Moss",
+        "Thomas Preston",
+        "Walter Pearson",
+        "Brian Roberts",
+        "Doyle Brunson",
+        "Bobby Baldwin",
+        "Hal Fowler",
+        "Stu Ungar",
+        "Jack Straus",
+        "Tom McEvoy",
+        "Jack Keller",
+        "Bill Smith",
+        "Barry Johnston",
+        "Johnny Chan",
+        "Phil Hellmuth",
+        "Mansour Matloubi",
+        "Brad Daugherty",
+        "Hamid Dastmalchi",
+        "Jim Bechtel",
+        "Russ Hamilton",
+        "Dan Harrington",
+        "Huck Seed",
+        "Stu Ungar",
+        "Scotty Nguyen",
+        "Noel Furlong",
+        "Chris Ferguson",
+        "Carlos Mortensen",
+        "Robert Varkonyi",
+        "Chris Moneymaker",
+        "Greg Raymer",
+        "Joe Hachem",
+        "Jamie Gold",
+        "Jerry Yang",
+        "Peter Eastgate",
+        "Joe Cada",
+        "Jonathan Duhamel",
+        "Pius Heinz",
+        "Greg Merson",
+        "Ryan Riess",
+        "Martin Jacobson",
+        "Joe McKeehen",
+    ]
+    return random.choice(names)

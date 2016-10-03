@@ -2,6 +2,10 @@ h1 .py {
     color: #66C;
 }
 
+a:hover, a:active, a:visited {
+    text-decoration: none;
+}
+
 #main {
     background-color: #354b1c;
     width: 100%;
@@ -9,6 +13,36 @@ h1 .py {
     color: #EED;
 }
 
+#main a {
+    color: #EED;
+}
+
+#login-bar {
+    width: 320px;
+    text-align: center;
+}
+
+#login-bar .login-link {
+    display: block;
+    width: 320px;
+    border-radius: 10px;
+    font-size: 20pt;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    margin: 10px 0px;
+}
+
+#login-bar .login-link.facebook {
+    background-color: #336699;
+    background-image: url('../images/facebook-logo.png');
+    background-repeat: no-repeat;
+    background-position: left center;
+    padding-left: 30px;
+}
+
+#login-bar .login-link.test {
+    background-color: #333;
+}
 
 /*****************************************************
   Players
@@ -158,6 +192,10 @@ h1 .py {
     clear: both;
     background-color: #333;
     padding: 10px 5px 10px 5px;
+}
+
+#table a {
+    color: #FFF;
 }
 
 #table .row {
