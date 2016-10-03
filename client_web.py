@@ -71,7 +71,7 @@ def facebook_authorized():
         )
 
     if isinstance(response, OAuthException):
-        return "Access denied: %s".format(response.message)
+        return "Access denied: {}".format(response.message)
 
     session["oauth-token"] = (response["access_token"], "")
     return redirect("/")
