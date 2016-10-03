@@ -2,28 +2,30 @@
 
 Traditional italian poker game application (5 card draw variant: https://en.wikipedia.org/wiki/Five-card_draw).
 
-The backend is entirely written in Python and it uses flask microframework to handle web requests and web sockets.  
+The backend is entirely written in Python and it uses flask microframework to handle web requests and web sockets.
 The front-end is pure HTML/CSS/Javascript (jQuery).
 
-### How it works
+### Architecture
 
-Architecturally, the application is made of four components.
-- **Backend worker**:
-    - Background process responsible for launching new poker games. When new clients connect, they are moved to a "lobby". As soon as enough clients are waiting in the lobby, a new game is kicked off.
-- **Backend web**:
+The application is made of four components.
+- **Game service**:
+    - Background process responsible for launching new games. When new clients connect, they are moved to a "lobby". As soon as enough clients are waiting in the lobby, a new game is kicked off.
+- **Backend web application**:
     - Handles HTTP requests and communicates to the clients via a persisted connection (web sockets).
-    - Acts as a middle layer by forwarding clients requests to the backend worker and responses to the frontend client.
-- **Frontend**:
-    - Handles end user interactions
-- **Message queuing service**:
-    - The web backend and the worker communicate by pushing and pulling messages to and from a queue. This is done using Redis.
+    - Acts as a middle layer between the game service and the frontend web application.
+- **Frontend web application**:
+    - Handles any end user interactions.
+- **Database**:
+    - The backend web application and the game service communicate by pushing and pulling messages to and from a queue. This is done using Redis.
 
-Note: the backend worker and the web application are completely separated. They can be deployed on different servers and scaled independently as the communication only happens via a distributed Redis database.
+
+Note: even if they are in the same repository, the game service and the web application are completely decoupled.
+They can be deployed on different servers and scaled independently as the communication only happens by exchanging JSON messages via a distributed database.
 
 
 ### Communication protocol
 
-As mentioned above, front-end clients communicate to the backend application by  exchanging JSON messages over a persisted HTTP connection using web sockets.
+As mentioned above, front-end clients communicate to the backend application by exchanging JSON messages over a persisted HTTP connection using web sockets.
 
 Once a new game is launched, the remote server starts broadcasting **game-update** messages to communicate every game related event to the frontend clients (for instance "player X bet 100 dollars", "player Y changed 3 cards", "player Z won", ...).
 
