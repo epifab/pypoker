@@ -1,12 +1,13 @@
-from . import Player, MessageFormatError, ChannelError, MessageTimeout, Game
+from . import Player, MessageFormatError, ChannelError, MessageTimeout
 import logging
 import time
 
 
-class PlayerServer(Player, Game.EventListener):
+class PlayerServer(Player):
     def __init__(self, channel, id, name, money, logger=None):
         Player.__init__(self, id=id, name=name, money=money)
         self._channel = channel
+        self._connected = True
         self._logger = logger if logger else logging
 
     def dto(self, with_score=False):
@@ -19,21 +20,19 @@ class PlayerServer(Player, Game.EventListener):
 
     def disconnect(self):
         """Disconnect the client"""
-        try:
+        if self._connected:
+            self._connected = False
             self.try_send_message({"msg_id": "disconnect"})
             self._channel.close()
-        except:
-            pass
 
     def update_channel(self, channel):
         self._channel = channel
 
-    def ping(self, pong=False):
+    def ping(self):
         try:
             self.send_message({"msg_id": "ping"})
-            if pong:
-                message = self.recv_message(timeout_epoch=time.time() + 2)
-                MessageFormatError.validate_msg_id(message, expected="ping")
+            message = self.recv_message(timeout_epoch=time.time() + 2)
+            MessageFormatError.validate_msg_id(message, expected="ping")
             return True
         except (ChannelError, MessageTimeout, MessageFormatError) as e:
             self._logger.error("Unable to ping {}: {}".format(self, e))
@@ -51,10 +50,7 @@ class PlayerServer(Player, Game.EventListener):
         return self._channel.send_message(message)
 
     def recv_message(self, timeout_epoch=None):
-        return self._channel.recv_message(timeout_epoch)
-
-    def game_event(self, event, event_data, game_data):
-        message = {"msg_id": "game-update"}
-        message.update(event_data)
-        message.update(game_data)
-        self.try_send_message(message)
+        message = self._channel.recv_message(timeout_epoch)
+        if "msg_id" in message and message["msg_id"] == "disconnect":
+            raise ChannelError("Client disconnected")
+        return message

@@ -37,6 +37,3 @@ class Player:
 
     def __str__(self):
         return "player {}".format(self._id)
-
-    def __repr__(self):
-        return self._id

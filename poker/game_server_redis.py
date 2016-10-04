@@ -1,13 +1,5 @@
 from . import GameServer, PlayerServer, \
-    ChannelError, MessageQueue, ChannelRedis, MessageFormatError
-
-
-class ChannelRedisWrapper(ChannelRedis):
-    def recv_message(self, timeout_epoch=None):
-        message = ChannelRedis.recv_message(self, timeout_epoch)
-        if "msg_id" in message and message["msg_id"] == "disconnect":
-            raise ChannelError("Client disconnected")
-        return message
+    MessageQueue, ChannelRedis, MessageFormatError
 
 
 class GameServerRedis(GameServer):
@@ -54,7 +46,7 @@ class GameServerRedis(GameServer):
                                          desc="'{}' is not a number".format(message["player"]["money"]))
 
             player = PlayerServer(
-                channel=ChannelRedisWrapper(
+                channel=ChannelRedis(
                     self._redis,
                     "poker5:player-{}:session-{}:I".format(player_id, session_id),
                     "poker5:player-{}:session-{}:O".format(player_id, session_id)

@@ -33,16 +33,17 @@ Frontend clients will respond to particular messages which indicate that input i
 
 *game-update* message structure:
 
-- *game* (id of the current game)
-- *pot*
-- *players* (list of players). Every element of the list includes:
+- *game_id* (id of the current game)
+- *player_ids* (list of player ids)
+- *players* (dictionary of players indexed by player ids). Every element of the list includes:
     -  *id*
     -  *name*
     -  *money*
     -  *bet* (total bet for the current hand)
     -  *alive* (true if the player has fold)
     -  *score* (this is sent only when the hand terminates and only for players who need to show their cards, see set-cards message for the structure)
-- *dealer* (zero-based index of the *players* list)
+- *pot*
+- *dealer_id*
 - *event* (see below)
 
 The following is a list of possible events with their additional message attributes:
@@ -51,7 +52,7 @@ The following is a list of possible events with their additional message attribu
 - **game-over** (current game was terminated)
 - **cards-assignment** (cards have been assigned to every player)
 - **player-action** (player action is required)
-    - *player* (zero-based index of the *players* list)
+    - *player_id* (player asked to perform the given action)
     - *action* (either "change-cards" or "bet")
     - *timeout* (number of seconds allowed to respond)
     - *timeout_date* (timeout timestamp)
@@ -59,13 +60,13 @@ The following is a list of possible events with their additional message attribu
     - *max_bet* (only when *action* is "bet")
     - *opening* (only when *action* is "bet", true if nobody has bet in the current hand)
 - **dead-player** (a player left the table)
-    - *player* (zero-based index of the *players* list)
+    - *player_id* (dead player id)
 - **bet** (a player bet)
-    - *player* (zero-based index of the *players* list)
+    - *player_id* (player who bet)
     - *bet* (the actual bet. -1 if the player folded)
     - *bet_type* (either "call", "check", "open", "raise" or "fold")
 - **cards-change** (a player changed the cards)
-    - *player* (zero-based index of the *players* list)
+    - *player_id* (player who changed his cards)
     - *num_cards* (number of cards that were changed)
 - **dead-hand** (hand terminated as nobody could open)
 - **winner-designation**
@@ -124,7 +125,7 @@ At this point, the server sends a first *game-update* message to notify that Jac
     "msg_id": "game-update",
     "event": "change-cards",
     "cards": 4,
-    "player": 1,
+    "player_id": "abcde-fghij-klmno-12345-2",
     "players": [
         {"id": "abcde-fghij-klmno-12345-1", "name": "John", "money": 123.0, "alive": true, "bet": 10.0}
         {"id": "abcde-fghij-klmno-12345-2", "name": "Jack", "money": 50.0, "alive": true, "bet": 10.0}
@@ -132,7 +133,7 @@ At this point, the server sends a first *game-update* message to notify that Jac
         {"id": "abcde-fghij-klmno-12345-4", "name": "Jane", "money": 500.0, "alive": true, "bet": 10.0}
     ],
     "pot": 50.0,
-    "dealer": 0
+    "dealer_id": "abcde-fghij-klmno-12345-4"
 }
 ```
 
@@ -142,14 +143,15 @@ And shortly after a second *game-update* message to notify it's "Jack" turn to b
 { 
     "msg_id": "game-update",
     "event": "player-action",
-    "player": 1,
+    "player_id": abcde-fghij-klmno-12345-2,
     "timeout": 30,
     "timeout_date": "2016-05-06 15:30:00+0000",
     "action": "bet",
     "min_bet": 1.0,
     "max_bet": 50.0,
     "players": ...
-    "pot": 50.0
+    "pot": 50.0,
+    "dealer_id": "abcde-fghij-klmno-12345-4"
 }
 ```
 

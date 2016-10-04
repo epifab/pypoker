@@ -139,7 +139,7 @@ Poker5 = {
                 this.log('New hand');
                 break;
             case 'bet':
-                player = message.players[message.player];
+                player = message.players[message.player_id];
                 playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
 
                 switch (message.bet_type) {
@@ -156,7 +156,7 @@ Poker5 = {
                 }
                 break;
             case 'cards-change':
-                player = message.players[message.player];
+                player = message.players[message.player_id];
                 playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
                 this.log(playerName + " changed " + message.num_cards + " cards.");
                 break;
@@ -164,11 +164,11 @@ Poker5 = {
                 this.onPlayerAction(message);
                 break;
             case 'dead-player':
-                player = message.players[message.player];
+                player = message.players[message.player_id];
                 this.log(player.name + " left.")
                 break;
             case 'winner-designation':
-                player = message.players[message.player];
+                player = message.players[message.player_id];
                 playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
                 this.log(playerName + " won!");
                 break;
@@ -232,8 +232,9 @@ Poker5 = {
     initGame: function(message) {
         $('#players').empty();
 
-        for (key in message.players) {
-            player = message.players[key];
+        for (k in message.player_ids) {
+            playerId = message.player_ids[k]
+            player = message.players[playerId]
 
             playerClass = 'player';
             if (player.id == $('#current-player').data('id')) {
@@ -267,8 +268,9 @@ Poker5 = {
     updateGame: function(message) {
         $('#pot').text(parseInt(message.pot));
 
-        for (playerKey in message.players) {
-            player = message.players[playerKey]
+        for (k in message.player_ids) {
+            playerId = message.player_ids[k]
+            player = message.players[playerId]
 
             $player = $('.player[data-id="' + player.id + '"]');
 
@@ -326,7 +328,7 @@ Poker5 = {
             $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money));
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
-            winner = message.event == 'winner-designation' && message.player == playerKey;
+            winner = message.event == 'winner-designation' && message.player_id == playerId;
             if (!winner) {
                 $player.removeClass('winner');
             }
@@ -334,7 +336,7 @@ Poker5 = {
                 $player.addClass('winner');
             }
 
-            alive = player.alive && (message.event != 'winner-designation' || message.player == playerKey);
+            alive = player.alive && (message.event != 'winner-designation' || message.player_id == playerId);
             if (!alive) {
                 $player.addClass('inactive');
             }
@@ -348,7 +350,7 @@ Poker5 = {
     },
 
     onPlayerAction: function(message) {
-        player = message.players[message.player];
+        player = message.players[message.player_id];
         isCurrentPlayer = player.id == $('#current-player').data('id');
 
         switch (message.action) {
@@ -423,8 +425,7 @@ Poker5 = {
                 'max': parseInt(message.max_bet),
                 'value': parseInt(message.min_bet),
                 'formatter': this.sliderHandler
-            });
-            $('#bet-input').slider('setValue', parseInt(message.min_bet));
+            }).slider('setValue', parseInt(message.min_bet));
 
             // Fold control
             if (message.opening) {

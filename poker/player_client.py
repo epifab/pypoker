@@ -33,7 +33,7 @@ class PlayerClient(Player):
 
         server_id = str(connection_message["server_id"])
 
-        self._logger.info("Player {} connected to server {}".format(self.get_id(), server_id))
+        self._logger.info("{}: connected to server {}".format(self, server_id))
 
         # Forwarding connection message to the client
         self._client_channel.send_message(connection_message)
@@ -52,40 +52,44 @@ class PlayerClient(Player):
         self._client_channel.close()
 
     def send_message_server(self, message):
+        self._logger.debug("{}: sending message to game server: {}".format(self, message))
         self._server_channel.send_message(message)
 
     def send_message_client(self, message):
+        self._logger.debug("{}: sending message to client: {}".format(self, message))
         self._client_channel.send_message(message)
 
     def recv_message_server(self, timeout_epoch=None):
-        return self._server_channel.recv_message(timeout_epoch)
+        message = self._server_channel.recv_message(timeout_epoch)
+        self._logger.debug("{}: game server message: {}".format(self, message))
+        return message
 
     def recv_message_client(self, timeout_epoch=None):
-        return self._client_channel.recv_message(timeout_epoch)
+        message = self._client_channel.recv_message(timeout_epoch)
+        self._logger.debug("{}: client message: {}".format(self, message))
+        return message
 
     def play(self):
         while True:
-            try:
-                message = self.recv_message_server()
+            message = self.recv_message_server()
 
-                if message["msg_id"] == "ping":
-                    self.send_message_server({"msg_id": "ping"})
-                    continue
+            if message["msg_id"] == "ping":
+                self.send_message_server({"msg_id": "ping"})
+                continue
 
-                # Forward messages to the client
-                self.send_message_client(message)
+            # Forward messages to the client
+            self.send_message_client(message)
 
-                if message["msg_id"] == "disconnect":
-                    break
+            # Game service disconnection
+            if message["msg_id"] == "disconnect":
+                self._logger.info("{}: disconnected by the server")
+                break
 
-                client_action_needed = message["msg_id"] == "ping" or \
-                    (message["msg_id"] == "game-update" \
-                     and message["event"] == "player-action" \
-                     and message["players"][message["player"]]["id"] == self.get_id())
+            client_action_needed = message["msg_id"] == "ping" or \
+                (message["msg_id"] == "game-update" \
+                 and message["event"] == "player-action" \
+                 and message["player_id"] == self.get_id())
 
-                if client_action_needed:
-                    client_message = self.recv_message_client(message["timeout"])
-                    self.send_message_server(client_message)
-            except:
-                self._client_channel.close()
-                raise
+            if client_action_needed:
+                client_message = self.recv_message_client(message["timeout"])
+                self.send_message_server(client_message)

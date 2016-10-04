@@ -131,21 +131,24 @@ def poker5(ws):
         raise
 
     def keep_alive():
-        last_ping = time.time()
-        while not ws.closed:
-            # Keep the websocket alive
-            gevent.sleep(0.1)
-            if time.time() > last_ping + 20:
-                # Ping the client every 20 secs to prevent idle connections
-                player.send_message_client({"msg_id": "keep_alive"})
-                last_ping = time.time()
+        try:
+            last_ping = time.time()
+            while not ws.closed:
+                # Keep the websocket alive
+                gevent.sleep(0.1)
+                if time.time() > last_ping + 20:
+                    # Ping the client every 20 secs to prevent idle connections
+                    player.send_message_client({"msg_id": "keep_alive"})
+                    last_ping = time.time()
+        except ChannelError:
+            app.logger.info("Connection closed with {}".format(player))
 
     try:
         # Keep websocket open
         gevent.spawn(keep_alive)
         player.play()
     except (ChannelError, MessageFormatError, MessageTimeout) as e:
-        app.logger.error("Terminating player {} connection: {}".format(player_id, e.args[0]))
+        app.logger.error("{} connection: {}".format(player, e.args[0]))
     finally:
         app.logger.info("Dropping connection with {}".format(player))
         player.disconnect()
