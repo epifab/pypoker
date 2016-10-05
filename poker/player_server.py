@@ -25,6 +25,10 @@ class PlayerServer(Player):
             self.try_send_message({"msg_id": "disconnect"})
             self._channel.close()
 
+    @property
+    def connected(self):
+        return self._connected
+
     def update_channel(self, channel):
         self._channel = channel
 
@@ -32,7 +36,7 @@ class PlayerServer(Player):
         try:
             self.send_message({"msg_id": "ping"})
             message = self.recv_message(timeout_epoch=time.time() + 2)
-            MessageFormatError.validate_msg_id(message, expected="ping")
+            MessageFormatError.validate_msg_id(message, expected="pong")
             return True
         except (ChannelError, MessageTimeout, MessageFormatError) as e:
             self._logger.error("Unable to ping {}: {}".format(self, e))

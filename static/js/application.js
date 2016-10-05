@@ -51,7 +51,7 @@ Poker5 = {
 
             switch (data.msg_id) {
                 case 'ping':
-                    Poker5.socket.send(JSON.stringify({'msg_id': 'ping'}));
+                    Poker5.socket.send(JSON.stringify({'msg_id': 'pong'}));
                     break;
                 case 'connect':
                     Poker5.onConnect(data);
