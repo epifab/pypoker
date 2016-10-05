@@ -1,4 +1,5 @@
 from . import Channel, MessageFormatError, MessageTimeout
+import gevent
 import json
 import signal
 import time
@@ -74,18 +75,19 @@ class MessageQueue:
         self._redis.expire(name, 5)
 
     def pop(self, name, timeout_epoch=None):
-        response = self._redis.brpop(
-            [name],
-            timeout=int(round(timeout_epoch - time.time())) if timeout_epoch else 0
-        )
-        if response is None:
-            raise MessageTimeout("Timed out")
-        try:
-            # Deserialize and return the message
-            return json.loads(response[1])
-        except ValueError:
-            # Invalid json
-            raise MessageFormatError(desc="Unable to decode the JSON message")
+        while timeout_epoch is None or time.time() < timeout_epoch:
+            response = self._redis.rpop(name)
+            if response is not None:
+                try:
+                    # Deserialize and return the message
+                    return json.loads(response)
+                except ValueError:
+                    # Invalid json
+                    raise MessageFormatError(desc="Unable to decode the JSON message")
+            else:
+                # Context switching
+                gevent.sleep(0.1)
+        raise MessageTimeout("Timed out")
 
 
 class ChannelRedis(MessageQueue, Channel):
