@@ -114,9 +114,15 @@ def poker5(ws):
     )
 
     try:
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #  Player connection
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
 
-        MessageQueue(redis).push(
+        message_queue = MessageQueue(redis)
+
+        message_queue.push(
             "poker5:lobby",
             {
                 "msg_id": "connect",
@@ -141,29 +147,56 @@ def poker5(ws):
         # Forwarding connection message to the client
         client_channel.send_message(connection_message)
 
+    except (ChannelError, MessageFormatError, MessageTimeout) as e:
+        app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
+
+    else:
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #  Game service communication
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         def message_handler(channel1, channel2):
+            # Forward messages received from channel1 to channel2
             try:
                 while True:
                     message = channel1.recv_message()
+                    if "msg_id" in message and message["msg_id"] == "disconnect":
+                        raise ChannelError
                     channel2.send_message(message)
-            except ChannelError:
-                try:
-                    channel1.close()
-                    channel2.send_message({"msg_id": "disconnect"})
-                except:
-                    pass
+            except (ChannelError, MessageFormatError):
+                pass
 
-        gevent.joinall([
+        greenlets = [
+            # Forward client messages to the game service
             gevent.spawn(message_handler, client_channel, server_channel),
+            # Forward game service messages to the client
             gevent.spawn(message_handler, server_channel, client_channel)
-        ])
+        ]
+
+        def closing_handler(*args, **kwargs):
+            # Kill other active greenlets
+            gevent.killall(greenlets, ChannelError)
+
+        greenlets[0].link(closing_handler)
+        greenlets[1].link(closing_handler)
+
+        gevent.joinall(greenlets)
+
+        try:
+            client_channel.send_message({"msg_id": "disconnect"})
+        except:
+            pass
+        finally:
+            client_channel.close()
+
+        try:
+            server_channel.send_message({"msg_id": "disconnect"})
+        except:
+            pass
+        finally:
+            server_channel.close()
 
         app.logger.error("player {} connection closed".format(player_id))
-
-    except (ChannelError, MessageFormatError, MessageTimeout) as e:
-        app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
-        raise
-
 
 
 def get_random_name():
