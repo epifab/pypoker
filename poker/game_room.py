@@ -35,20 +35,39 @@ class GameRoom(Game.EventListener):
         try:
             try:
                 old_player = self._players[player.get_id()]
-                old_player.disconnect()
-                # The player was already connected to this room
-                # @todo: he could potentially continue to play like he never left
-                self._logger.info("{}: {} re-joined".format(self, player))
+
             except KeyError:
                 # new player
                 self._player_ids[self._get_free_seat()] = player.get_id()
                 self._logger.info("{}: {} joined".format(self, player))
-            self._players[player.get_id()] = player
+                self._players[player.get_id()] = player
+
+            else:
+                # If we reached this point, it means that this player was already in this room.
+                # In case he is currently in a game, we replace the old channel with the new one
+                # so he will magically rejoin the game
+                old_player.update_channel(player)
+                # Throwing away the new player object
+                player = old_player
+                self._logger.info("{}: {} re-joined".format(self, player))
+
+            # Updating the client
+            if self._last_broadcast_event:
+                player.send_message(self._last_broadcast_event)
+                # Attempting to send the player his cards
+                score = player.get_score()
+                if score:
+                    player.send_message({
+                        "msg_id": "set-cards",
+                        "cards": [c.dto() for c in player.get_cards()],
+                        "score": {
+                            "cards": [c.dto() for c in score.get_cards()],
+                            "category": score.get_category()
+                        }
+                    })
+
         finally:
             self._room_lock.release()
-
-        if self._last_broadcast_event:
-            player.try_send_message(self._last_broadcast_event)
 
     def leave(self, player_id):
         self._room_lock.acquire()

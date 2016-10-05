@@ -21,16 +21,22 @@ class PlayerServer(Player):
     def disconnect(self):
         """Disconnect the client"""
         if self._connected:
-            self._connected = False
             self.try_send_message({"msg_id": "disconnect"})
             self._channel.close()
+            self._connected = False
+
+    @property
+    def channel(self):
+        return self._channel
 
     @property
     def connected(self):
         return self._connected
 
-    def update_channel(self, channel):
-        self._channel = channel
+    def update_channel(self, new_player):
+        self.disconnect()
+        self._channel = new_player.channel
+        self._connected = new_player.connected
 
     def ping(self):
         try:

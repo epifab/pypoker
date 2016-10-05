@@ -5,6 +5,8 @@ Poker5 = {
 
     cardsChangeMode: true,
 
+    gameId: null,
+
     scoreCategories: {
         0: "Highest card",
         1: "Pair",
@@ -124,6 +126,9 @@ Poker5 = {
                 this.destroyGame();
                 break;
             default:
+                if (this.gameId == null) {
+                    this.initGame(message);
+                }
                 this.updateGame(message);
         }
 
@@ -230,6 +235,8 @@ Poker5 = {
     },
 
     initGame: function(message) {
+        this.gameId = message.game_id;
+
         $('#players').empty();
 
         for (k in message.player_ids) {
@@ -258,6 +265,7 @@ Poker5 = {
     },
 
     destroyGame: function() {
+        this.gameId = null;
         $('#players').empty();
         this.resetControls();
         this.resetTimers();
