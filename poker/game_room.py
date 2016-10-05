@@ -16,13 +16,19 @@ class GameRoom(Game.EventListener):
         self._stakes = stakes
         self._room_lock = threading.Lock()
         self._players = {}
-        self._player_ids = []
+        self._player_ids = [None] * max_room_size
         self._active = False
         self._logger = logger if logger else logging
         self._last_broadcast_event = None
 
     def __str__(self):
         return "room {}".format(self._id)
+
+    def _get_free_seat(self):
+        try:
+            return self._player_ids.index(None)
+        except ValueError:
+            raise FullGameRoomException
 
     def join(self, player):
         self._room_lock.acquire()
@@ -35,7 +41,7 @@ class GameRoom(Game.EventListener):
                 self._logger.info("{}: {} re-joined".format(self, player))
             except KeyError:
                 # new player
-                self._player_ids.append(player.get_id())
+                self._player_ids[self._get_free_seat()] = player.get_id()
                 self._logger.info("{}: {} joined".format(self, player))
             self._players[player.get_id()] = player
         finally:
@@ -51,7 +57,8 @@ class GameRoom(Game.EventListener):
                 player = self._players[player_id]
                 player.disconnect()
                 del self._players[player_id]
-                self._player_ids = filter(lambda x: x != player_id, self._player_ids)
+                player_key = self._player_ids.index(player_id)
+                self._player_ids[player_key] = None
                 self._logger.info("{}: {} left".format(self, player))
             except KeyError:
                 # Player wasn't actually in the room
@@ -68,7 +75,8 @@ class GameRoom(Game.EventListener):
         message.update(game_data)
         for player_id in self._players:
             self._players[player_id].try_send_message(message)
-        self._last_broadcast_event = message
+
+        self._last_broadcast_event = None if event == Game.Event.game_over else message
 
     @property
     def active(self):
@@ -86,7 +94,11 @@ class GameRoom(Game.EventListener):
             # Remove unresponsive players
             self.ping_all_players()
 
-            players = [self._players[player_id] for player_id in self._player_ids]
+            # List of players sorted according to the original _player_ids list
+            players = [self._players[player_id]
+                       for player_id in self._player_ids
+                       if player_id is not None]
+
             if len(players) > 1:
                 lowest_rank = 11 - len(players)
                 game = Game(
@@ -102,4 +114,4 @@ class GameRoom(Game.EventListener):
             else:
                 self._active = False
 
-        self._logger.info("{}: deactivated".format(self))
+        self._logger.info("{}: inactive".format(self))

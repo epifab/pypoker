@@ -470,8 +470,12 @@ class Game:
 
         return game_dto
 
-    def _raise_event(self, event, message={}):
+    def _raise_event(self, event, event_data=None):
         """Broadcast game events"""
-        message["event"] = event
-        for subscriber in self._event_subscribers:
-            subscriber.game_event(event, message, self.dto())
+        event_data = event_data if event_data else {}
+        event_data["event"] = event
+        game_data = self.dto()
+        gevent.joinall([
+            gevent.spawn(subscriber.game_event, event, event_data, game_data)
+            for subscriber in self._event_subscribers
+        ])
