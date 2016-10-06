@@ -51,14 +51,6 @@ body {
 
  *****************************************************/
 
-#table-wrapper {
-    position: relative;
-    height: 300px;
-    margin-top: 80px;
-    margin-bottom: 80px;
-    min-width: 500px;
-}
-
 #players .seat {
     float: left;
     width: 80px;
@@ -67,7 +59,7 @@ body {
     padding: 10px 5px 5px 5px;
     margin: 5px 25px 0px 25px;
     position: absolute;
-    font-size: 8pt;
+    font-size: 7pt;
 }
 
 #players .seat[data-key="0"] {
@@ -122,8 +114,9 @@ body {
 
 #players .player-info {
     position: absolute;
-    top: 10px;
-    left: 5px;
+    top: 5px;
+    left: -5px;
+    overflow: hidden;
 }
 
 #players .player.inactive {
@@ -131,13 +124,16 @@ body {
 }
 
 #players .player.winner .player-info {
-    left: -5px;
-    top: -10px;
-    width: 90px;
-    height: 90px;
+    left: -10px;
+    top: -15px;
+    width: 80px;
+    height: 80px;
     color: #FFF;
+}
+
+#players .player.winner .player-name {
     font-weight: bold;
-    font-size: 12pt;
+    font-size: 11pt;
 }
 
 #players .player .player-info {
@@ -148,14 +144,18 @@ body {
     z-index: 10;
 }
 
+#players .player .player-name {
+    padding-top: 15px;
+}
+
 #players .player.current .player-info {
     background-color: #2377c6;
 }
 
 #players .player .timer {
     position: absolute;
-    top: -10px;
-    left: -15px;
+    top: -15px;
+    left: -25px;
     width: 110px;
     float: left;
 }
@@ -164,7 +164,7 @@ body {
     position: absolute;
     top: 90px;
     text-align: center;
-    width: 80px;
+    width: 60px;
     height: 25px;
     left: 0px;
     background-color: #194996;
@@ -184,7 +184,7 @@ body {
     position: absolute;
     top: 75px;
     left: -15px;
-    width: 110px;
+    width: 90px;
     z-index: 20;
 }
 
@@ -194,7 +194,7 @@ body {
 
 #players .card {
     font-weight: bold;
-    width: 20px;
+    width: 16px;
     padding: 3px;
     height: 40px;
     background-color: #FFF;
@@ -203,7 +203,7 @@ body {
 
 #players .card .suit {
     margin-top: -8px;
-    font-size: 15pt;
+    font-size: 11pt;
 }
 
 #players .card[data-suit="hearts"], #players .card[data-suit="diams"] {
@@ -247,6 +247,14 @@ body {
 
  *****************************************************/
 
+#table-wrapper {
+    position: relative;
+    height: 300px;
+    margin-top: 80px;
+    margin-bottom: 80px;
+    min-width: 400px;
+}
+
 #table {
     background-color: #354b1c;
     width: 100%;
@@ -254,6 +262,7 @@ body {
     border-radius: 200px;
     border: 20px solid #222;
     padding: 10px 5px 10px 5px;
+    font-size: 8pt;
 }
 
 #table .game-info {
@@ -358,7 +367,8 @@ body {
 
  *****************************************************/
 
-#player-controls .btn, #player-controls .slider {
+#player-controls .btn,
+#player-controls .slider {
     width: 280px;
     padding: 10px;
     margin: 5px 0px;

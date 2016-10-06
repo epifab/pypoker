@@ -122,7 +122,7 @@ Poker5 = {
 
     destroyGame: function() {
         $('.player').removeClass('winner');
-        $('.player .bet').text('');
+        $('.player .bet').empty();
         $('#current-player').hide();
         this.gameId = null;
     },
@@ -175,8 +175,6 @@ Poker5 = {
                 this.onPlayerAction(message);
                 break;
             case 'dead-player':
-                player = message.players[message.player_id];
-                this.log(player.name + " left.")
                 break;
             case 'winner-designation':
                 player = message.players[message.player_id];
@@ -254,32 +252,32 @@ Poker5 = {
     },
 
     onRoomUpdate: function(message) {
-        if (message['event'] == 'init') {
-            this.initRoom(message);
-        }
-        else {
-            playerId = message.player_id;
-            player = message.players[playerId]
-            playerName = playerId == $('#current-player').data('id') ? 'You' : player.name;
+        switch (message.event) {
+            case 'init':
+                this.initRoom(message);
+                break;
 
-            switch (message.event) {
-                case 'player-added':
-                    this.log(playerName + " joined");
-                    for (k in message.player_ids) {
-                        if (message.player_ids[k] == playerId) {
-                            $seat = $('.seat[data-key="' + k + '"]');
-                            $seat.empty();
-                            $seat.append(this.createPlayer(player));
-                            break;
-                        }
+            case 'player-added':
+                playerId = message.player_id;
+                player = message.players[playerId]
+                playerName = playerId == $('#current-player').data('id') ? 'You' : player.name;
+                for (k in message.player_ids) {
+                    if (message.player_ids[k] == playerId) {
+                        $seat = $('.seat[data-key="' + k + '"]');
+                        $seat.empty();
+                        $seat.append(this.createPlayer(player));
+                        break;
                     }
-                    break;
+                }
+                this.log(playerName + " joined the room");
+                break;
 
-                case 'player-removed':
-                    this.log(playerName + " left");
-                    $('.player[data-id="' + playerId + '"]').remove();
-                    break;
-            }
+            case 'player-removed':
+                playerId = message.player_id;
+                playerName = $('.player[data-id=' + playerId + '] .player-name').text();
+                $('.player[data-id="' + playerId + '"]').remove();
+                this.log(playerName + " left the room");
+                break;
         }
     },
 
