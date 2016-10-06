@@ -367,35 +367,3 @@ body {
 #player-controls .slider .tooltip {
     display: none;
 }
-
-
-
-
-/*****************************************************
-  Mobile
-
- *****************************************************/
-
-
-@media only screen
-and (min-device-width: 200px)
-and (max-device-width: 480px) {
-    body {
-        background-color: #354b1c;
-    }
-
-    #header {
-        display: none;
-    }
-
-    .container {
-        padding-left: 0px;
-        padding-right: 0px;
-    }
-
-    #current-player .btn, #current-player .slider {
-        width: 100%;
-        padding: 10px;
-        margin-bottom: 12px;
-    }
-}
