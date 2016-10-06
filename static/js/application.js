@@ -46,6 +46,7 @@ Poker5 = {
 
         this.socket.onclose = function() {
             Poker5.log('Disconnected :(');
+            Poker5.destroyRoom();
         };
 
         this.socket.onmessage = function(message) {
@@ -119,13 +120,17 @@ Poker5 = {
         this.disableBetMode();
     },
 
+    destroyGame: function() {
+        $('.player').removeClass('winner');
+        $('.player').addClass('inactive');
+        $('.player .bet').text('');
+        $('#current-player').hide();
+        this.gameId = null;
+    },
+
     onGameUpdate: function(message) {
         if (message.event == 'game-over') {
-            $('.player').removeClass('winner');
-            $('.player').addClass('inactive');
-            $('.player .bet').text('');
-            $('#current-player').hide();
-            this.gameId = null;
+            this.destroyGame();
         }
         else {
             if (this.gameId == null) {
@@ -140,13 +145,10 @@ Poker5 = {
 
         switch (message.event) {
             case 'new-game':
-                this.log('New game');
                 break;
             case 'game-over':
-                this.log('Game over');
                 break;
             case 'cards-assignment':
-                this.log('New hand');
                 break;
             case 'bet':
                 player = message.players[message.player_id];
@@ -227,23 +229,33 @@ Poker5 = {
         return $player;
     },
 
+    destroyRoom: function() {
+        this.destroyGame();
+        this.roomId = null;
+        $('#players').empty();
+    },
+
+    initRoom: function(message) {
+        this.roomId = message.room_id;
+        // Initializing the room
+        $('#players').empty();
+        for (k in message.player_ids) {
+            $seat = $('<div class="seat"></div>');
+            $seat.attr('data-key', k);
+
+            playerId = message.player_ids[k];
+
+            if (playerId) {
+                // This seat is taken
+                $seat.append(this.createPlayer(message.players[playerId]));
+            }
+            $('#players').append($seat);
+        }
+    },
+
     onRoomUpdate: function(message) {
         if (message['event'] == 'init') {
-            this.roomId = message.room_id;
-            // Initializing the room
-            $('#players').empty();
-            for (k in message.player_ids) {
-                $seat = $('<div class="seat"></div>');
-                $seat.attr('data-key', k);
-
-                playerId = message.player_ids[k];
-
-                if (playerId) {
-                    // This seat is taken
-                    $seat.append(this.createPlayer(message.players[playerId]));
-                }
-                $('#players').append($seat);
-            }
+            this.initRoom(message);
         }
         else {
             playerId = message.player_id;
