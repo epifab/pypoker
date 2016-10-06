@@ -34,6 +34,31 @@ class GameRoom(Game.EventListener):
         except ValueError:
             raise FullGameRoomException
 
+    def _send_room_init(self, player):
+        player.send_message({
+            "msg_id": "room-update",
+            "event": "init",
+            "room_id": self._id,
+            "players": {k: self._players[k].dto() for k in self._players},
+            "player_ids": self._player_ids
+        })
+
+    def _broadcast_room_event(self, event, player_id):
+        self._broadcast({
+            "msg_id": "room-update",
+            "event": event,
+            "room_id": self._id,
+            "players": {k: self._players[k].dto() for k in self._players},
+            "player_ids": self._player_ids,
+            "player_id": player_id
+        })
+
+    def _broadcast(self, message):
+        gevent.joinall([
+            gevent.spawn(player.send_message, message)
+            for player in self._players.values()
+        ])
+
     def join(self, player):
         self._players_lock.acquire()
         try:
@@ -43,20 +68,25 @@ class GameRoom(Game.EventListener):
                 old_player = self._players[player.get_id()]
 
             except KeyError:
-                # new player
+                # New player
                 is_new_player = True
+                # Sending room initialization message
+                self._send_room_init(player)
+                # Adding player to the room
                 self._player_ids[self._get_free_seat()] = player.get_id()
-                self._logger.info("{}: {} joined".format(self, player))
                 self._players[player.get_id()] = player
+                self._broadcast_room_event("player-added", player.get_id())
+                self._logger.info("{}: {} joined".format(self, player))
 
             else:
-                # If we reached this point, it means that this player was already in this room.
+                # Player already connected to this room
                 # In case he is currently in a game, we replace the old channel with the new one
                 # so he will magically rejoin the game
                 is_new_player = False
                 old_player.update_channel(player)
                 # Throwing away the new player object
                 player = old_player
+                self._send_room_init(player)
                 self._logger.info("{}: {} re-joined".format(self, player))
 
             # Updating the client
@@ -77,14 +107,17 @@ class GameRoom(Game.EventListener):
         try:
             try:
                 player = self._players[player_id]
+            except KeyError:
+                # Player wasn't actually in the room
+                pass
+            else:
                 player.disconnect()
                 del self._players[player_id]
                 player_key = self._player_ids.index(player_id)
                 self._player_ids[player_key] = None
                 self._logger.info("{}: {} left".format(self, player))
-            except KeyError:
-                # Player wasn't actually in the room
-                pass
+                self._broadcast_room_event("player-removed", player_id)
+
         finally:
             self._players_lock.release()
 
@@ -108,12 +141,7 @@ class GameRoom(Game.EventListener):
         finally:
             self._game_lock.release()
 
-        # Broadcasting the event to current players
-        message_greenlets = [
-            gevent.spawn(player.send_message, event_message)
-            for player in self._players.values()
-        ]
-        gevent.joinall(message_greenlets)
+        self._broadcast(event_message)
 
     @property
     def active(self):

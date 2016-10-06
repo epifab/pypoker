@@ -5,6 +5,8 @@ Poker5 = {
 
     cardsChangeMode: true,
 
+    roomId: null,
+
     gameId: null,
 
     scoreCategories: {
@@ -61,8 +63,8 @@ Poker5 = {
                 case 'disconnect':
                     Poker5.onDisconnect(data);
                     break;
-                case 'lobby-update':
-                    Poker5.onLobbyUpdate(data);
+                case 'room-update':
+                    Poker5.onRoomUpdate(data);
                     break;
                 case 'set-cards':
                     Poker5.onSetCards(data);
@@ -118,26 +120,29 @@ Poker5 = {
     },
 
     onGameUpdate: function(message) {
-        switch (message.event) {
-            case 'new-game':
-                this.initGame(message);
-                break;
-            case 'game-over':
-                this.destroyGame();
-                break;
-            default:
-                if (this.gameId == null) {
-                    this.initGame(message);
-                }
-                this.updateGame(message);
+        if (message.event == 'game-over') {
+            $('.player').removeClass('winner');
+            $('.player').addClass('inactive');
+            $('.player .bet').text('');
+            $('#current-player').hide();
+            this.gameId = null;
         }
+        else {
+            if (this.gameId == null) {
+                this.resetCards();
+                $('#current-player').show();
+            }
+            this.updateGame(message);
+        }
+
+        this.resetControls();
+        this.resetTimers();
 
         switch (message.event) {
             case 'new-game':
                 this.log('New game');
                 break;
             case 'game-over':
-                this.destroyGame();
                 this.log('Game over');
                 break;
             case 'cards-assignment':
@@ -199,17 +204,70 @@ Poker5 = {
         Poker5.setCardsChangeMode(false);
     },
 
-    onLobbyUpdate: function(message) {
-        player = message.player;
-        playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
+    createPlayer: function(player) {
+        isCurrentPlayer = player.id == $('#current-player').data('id');
 
-        switch (message.event) {
-            case 'player-added':
-                this.log(playerName + " joined the lobby");
-                break;
-            case 'player-removed':
-                this.log(playerName + " left the lobby");
-                break;
+        $playerName = $('<p class="player-name"></p>');
+        $playerName.text(isCurrentPlayer ? 'You' : player.name);
+
+        $playerMoney = $('<p class="player-money"></p>');
+        $playerMoney.text('$' + parseInt(player.money));
+
+        $playerInfo = $('<div class="player-info"></div>');
+        $playerInfo.append($playerName);
+        $playerInfo.append($playerMoney);
+
+        $player = $('<div class="player inactive' + (isCurrentPlayer ? ' current' : '') + '"></div>');
+        $player.attr('data-id', player.id);
+        $player.append($('<div class="cards"></div>'));
+        $player.append($playerInfo);
+        $player.append($('<div class="timer"></div>'));
+        $player.append($('<div class="bet"></div>'));
+
+        return $player;
+    },
+
+    onRoomUpdate: function(message) {
+        if (message['event'] == 'init') {
+            this.roomId = message.room_id;
+            // Initializing the room
+            $('#players').empty();
+            for (k in message.player_ids) {
+                $seat = $('<div class="seat"></div>');
+                $seat.attr('data-key', k);
+
+                playerId = message.player_ids[k];
+
+                if (playerId) {
+                    // This seat is taken
+                    $seat.append(this.createPlayer(message.players[playerId]));
+                }
+                $('#players').append($seat);
+            }
+        }
+        else {
+            playerId = message.player_id;
+            player = message.players[playerId]
+            playerName = playerId == $('#current-player').data('id') ? 'You' : player.name;
+
+            switch (message.event) {
+                case 'player-added':
+                    this.log(playerName + " joined");
+                    for (k in message.player_ids) {
+                        if (message.player_ids[k] == playerId) {
+                            $seat = $('.seat[data-key="' + k + '"]');
+                            $seat.empty();
+                            $seat.append(this.createPlayer(player));
+                            break;
+                        }
+                    }
+                    break;
+
+                case 'player-removed':
+                    this.log(playerName + " left");
+                    $('.player[data-id="' + playerId + '"]').remove();
+                    break;
+            }
         }
     },
 
@@ -221,7 +279,7 @@ Poker5 = {
                 message.cards[cardKey][1]);
         }
         $('#current-player .cards .category').text(Poker5.scoreCategories[message.score.category]);
-        $('#current-player').data('allowed-to-open', message.allowed_to_open)
+        $('#current-player').data('allowed-to-open', message.allowed_to_open);
     },
 
     onBet: function(message) {
@@ -234,46 +292,9 @@ Poker5 = {
         $("html, body").animate({ scrollTop: $(document).height() }, "slow");
     },
 
-    initGame: function(message) {
+    updateGame: function(message) {
         this.gameId = message.game_id;
 
-        $('#players').empty();
-
-        for (k in message.player_ids) {
-            playerId = message.player_ids[k]
-            player = message.players[playerId]
-
-            playerClass = 'player';
-            if (player.id == $('#current-player').data('id')) {
-                playerClass += ' current';
-            }
-
-            $('#players').append(
-                '<div class="' + playerClass + '" data-id="' + player.id + '">'
-                + '<div class="cards"></div>'
-                + '<div class="player-info">'
-                + '<p class="player-name">' + (player.id == $('#current-player').data('id') ? 'You' : player.name) + '</p>'
-                + '<p class="player-money">$' + parseInt(player.money) + '</p>'
-                + '</div>'
-                + '<div class="timer"></div>'
-                + '<div class="bet"></div>'
-                + '</div>');
-        }
-
-        $('#current-player').show();
-        this.resetCards();
-    },
-
-    destroyGame: function() {
-        this.gameId = null;
-        $('#players').empty();
-        this.resetControls();
-        this.resetTimers();
-        $('#current-player').hide();
-        $('#pot').empty();
-    },
-
-    updateGame: function(message) {
         $('#pot').text(parseInt(message.pot));
 
         for (k in message.player_ids) {
@@ -337,24 +358,15 @@ Poker5 = {
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
             winner = message.event == 'winner-designation' && message.player_id == playerId;
-            if (!winner) {
-                $player.removeClass('winner');
-            }
-            else {
-                $player.addClass('winner');
-            }
+            winner
+                ? $player.addClass('winner')
+                : $player.removeClass('winner');
 
             alive = player.alive && (message.event != 'winner-designation' || message.player_id == playerId);
-            if (!alive) {
-                $player.addClass('inactive');
-            }
-            else {
-                $player.removeClass('inactive');
-            }
+            alive
+                ? $player.removeClass('inactive')
+                : $player.addClass('inactive');
         }
-
-        this.resetControls();
-        this.resetTimers();
     },
 
     onPlayerAction: function(message) {

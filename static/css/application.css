@@ -49,7 +49,7 @@ a:hover, a:active, a:visited {
 
  *****************************************************/
 
-#players .player {
+#players .seat {
     float: left;
     width: 110px;
     height: 200px;
@@ -104,6 +104,7 @@ a:hover, a:active, a:visited {
     top: 140px;
     text-align: center;
     width: 110px;
+    height: 30px;
     left: 0px;
     background-color: #194996;
     padding: 5px;
