@@ -72,7 +72,7 @@ class MessageQueue:
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
         self._redis.lpush(name, msg_encoded)
-        self._redis.expire(name, 5)
+        self._redis.expire(name, 5 * 60)
 
     def pop(self, name, timeout_epoch=None):
         while timeout_epoch is None or time.time() < timeout_epoch:
