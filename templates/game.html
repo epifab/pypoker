@@ -1,54 +1,59 @@
-<h4>Hi {{player_name}}! Enjoy your poker game :)</h4>
+<div  class="container">
+    <div class="row">
+        <div id="table-wrapper" class="col-sm-8">
+            <div id="players"></div>
 
-<div id="table-wrapper">
-    <div id="players"></div>
+            <div id="table">
+                <div class="game-info">
+                    <div id="pot"></div>
+                    <div id="game-status">
+                        <p data-key="4"></p>
+                        <p data-key="3"></p>
+                        <p data-key="2"></p>
+                        <p data-key="1"></p>
+                        <p data-key="0">Attempting to connect...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div id="table">
-        <div class="game-info">
-            <div id="pot"></div>
-            <div id="game-status">
-                <p data-key="4"></p>
-                <p data-key="3"></p>
-                <p data-key="2"></p>
-                <p data-key="1"></p>
-                <p data-key="0">Attempting to connect...</p>
+        <div id="current-player-wrapper" class="col-sm-4">
+            <h4>Hi {{player_name}}!</h4>
+            <p>Enjoy your poker game :)</p>
+
+            <div id="current-player" class="player">
+                <div class="cards">
+                    <div class="card medium pull-left" data-key="0"></div>
+                    <div class="card medium pull-left" data-key="1"></div>
+                    <div class="card medium pull-left" data-key="2"></div>
+                    <div class="card medium pull-left" data-key="3"></div>
+                    <div class="card medium pull-left" data-key="4"></div>
+                    <div class="category"></div>
+                </div>
+
+                <div id="player-controls">
+                    <div id="bet-controls" class="controls">
+                        <div id="fold-cmd-wrapper">
+                            <input type="button" id="fold-cmd" class="btn btn-danger" value="Fold" />
+                        </div>
+                        <div id="bet-input-wrapper">
+                            <input id="bet-input" type="hidden" class="slider"
+                                   data-slider-id="bet-input"
+                                   data-slider-step="1"/>
+                        </div>
+                        <div id="bet-cmd-wrapper">
+                            <input type="button" id="bet-cmd" class="btn btn-primary" value="Check" />
+                        </div>
+                        <div id="no-bet-cmd-wrapper">
+                            <input type="button" id="no-bet-cmd" class="btn btn-warning" value="Unable to open" />
+                        </div>
+                    </div>
+
+                    <div id="change-cards-controls" class="controls">
+                        <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<div id="current-player" class="player">
-    <div class="cards">
-        <div class="card medium pull-left" data-key="0"></div>
-        <div class="card medium pull-left" data-key="1"></div>
-        <div class="card medium pull-left" data-key="2"></div>
-        <div class="card medium pull-left" data-key="3"></div>
-        <div class="card medium pull-left" data-key="4"></div>
-        <div class="category"></div>
-    </div>
-
-    <div id="player-controls">
-        <div id="bet-controls" class="controls">
-            <div id="fold-cmd-wrapper">
-                <input type="button" id="fold-cmd" class="btn btn-danger" value="Fold" />
-            </div>
-            <div id="bet-input-wrapper">
-                <input id="bet-input" type="hidden" class="slider"
-                       data-slider-id="bet-input"
-                       data-slider-step="1"/>
-            </div>
-            <div id="bet-cmd-wrapper">
-                <input type="button" id="bet-cmd" class="btn btn-primary" value="Check" />
-            </div>
-            <div id="no-bet-cmd-wrapper">
-                <input type="button" id="no-bet-cmd" class="btn btn-warning" value="Unable to open" />
-            </div>
-        </div>
-
-        <div id="change-cards-controls" class="controls">
-            <span id="change-cards-cmd" class="btn btn-primary">Change cards</span>
-        </div>
-    </div>
-</div>
-
-<div id="game-log" class="clearfix"></div>

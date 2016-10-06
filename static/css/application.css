@@ -6,11 +6,13 @@ a:hover, a:active, a:visited {
     text-decoration: none;
 }
 
-#main {
-    background-color: #354b1c;
-    width: 100%;
-    padding: 20px;
+body {
+    background-color: #000;
     color: #EED;
+}
+
+.jumbotron {
+    color: #333;
 }
 
 #main a {
@@ -49,14 +51,73 @@ a:hover, a:active, a:visited {
 
  *****************************************************/
 
+#table-wrapper {
+    position: relative;
+    height: 300px;
+    margin-top: 80px;
+    margin-bottom: 80px;
+    min-width: 500px;
+}
+
 #players .seat {
     float: left;
-    width: 110px;
-    height: 200px;
+    width: 80px;
+    height: 120px;
     text-align: center;
     padding: 10px 5px 5px 5px;
-    margin: 5px 15px 0px 15px;
-    position: relative;
+    margin: 5px 25px 0px 25px;
+    position: absolute;
+    font-size: 8pt;
+}
+
+#players .seat[data-key="0"] {
+    top: -40px;
+    left: 0%;
+}
+
+#players .seat[data-key="1"] {
+    top: -70px;
+    left: 20%;
+}
+
+#players .seat[data-key="2"] {
+    top: -70px;
+    left: 40%;
+}
+
+#players .seat[data-key="3"] {
+    top: -70px;
+    left: 60%;
+}
+
+#players .seat[data-key="4"] {
+    top: -40px;
+    left: 80%;
+}
+
+#players .seat[data-key="5"] {
+    bottom: -50px;
+    left: 0%;
+}
+
+#players .seat[data-key="6"] {
+    bottom: -80px;
+    left: 20%;
+}
+
+#players .seat[data-key="7"] {
+    bottom: -80px;
+    left: 40%;
+}
+
+#players .seat[data-key="8"] {
+    bottom: -80px;
+    left: 60%;
+}
+
+#players .seat[data-key="9"] {
+    bottom: -50px;
+    left: 80%;
 }
 
 #players .player-info {
@@ -72,17 +133,17 @@ a:hover, a:active, a:visited {
 #players .player.winner .player-info {
     left: -5px;
     top: -10px;
-    width: 120px;
-    height: 120px;
+    width: 90px;
+    height: 90px;
     color: #FFF;
     font-weight: bold;
-    font-size: 14pt;
+    font-size: 12pt;
 }
 
 #players .player .player-info {
-    width: 100px;
-    height: 100px;
-    border-radius: 100px;
+    width: 70px;
+    height: 70px;
+    border-radius: 70px;
     background-color: #333;
     z-index: 10;
 }
@@ -93,18 +154,18 @@ a:hover, a:active, a:visited {
 
 #players .player .timer {
     position: absolute;
-    top: -25px;
-    left: -30px;
-    width: 170px;
+    top: -10px;
+    left: -15px;
+    width: 110px;
     float: left;
 }
 
 #players .player .bet {
     position: absolute;
-    top: 140px;
+    top: 90px;
     text-align: center;
-    width: 110px;
-    height: 30px;
+    width: 80px;
+    height: 25px;
     left: 0px;
     background-color: #194996;
     padding: 5px;
@@ -122,7 +183,7 @@ a:hover, a:active, a:visited {
 #players .player .cards {
     position: absolute;
     top: 75px;
-    left: 0px;
+    left: -15px;
     width: 110px;
     z-index: 20;
 }
@@ -187,12 +248,16 @@ a:hover, a:active, a:visited {
  *****************************************************/
 
 #table {
+    background-color: #354b1c;
     width: 100%;
-    border-radius: 50px;
-    border: 2px solid #222;
-    clear: both;
-    background-color: #333;
+    height: 100%;
+    border-radius: 200px;
+    border: 20px solid #222;
     padding: 10px 5px 10px 5px;
+}
+
+#table .game-info {
+    margin: 50px;
 }
 
 #table a {
@@ -263,11 +328,11 @@ a:hover, a:active, a:visited {
 
 #current-player {
     display: none;
-    clear: both;
     margin-top: 15px;
 }
 
 #current-player .cards {
+    width: 280px;
     margin: 10px -25px 0px 25px;
     position: relative;
 }

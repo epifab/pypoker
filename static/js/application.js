@@ -122,7 +122,6 @@ Poker5 = {
 
     destroyGame: function() {
         $('.player').removeClass('winner');
-        $('.player').addClass('inactive');
         $('.player .bet').text('');
         $('#current-player').hide();
         this.gameId = null;
@@ -219,7 +218,7 @@ Poker5 = {
         $playerInfo.append($playerName);
         $playerInfo.append($playerMoney);
 
-        $player = $('<div class="player inactive' + (isCurrentPlayer ? ' current' : '') + '"></div>');
+        $player = $('<div class="player' + (isCurrentPlayer ? ' current' : '') + '"></div>');
         $player.attr('data-id', player.id);
         $player.append($('<div class="cards"></div>'));
         $player.append($playerInfo);
@@ -242,6 +241,7 @@ Poker5 = {
         for (k in message.player_ids) {
             $seat = $('<div class="seat"></div>');
             $seat.attr('data-key', k);
+            $seat.append('<div class="player inactive"><div class="player-info"></div></div>');
 
             playerId = message.player_ids[k];
 
