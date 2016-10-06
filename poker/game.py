@@ -90,6 +90,18 @@ class Game:
         finally:
             self._raise_event(Game.Event.game_over)
 
+    def send_cards(self, player):
+        score = player.get_score()
+        player.send_message({
+            "msg_id": "set-cards",
+            "cards": [c.dto() for c in score.get_cards()],
+            "score": {
+                "cards": [c.dto() for c in score.get_cards()],
+                "category": score.get_category()
+            },
+            "allowed_to_open": player.get_id() in self._player_ids_allowed_to_open
+        })
+
     def _play_hand(self):
         """Play a single hand."""
         try:
@@ -169,15 +181,7 @@ class Game:
 
             try:
                 player.set_cards(score.get_cards(), score)
-                player.send_message({
-                    "msg_id": "set-cards",
-                    "cards": [c.dto() for c in score.get_cards()],
-                    "score": {
-                        "cards": [c.dto() for c in score.get_cards()],
-                        "category": score.get_category()
-                    },
-                    "allowed_to_open": player_id in self._player_ids_allowed_to_open
-                })
+                self.send_cards(player)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
                 self._add_dead_player(player_id, e)
@@ -299,14 +303,7 @@ class Game:
                     score = self._score_detector.get_score(cards)
                     # Sending cards to the remote player
                     player.set_cards(score.get_cards(), score)
-                    player.send_message({
-                        "msg_id": "set-cards",
-                        "cards": [c.dto() for c in score.get_cards()],
-                        "score": {
-                            "cards": [c.dto() for c in score.get_cards()],
-                            "category": score.get_category()
-                        }
-                    })
+                    self.send_cards(player)
 
                 self._logger.info("{}: {} changed {} cards".format(self, player, len(discards)))
                 self._raise_event(Game.Event.cards_change, {"player_id": player_id, "num_cards": len(discards)})

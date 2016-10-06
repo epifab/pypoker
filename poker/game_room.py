@@ -1,4 +1,5 @@
 from . import Deck, ScoreDetector, Game
+import gevent
 import logging
 import threading
 
@@ -14,12 +15,15 @@ class GameRoom(Game.EventListener):
         self._id = id
         self._max_room_size = max_room_size
         self._stakes = stakes
-        self._room_lock = threading.Lock()
+        self._game = None
+        self._game_lock = threading.Lock()
+        self._latest_game_event = None
+        self._latest_game = None
         self._players = {}
+        self._players_lock = threading.Lock()
         self._player_ids = [None] * max_room_size
         self._active = False
         self._logger = logger if logger else logging
-        self._last_broadcast_event = None
 
     def __str__(self):
         return "room {}".format(self._id)
@@ -31,13 +35,16 @@ class GameRoom(Game.EventListener):
             raise FullGameRoomException
 
     def join(self, player):
-        self._room_lock.acquire()
+        self._players_lock.acquire()
         try:
+            is_new_player = True
+
             try:
                 old_player = self._players[player.get_id()]
 
             except KeyError:
                 # new player
+                is_new_player = True
                 self._player_ids[self._get_free_seat()] = player.get_id()
                 self._logger.info("{}: {} joined".format(self, player))
                 self._players[player.get_id()] = player
@@ -46,31 +53,27 @@ class GameRoom(Game.EventListener):
                 # If we reached this point, it means that this player was already in this room.
                 # In case he is currently in a game, we replace the old channel with the new one
                 # so he will magically rejoin the game
+                is_new_player = False
                 old_player.update_channel(player)
                 # Throwing away the new player object
                 player = old_player
                 self._logger.info("{}: {} re-joined".format(self, player))
 
             # Updating the client
-            if self._last_broadcast_event:
-                player.send_message(self._last_broadcast_event)
-                # Attempting to send the player his cards
-                score = player.get_score()
-                if score:
-                    player.send_message({
-                        "msg_id": "set-cards",
-                        "cards": [c.dto() for c in player.get_cards()],
-                        "score": {
-                            "cards": [c.dto() for c in score.get_cards()],
-                            "category": score.get_category()
-                        }
-                    })
-
+            self._game_lock.acquire()
+            try:
+                if self._latest_game_event:
+                    player.send_message(self._latest_game_event)
+                    if not is_new_player:
+                        # Sending cards to the player in case he was already in a game
+                        self._latest_game.send_cards(player)
+            finally:
+                self._game_lock.release()
         finally:
-            self._room_lock.release()
+            self._players_lock.release()
 
     def leave(self, player_id):
-        self._room_lock.acquire()
+        self._players_lock.acquire()
         try:
             try:
                 player = self._players[player_id]
@@ -83,19 +86,34 @@ class GameRoom(Game.EventListener):
                 # Player wasn't actually in the room
                 pass
         finally:
-            self._room_lock.release()
+            self._players_lock.release()
 
     def game_event(self, event, event_data, game_data):
         if event == Game.Event.dead_player:
             self.leave(event_data["player_id"])
         # Broadcast the event to the room
-        message = {"msg_id": "game-update"}
-        message.update(event_data)
-        message.update(game_data)
-        for player_id in self._players:
-            self._players[player_id].try_send_message(message)
+        event_message = {"msg_id": "game-update"}
+        event_message.update(event_data)
+        event_message.update(game_data)
 
-        self._last_broadcast_event = None if event == Game.Event.game_over else message
+        # Updating the latest event message
+        self._game_lock.acquire()
+        try:
+            if event == Game.Event.game_over:
+                self._latest_game = None
+                self._latest_game_event = None
+            else:
+                self._latest_game = self._game
+                self._latest_game_event = event_message
+        finally:
+            self._game_lock.release()
+
+        # Broadcasting the event to current players
+        message_greenlets = [
+            gevent.spawn(player.send_message, event_message)
+            for player in self._players.values()
+        ]
+        gevent.joinall(message_greenlets)
 
     @property
     def active(self):
@@ -120,16 +138,18 @@ class GameRoom(Game.EventListener):
 
             if len(players) > 1:
                 lowest_rank = 11 - len(players)
-                game = Game(
+
+                self._game = Game(
                     players=players,
                     deck=Deck(lowest_rank),
                     score_detector=ScoreDetector(lowest_rank),
                     stake=10.0,
                     logger=self._logger
                 )
-                # Handle game events
-                game.subscribe(self)
-                game.play_game()
+                self._game.subscribe(self)
+                self._game.play_game()
+                self._game.unsubscribe(self)
+                self._game = None
             else:
                 self._active = False
 
