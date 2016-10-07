@@ -14,7 +14,7 @@ class GameServerRedis(GameServer):
             # Receiving connection requests
             message = self._message_queue.pop(self._connection_channel)
 
-            MessageFormatError.validate_msg_id(message, "connect")
+            MessageFormatError.validate_message_type(message, "connect")
 
             try:
                 session_id = str(message["session_id"])
@@ -59,7 +59,7 @@ class GameServerRedis(GameServer):
 
             # Acknowledging the connection
             player.send_message({
-                "msg_id": "connect",
+                "message_type": "connect",
                 "server_id": self._id,
                 "player": player.dto()
             })

@@ -18,16 +18,16 @@ class MessageFormatError(Exception):
         Exception.__init__(self, message)
 
     @staticmethod
-    def validate_msg_id(message, expected):
-        if "msg_id" not in message:
-            raise MessageFormatError(attribute="msg_id", desc="Attribute is missing")
-        elif message["msg_id"] == "error":
+    def validate_message_type(message, expected):
+        if "message_type" not in message:
+            raise MessageFormatError(attribute="message_type", desc="Attribute is missing")
+        elif message["message_type"] == "error":
             if "error" in message:
                 raise MessageFormatError(desc="Error received from the remote host: '{}'".format(message['error']))
             else:
                 raise MessageFormatError(desc="Unknown error received from the remote host")
-        if message["msg_id"] != expected:
-            raise MessageFormatError(attribute="msg_id", expected=expected, found=message["msg_id"])
+        if message["message_type"] != expected:
+            raise MessageFormatError(attribute="message_type", expected=expected, found=message["message_type"])
 
 
 class Channel():

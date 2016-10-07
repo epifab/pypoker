@@ -36,7 +36,7 @@ class GameRoom(Game.EventListener):
 
     def _send_room_init(self, player):
         player.send_message({
-            "msg_id": "room-update",
+            "message_type": "room-update",
             "event": "init",
             "room_id": self._id,
             "players": {k: self._players[k].dto() for k in self._players},
@@ -45,7 +45,7 @@ class GameRoom(Game.EventListener):
 
     def _broadcast_room_event(self, event, player_id):
         self._broadcast({
-            "msg_id": "room-update",
+            "message_type": "room-update",
             "event": event,
             "room_id": self._id,
             "players": {k: self._players[k].dto() for k in self._players},
@@ -122,16 +122,15 @@ class GameRoom(Game.EventListener):
             self._players_lock.release()
 
     def game_event(self, event, event_data, game_data):
-        if event == Game.Event.dead_player:
-            self.leave(event_data["player_id"])
-        # Broadcast the event to the room
-        event_message = {"msg_id": "game-update"}
-        event_message.update(event_data)
-        event_message.update(game_data)
-
         # Updating the latest event message
         self._game_lock.acquire()
         try:
+            # Broadcast the event to the room
+            event_message = {"message_type": "game-update"}
+            event_message.update(event_data)
+            event_message.update(game_data)
+            self._broadcast(event_message)
+
             if event == Game.Event.game_over:
                 self._latest_game = None
                 self._latest_game_event = None
@@ -141,7 +140,9 @@ class GameRoom(Game.EventListener):
         finally:
             self._game_lock.release()
 
-        self._broadcast(event_message)
+        if event == Game.Event.dead_player:
+            self.leave(event_data["player_id"])
+
 
     @property
     def active(self):

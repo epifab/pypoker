@@ -93,7 +93,7 @@ class Game:
     def send_cards(self, player):
         score = player.get_score()
         player.send_message({
-            "msg_id": "set-cards",
+            "message_type": "set-cards",
             "cards": [c.dto() for c in score.get_cards()],
             "score": {
                 "cards": [c.dto() for c in score.get_cards()],
@@ -245,7 +245,7 @@ class Game:
     def _add_dead_player(self, player_id, exception):
         player = self._players[player_id]
         self._logger.info("{}: {} error: {}".format(self, player, exception.args[0]))
-        player.try_send_message({"msg_id": "error", "error": exception.args[0]})
+        player.try_send_message({"message_type": "error", "error": exception.args[0]})
         self._dead_player_ids.add(player_id)
         self._raise_event(Game.Event.dead_player, {"player_id": player_id})
         self._add_folder(player_id)
@@ -315,10 +315,10 @@ class Game:
         """Gives players the opportunity to change some of their cards.
         Returns a tuple: (discard card keys, discard)."""
         message = player.recv_message(timeout_epoch=timeout_epoch)
-        if "msg_id" not in message:
-            raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
+        if "message_type" not in message:
+            raise MessageFormatError(attribute="message_type", desc="Attribute missing")
 
-        MessageFormatError.validate_msg_id(message, "change-cards")
+        MessageFormatError.validate_message_type(message, "change-cards")
 
         if "cards" not in message:
             raise MessageFormatError(attribute="cards", desc="Attribute is missing")
@@ -417,10 +417,10 @@ class Game:
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
         message = player.recv_message(timeout_epoch=timeout_epoch)
-        if "msg_id" not in message:
-            raise MessageFormatError(attribute="msg_id", desc="Attribute missing")
+        if "message_type" not in message:
+            raise MessageFormatError(attribute="message_type", desc="Attribute missing")
 
-        MessageFormatError.validate_msg_id(message, "bet")
+        MessageFormatError.validate_message_type(message, "bet")
 
         # No bet actually required (opening phase, score is too weak)
         if max_bet == -1:

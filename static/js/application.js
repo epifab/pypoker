@@ -54,9 +54,9 @@ Poker5 = {
 
             console.log(data);
 
-            switch (data.msg_id) {
+            switch (data.message_type) {
                 case 'ping':
-                    Poker5.socket.send(JSON.stringify({'msg_id': 'pong'}));
+                    Poker5.socket.send(JSON.stringify({'message_type': 'pong'}));
                     break;
                 case 'connect':
                     Poker5.onConnect(data);
@@ -94,7 +94,7 @@ Poker5 = {
                 discards.push($(this).data('key'))
             });
             Poker5.socket.send(JSON.stringify({
-                'msg_id': 'change-cards',
+                'message_type': 'change-cards',
                 'cards': discards
             }));
             Poker5.setCardsChangeMode(false);
@@ -102,7 +102,7 @@ Poker5 = {
 
         $('#fold-cmd, #no-bet-cmd').click(function() {
             Poker5.socket.send(JSON.stringify({
-                'msg_id': 'bet',
+                'message_type': 'bet',
                 'bet': -1
             }));
             Poker5.disableBetMode();
@@ -110,7 +110,7 @@ Poker5 = {
 
         $('#bet-cmd').click(function() {
             Poker5.socket.send(JSON.stringify({
-                'msg_id': 'bet',
+                'message_type': 'bet',
                 'bet': $('#bet-input').val()
             }));
             Poker5.disableBetMode();
@@ -175,6 +175,7 @@ Poker5 = {
                 this.onPlayerAction(message);
                 break;
             case 'dead-player':
+                // Player will be already flagged as inactive
                 break;
             case 'winner-designation':
                 player = message.players[message.player_id];
@@ -203,27 +204,32 @@ Poker5 = {
         Poker5.setCardsChangeMode(false);
     },
 
-    createPlayer: function(player) {
-        isCurrentPlayer = player.id == $('#current-player').data('id');
+    createPlayer: function(player=undefined) {
+        if (player === undefined) {
+            return $('<div class="player"><div class="player-info"></div></div>');
+        }
+        else {
+            isCurrentPlayer = player.id == $('#current-player').data('id');
 
-        $playerName = $('<p class="player-name"></p>');
-        $playerName.text(isCurrentPlayer ? 'You' : player.name);
+            $playerName = $('<p class="player-name"></p>');
+            $playerName.text(isCurrentPlayer ? 'You' : player.name);
 
-        $playerMoney = $('<p class="player-money"></p>');
-        $playerMoney.text('$' + parseInt(player.money));
+            $playerMoney = $('<p class="player-money"></p>');
+            $playerMoney.text('$' + parseInt(player.money));
 
-        $playerInfo = $('<div class="player-info"></div>');
-        $playerInfo.append($playerName);
-        $playerInfo.append($playerMoney);
+            $playerInfo = $('<div class="player-info"></div>');
+            $playerInfo.append($playerName);
+            $playerInfo.append($playerMoney);
 
-        $player = $('<div class="player' + (isCurrentPlayer ? ' current' : '') + '"></div>');
-        $player.attr('data-id', player.id);
-        $player.append($('<div class="cards"></div>'));
-        $player.append($playerInfo);
-        $player.append($('<div class="timer"></div>'));
-        $player.append($('<div class="bet"></div>'));
+            $player = $('<div class="player' + (isCurrentPlayer ? ' current' : '') + '"></div>');
+            $player.attr('data-id', player.id);
+            $player.append($('<div class="cards"></div>'));
+            $player.append($playerInfo);
+            $player.append($('<div class="timer"></div>'));
+            $player.append($('<div class="bet"></div>'));
 
-        return $player;
+            return $player;
+        }
     },
 
     destroyRoom: function() {
@@ -239,13 +245,17 @@ Poker5 = {
         for (k in message.player_ids) {
             $seat = $('<div class="seat"></div>');
             $seat.attr('data-key', k);
-            $seat.append('<div class="player inactive"><div class="player-info"></div></div>');
 
             playerId = message.player_ids[k];
 
             if (playerId) {
                 // This seat is taken
                 $seat.append(this.createPlayer(message.players[playerId]));
+                $seat.attr('data-player-id', playerId);
+            }
+            else {
+                $seat.append(this.createPlayer());
+                $seat.attr('data-player-id', null);
             }
             $('#players').append($seat);
         }
@@ -261,21 +271,32 @@ Poker5 = {
                 playerId = message.player_id;
                 player = message.players[playerId]
                 playerName = playerId == $('#current-player').data('id') ? 'You' : player.name;
-                for (k in message.player_ids) {
-                    if (message.player_ids[k] == playerId) {
-                        $seat = $('.seat[data-key="' + k + '"]');
-                        $seat.empty();
-                        $seat.append(this.createPlayer(player));
-                        break;
+                // Go through every available seat, find the one where the new player should sat and seated him
+                $('.seat').each(function() {
+                    seat = $(this).attr('data-key');
+                    if (message.player_ids[seat] == playerId) {
+                        $(this).empty();
+                        $(this).append(Poker5.createPlayer(player));
+                        $(this).attr('data-player-id', playerId);
+                        return;
                     }
-                }
+                });
                 this.log(playerName + " joined the room");
                 break;
 
             case 'player-removed':
                 playerId = message.player_id;
                 playerName = $('.player[data-id=' + playerId + '] .player-name').text();
-                $('.player[data-id="' + playerId + '"]').remove();
+                // Go through every available seat, find the one where the leaving player sat and kick him out
+                $('.seat').each(function() {
+                    seatedPlayerId = $(this).attr('data-player-id');
+                    if (seatedPlayerId == playerId) {
+                        $(this).empty();
+                        $(this).append(Poker5.createPlayer());
+                        $(this).attr('data-player-id', null);
+                        return;
+                    }
+                });
                 this.log(playerName + " left the room");
                 break;
         }
@@ -563,81 +584,6 @@ Poker5 = {
 }
 
 $(document).ready(function() {
-    Poker5.init()
-    // Tests
-//    Poker5.onConnect({
-//        "msg_id": "connect",
-//        "server": "server-123",
-//        "player": {
-//            "id": "12345-67890-abcde-fghij",
-//            "name": "John Doe",
-//            "money": 1000
-//        }
-//    });
-//
-//    Poker5.onGameUpdate({
-//        "msg_id": "game-update",
-//        "game": "game-123",
-//        "event": "new-game",
-//        "players": [
-//            {
-//                "id": "23456-67890-abcde-fghij",
-//                "name": "Jim Morrison",
-//                "money": 1000,
-//                "alive": true,
-//                "bet": 0
-//            },
-//            {
-//                "id": "12345-67890-abcde-fghij",
-//                "name": "John Doe",
-//                "money": 1000,
-//                "alive": true,
-//                "bet": 0
-//            }
-//        ],
-//        "pot": 0
-//    });
-//
-//    Poker5.onSetCards({
-//        "msg_id": "set-cards",
-//        "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]],
-//        "score": {
-//            "category": 7,
-//            "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]]
-//        }
-//    });
-//
-//    Poker5.onGameUpdate({
-//        "msg_id": "game-update",
-//        "player": 0,
-//        "timeout": 60,
-//        "game": "game-123",
-//        "event": "player-action",
-//        "players": [
-//            {
-//                "id": "23456-67890-abcde-fghij",
-//                "name": "Jim Morrison",
-//                "money": 1600,
-//                "alive": true,
-//                "bet": 0,
-//                "score": {
-//                    "cards": [[14, 3], [14, 2], [14, 1], [14, 0], [9, 2]],
-//                    "category": 7
-//                }
-//            },
-//            {
-//                "id": "12345-67890-abcde-fghij",
-//                "name": "John Doe",
-//                "money": 400,
-//                "alive": true,
-//                "bet": 0,
-//                "score": {
-//                    "cards": [[13, 3], [13, 2], [13, 1], [13, 0], [10, 3]],
-//                    "category": 7
-//                }
-//            }
-//        ],
-//        "pot": 0
-//    });
+    Poker5.init();
 })
 

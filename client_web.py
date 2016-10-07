@@ -97,7 +97,7 @@ def poker5(ws):
     client_channel = ChannelWebSocket(ws)
 
     if "player-id" not in session:
-        client_channel.send_message({"msg_id": "error", "error": "Unrecognized user"})
+        client_channel.send_message({"message_type": "error", "error": "Unrecognized user"})
         client_channel.close()
         return
 
@@ -125,7 +125,7 @@ def poker5(ws):
         message_queue.push(
             "poker5:lobby",
             {
-                "msg_id": "connect",
+                "message_type": "connect",
                 "player": {
                     "id": player_id,
                     "name": player_name,
@@ -138,7 +138,7 @@ def poker5(ws):
         connection_message = server_channel.recv_message(time.time() + 5)  # 5 seconds
 
         # Validating message id
-        MessageFormatError.validate_msg_id(connection_message, "connect")
+        MessageFormatError.validate_message_type(connection_message, "connect")
 
         server_id = str(connection_message["server_id"])
 
@@ -160,7 +160,7 @@ def poker5(ws):
             try:
                 while True:
                     message = channel1.recv_message()
-                    if "msg_id" in message and message["msg_id"] == "disconnect":
+                    if "message_type" in message and message["message_type"] == "disconnect":
                         raise ChannelError
                     channel2.send_message(message)
             except (ChannelError, MessageFormatError):
@@ -183,20 +183,20 @@ def poker5(ws):
         gevent.joinall(greenlets)
 
         try:
-            client_channel.send_message({"msg_id": "disconnect"})
+            client_channel.send_message({"message_type": "disconnect"})
         except:
             pass
         finally:
             client_channel.close()
 
         try:
-            server_channel.send_message({"msg_id": "disconnect"})
+            server_channel.send_message({"message_type": "disconnect"})
         except:
             pass
         finally:
             server_channel.close()
 
-        app.logger.error("player {} connection closed".format(player_id))
+        app.logger.info("player {} connection closed".format(player_id))
 
 
 def get_random_name():

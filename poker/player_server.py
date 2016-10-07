@@ -21,7 +21,7 @@ class PlayerServer(Player):
     def disconnect(self):
         """Disconnect the client"""
         if self._connected:
-            self.try_send_message({"msg_id": "disconnect"})
+            self.try_send_message({"message_type": "disconnect"})
             self._channel.close()
             self._connected = False
 
@@ -40,9 +40,9 @@ class PlayerServer(Player):
 
     def ping(self):
         try:
-            self.send_message({"msg_id": "ping"})
+            self.send_message({"message_type": "ping"})
             message = self.recv_message(timeout_epoch=time.time() + 2)
-            MessageFormatError.validate_msg_id(message, expected="pong")
+            MessageFormatError.validate_message_type(message, expected="pong")
             return True
         except (ChannelError, MessageTimeout, MessageFormatError) as e:
             self._logger.error("Unable to ping {}: {}".format(self, e))
@@ -61,6 +61,6 @@ class PlayerServer(Player):
 
     def recv_message(self, timeout_epoch=None):
         message = self._channel.recv_message(timeout_epoch)
-        if "msg_id" in message and message["msg_id"] == "disconnect":
+        if "message_type" in message and message["message_type"] == "disconnect":
             raise ChannelError("Client disconnected")
         return message
