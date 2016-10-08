@@ -43,7 +43,7 @@ class Game:
         def game_event(self, event, event_data, game_data):
             raise NotImplemented
 
-    def __init__(self, players, deck, score_detector, stake=10.0, logger=None):
+    def __init__(self, players, deck, score_detector, dealer_id=None, stake=10.0, logger=None):
         self._id = str(uuid.uuid4())
         # Dictionary of players keyed by their ids
         self._players = {player.get_id(): player for player in players}
@@ -54,7 +54,7 @@ class Game:
         # List of player ids sorted according to the original players list
         self._player_ids = [player.get_id() for player in players]
         # Current dealer
-        self._dealer_id = self._player_ids[0]
+        self._dealer_id = dealer_id if dealer_id else self._player_ids[0]
         # Players who fold
         self._folder_ids = set()
         # Players who timed out or died
@@ -107,7 +107,6 @@ class Game:
         try:
             # Initialization
             self._deck.initialize()
-            self._folder_ids = set(self._dead_player_ids)
             self._player_ids_allowed_to_open = set()
             self._player_ids_show_cards = set()
 
@@ -118,24 +117,38 @@ class Game:
             self._assign_cards()
             gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
 
-            # Opening bet round
-            self._logger.info("{}: [[opening bet round]]".format(self))
-            player_id = self._opening_bet_round()
-            gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
+            try:
+                # Opening bet round
+                self._logger.info("{}: [[opening bet round]]".format(self))
+                player_id = self._opening_bet_round()
+                gevent.sleep(Game.WAIT_AFTER_OPENING_BET)
 
-            # Cards change
-            self._logger.info("{}: [[change cards]]".format(self))
-            self._change_cards()
-            gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
+            except DeadHandException:
+                # Automatically play another hand if the last has failed
+                self._logger.info("{}: dead hand".format(self))
+                self._raise_event(Game.Event.dead_hand)
 
-            # Final bet round
-            self._logger.info("{}: [[final bet round]]".format(self))
-            player_id = self._final_bet_round(player_id)
-            gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
+                self._dead_hands_counter += 1
+                self._folder_ids = set(self._dead_player_ids)
+                self._dealer_id = self._next_active_player_id(self._dealer_id)
+                gevent.sleep(Game.WAIT_AFTER_HAND)
+                self._play_hand()  # Play another hand with the same players
+                return  # Ensure no more code is executed
 
-            # Winner detection
-            self._logger.info("{}: [[winner detection]]".format(self))
-            self._detect_winner(player_id)
+            else:
+                # Cards change
+                self._logger.info("{}: [[change cards]]".format(self))
+                self._change_cards()
+                gevent.sleep(Game.WAIT_AFTER_CARDS_CHANGE)
+
+                # Final bet round
+                self._logger.info("{}: [[final bet round]]".format(self))
+                player_id = self._final_bet_round(player_id)
+                gevent.sleep(Game.WAIT_AFTER_FINAL_BET)
+
+                # Winner detection
+                self._logger.info("{}: [[winner detection]]".format(self))
+                self._detect_winner(player_id)
 
         except WinnerDetection as e:
             winner_id = e.args[0]
@@ -146,7 +159,6 @@ class Game:
             # Re-initialize pot, bets and move to the next dealer
             self._pot = 0.0
             self._bets = {player_id: 0.0 for player_id in self._player_ids}
-            self._dealer_id = self._next_player_id(self._dealer_id)
 
             self._dead_hands_counter = 0
             self._logger.info("{}: {} won".format(self, winner))
@@ -154,21 +166,15 @@ class Game:
 
             gevent.sleep(Game.WAIT_AFTER_HAND)
 
-        except DeadHandException:
-            # Automatically play another hand if the last has failed
-            self._dead_hands_counter += 1
-            self._logger.info("{}: dead hand".format(self))
-            self._raise_event(Game.Event.dead_hand)
-
-            gevent.sleep(Game.WAIT_AFTER_HAND)
-            self._play_hand()
+            self._folder_ids = set(self._dead_player_ids)
+            self._dealer_id = self._next_active_player_id(self._dealer_id)
 
     def _assign_cards(self):
         # Define the minimum score to open
         min_opening_score = self._min_opening_scores[self._dead_hands_counter % len(self._min_opening_scores)]
 
         # Assign cards
-        for player_id, player in self._players_round(self._dealer_id):
+        for player_id, player in self._active_players_round(self._dealer_id):
             # Collect stakes
             self._pot += self._stake
             self._bets[player_id] += self._stake
@@ -190,7 +196,7 @@ class Game:
 
     def _opening_bet_round(self):
         # Bet round
-        for player_id, player in self._players_round(self._dealer_id):
+        for player_id, player in self._active_players_round(self._dealer_id):
             # Ask remote player to bet
             bet, _ = self._bet(player_id=player_id, min_bet=1.0, max_bet=self._pot, opening=True)
 
@@ -262,23 +268,41 @@ class Game:
             raise WinnerDetection(active_player_ids[0])
 
     def _players_round(self, start_player_id):
-        """Iterate through a list of players who did not fold."""
         start_item = self._player_ids.index(start_player_id)
 
         for i in range(len(self._player_ids)):
             next_item = (i + start_item) % len(self._player_ids)
             player_id = self._player_ids[next_item]
+            yield player_id, self._players[player_id]
+        raise StopIteration
+
+    def _active_players_round(self, start_player_id):
+        """Iterate through a list of players who did not fold."""
+        for player_id, player in self._players_round(start_player_id):
             if player_id not in self._folder_ids:
-                yield player_id, self._players[player_id]
+                yield player_id, player
         raise StopIteration
 
     def _next_player_id(self, player_id):
-        current_item = self._player_ids.index(player_id)
-        next_item = (current_item + 1) % len(self._player_ids)
-        return self._player_ids[next_item]
+        try:
+            players = self._players_round(player_id)
+            players.next()
+            player_id, _ = players.next()
+            return player_id
+        except StopIteration:
+            return player_id
+
+    def _next_active_player_id(self, player_id):
+        try:
+            players = self._active_players_round(player_id)
+            players.next()
+            player_id, _ = players.next()
+            return player_id
+        except StopIteration:
+            return player_id
 
     def _change_cards(self):
-        for player_id, player in self._players_round(self._dealer_id):
+        for player_id, player in self._active_players_round(self._dealer_id):
             try:
                 timeout_epoch = time.time() + self.CHANGE_CARDS_TIMEOUT + self.TIMEOUT_TOLERANCE
                 self._logger.info("{}: {} changing cards...".format(self, player))
@@ -339,7 +363,7 @@ class Game:
     def _detect_winner(self, best_player_id):
         # Works out the winner
         winner = None
-        for player_id, player in self._players_round(best_player_id):
+        for player_id, player in self._active_players_round(best_player_id):
             if not winner or player.get_score().cmp(winner.get_score()) > 0:
                 winner = player
                 self._player_ids_show_cards.add(player_id)

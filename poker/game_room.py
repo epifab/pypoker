@@ -1,4 +1,4 @@
-from . import Deck, ScoreDetector, Game
+from . import Deck, ScoreDetector, Game, GameError
 import gevent
 import logging
 import threading
@@ -17,6 +17,7 @@ class GameRoom(Game.EventListener):
         self._stakes = stakes
         self._game = None
         self._game_lock = threading.Lock()
+        self._dealer_index = -1
         self._latest_game_event = None
         self._latest_game = None
         self._players = {}
@@ -131,6 +132,9 @@ class GameRoom(Game.EventListener):
             event_message.update(game_data)
             self._broadcast(event_message)
 
+            if event == Game.Event.cards_assignment:
+                self._dealer_index = self._player_ids.index(game_data["dealer_id"])
+
             if event == Game.Event.game_over:
                 self._latest_game = None
                 self._latest_game_event = None
@@ -143,7 +147,6 @@ class GameRoom(Game.EventListener):
         if event == Game.Event.dead_player:
             self.leave(event_data["player_id"])
 
-
     @property
     def active(self):
         return self._active
@@ -153,33 +156,50 @@ class GameRoom(Game.EventListener):
             if not self._players[player_id].ping():
                 self.leave(player_id)
 
+    def new_game(self):
+        # Remove unresponsive players
+        self.ping_all_players()
+
+        self._players_lock.acquire()
+        try:
+            if len(self._players) < 2:
+                raise GameError("Not enough players")
+
+            else:
+                # In the traditional poker the lowest rank is 9 with 2 players, 8 with three, 7 with four, 6 with five
+                lowest_rank = 11 - len(self._players)
+
+                # Dealer
+                for i in range(self._max_room_size):
+                    self._dealer_index = (self._dealer_index + 1) % self._max_room_size
+                    if self._player_ids[self._dealer_index] is not None:
+                        break
+
+                return Game(
+                    players=[self._players[player_id] for player_id in self._player_ids if player_id is not None],
+                    dealer_id=self._player_ids[self._dealer_index],
+                    deck=Deck(lowest_rank),
+                    score_detector=ScoreDetector(lowest_rank),
+                    stake=self._stakes,
+                    logger=self._logger
+                )
+
+        finally:
+            self._players_lock.release()
+
+
     def activate(self):
         self._active = True
         self._logger.info("{}: active".format(self))
+
         while self._active:
-            # Remove unresponsive players
-            self.ping_all_players()
-
-            # List of players sorted according to the original _player_ids list
-            players = [self._players[player_id]
-                       for player_id in self._player_ids
-                       if player_id is not None]
-
-            if len(players) > 1:
-                lowest_rank = 11 - len(players)
-
-                self._game = Game(
-                    players=players,
-                    deck=Deck(lowest_rank),
-                    score_detector=ScoreDetector(lowest_rank),
-                    stake=10.0,
-                    logger=self._logger
-                )
+            try:
+                self._game = self.new_game()
                 self._game.subscribe(self)
                 self._game.play_game()
                 self._game.unsubscribe(self)
                 self._game = None
-            else:
+            except GameError:
                 self._active = False
 
         self._logger.info("{}: inactive".format(self))
