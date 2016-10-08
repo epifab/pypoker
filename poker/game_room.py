@@ -1,4 +1,4 @@
-from . import Deck, ScoreDetector, Game, GameError
+from . import Deck, ScoreDetector, Game, TraditionalPokerGame, GameError
 import gevent
 import logging
 import threading
@@ -11,10 +11,10 @@ class FullGameRoomException(Exception):
 class GameRoom(Game.EventListener):
     room_number = 1
 
-    def __init__(self, id, max_room_size=5, stakes=10.0, logger=None):
+    def __init__(self, id, game_factory, max_room_size=5, logger=None):
         self._id = id
         self._max_room_size = max_room_size
-        self._stakes = stakes
+        self._game_factory = game_factory
         self._game = None
         self._game_lock = threading.Lock()
         self._dealer_index = -1
@@ -97,7 +97,7 @@ class GameRoom(Game.EventListener):
                     player.send_message(self._latest_game_event)
                     if not is_new_player:
                         # Sending cards to the player in case he was already in a game
-                        self._latest_game.send_cards(player)
+                        self._latest_game.send_player_cards(player)
             finally:
                 self._game_lock.release()
         finally:
@@ -132,10 +132,10 @@ class GameRoom(Game.EventListener):
             event_message.update(game_data)
             self._broadcast(event_message)
 
-            if event == Game.Event.cards_assignment:
+            if event == Game.Event.CARDS_ASSIGNMENT:
                 self._dealer_index = self._player_ids.index(game_data["dealer_id"])
 
-            if event == Game.Event.game_over:
+            if event == Game.Event.GAME_OVER:
                 self._latest_game = None
                 self._latest_game_event = None
             else:
@@ -144,7 +144,7 @@ class GameRoom(Game.EventListener):
         finally:
             self._game_lock.release()
 
-        if event == Game.Event.dead_player:
+        if event == Game.Event.DEAD_PLAYER:
             self.leave(event_data["player_id"])
 
     @property
@@ -166,22 +166,15 @@ class GameRoom(Game.EventListener):
                 raise GameError("Not enough players")
 
             else:
-                # In the traditional poker the lowest rank is 9 with 2 players, 8 with three, 7 with four, 6 with five
-                lowest_rank = 11 - len(self._players)
-
                 # Dealer
                 for i in range(self._max_room_size):
                     self._dealer_index = (self._dealer_index + 1) % self._max_room_size
                     if self._player_ids[self._dealer_index] is not None:
                         break
 
-                return Game(
+                return self._game_factory.create_game(
                     players=[self._players[player_id] for player_id in self._player_ids if player_id is not None],
                     dealer_id=self._player_ids[self._dealer_index],
-                    deck=Deck(lowest_rank),
-                    score_detector=ScoreDetector(lowest_rank),
-                    stake=self._stakes,
-                    logger=self._logger
                 )
 
         finally:

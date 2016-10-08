@@ -6,11 +6,12 @@ from uuid import uuid4
 
 
 class GameServer:
-    def __init__(self, logger=None):
+    def __init__(self, game_factory, logger=None):
         self._id = str(uuid4())
         self._rooms = []
         self._players = {}
         self._lobby_lock = threading.Lock()
+        self._game_factory = game_factory
         self._logger = logger if logger else logging
 
     def __str__(self):
@@ -36,7 +37,7 @@ class GameServer:
             GameRoom.room_number += 1
 
             # All rooms are full: creating new room
-            room = GameRoom(id=room_id, max_room_size=5, stakes=10.0, logger=self._logger)
+            room = GameRoom(id=room_id, max_room_size=5, game_factory=self._game_factory, logger=self._logger)
             room.join(player)
             self._rooms.append(room)
             return room

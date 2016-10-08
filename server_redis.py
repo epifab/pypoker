@@ -1,4 +1,4 @@
-from poker import GameServerRedis
+from poker import GameServerRedis, TraditionalPokerGameFactory
 import logging
 import redis
 import os
@@ -10,5 +10,9 @@ if __name__ == '__main__':
 
     redis_url = os.environ["REDIS_URL"]
 
-    server = GameServerRedis(redis.from_url(redis_url), logger=logger)
+    server = GameServerRedis(
+        redis=redis.from_url(redis_url),
+        game_factory=TraditionalPokerGameFactory(blind=10.0, logger=logger),
+        logger=logger
+    )
     server.start()

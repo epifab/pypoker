@@ -3,8 +3,8 @@ from . import GameServer, PlayerServer, \
 
 
 class GameServerRedis(GameServer):
-    def __init__(self, redis, logger=None):
-        GameServer.__init__(self, logger)
+    def __init__(self, redis, game_factory, logger=None):
+        GameServer.__init__(self, game_factory, logger)
         self._redis = redis
         self._message_queue = MessageQueue(redis)
         self._connection_channel = "poker5:lobby"
