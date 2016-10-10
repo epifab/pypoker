@@ -23,13 +23,14 @@ class Score:
         self._category = category
         self._cards = cards
 
-    def get_category(self):
+    @property
+    def category(self):
         """Gets the category for this score."""
         return self._category
 
-    def get_cards(self, limit=0):
-        """Gets the list of cards sorted in a descending order according to their category."""
-        return self._cards if not limit or len(self._cards) < limit else self._cards[0:limit]
+    @property
+    def cards(self, limit=0):
+        return self._cards
 
     def cmp(self, other):
         """Compare scores. Returns:
@@ -38,17 +39,17 @@ class Score:
         a negative integer if score2 is higher than this score."""
 
         # Compare categories first
-        categories_diff = self.get_category() - other.get_category()
+        categories_diff = self.category - other.category
         if categories_diff:
             return categories_diff
 
         # Same score, compare the list of cards
-        cards1 = self.get_cards(limit=5)
-        cards2 = other.get_cards(limit=5)
+        cards1 = self.cards[0:5]
+        cards2 = other.cards[0:5]
 
         # In the traditional italian poker royal flushes are weaker than minimum straight flushes (e.g. 10, 9, 8, 7, A)
         # This is done so you are not mathematically sure to have the strongest hand.
-        if self.get_category() == Score.STRAIGHT_FLUSH:
+        if self.category == Score.STRAIGHT_FLUSH:
             if Score._straight_is_max(cards1) and Score._straight_is_min(cards2):
                 return -1
             elif Score._straight_is_min(cards1) and Score._straight_is_max(cards2):
@@ -70,7 +71,7 @@ class Score:
         Returns a negative integer if cards1 < cards2, positive if cards1 > cards2 or 0 if their ranks are identical"""
         for i in range(len(cards1)):
             try:
-                rank_diff = cards1[i].get_rank() - cards2[i].get_rank()
+                rank_diff = cards1[i].rank - cards2[i].rank
                 if rank_diff:
                     return rank_diff
             except IndexError:
@@ -84,7 +85,7 @@ class Score:
         Returns a negative integer if cards1 < cards2, positive if cards1 > cards2 or 0 if their suits are identical"""
         for i in range(len(cards1)):
             try:
-                suit_diff = cards1[i].get_suit() - cards2[i].get_suit()
+                suit_diff = cards1[i].suit - cards2[i].suit
                 if suit_diff:
                     return suit_diff
             except IndexError:
@@ -94,15 +95,15 @@ class Score:
 
     @staticmethod
     def _straight_is_min(straight_sequence):
-        return straight_sequence[4].get_rank() == 14
+        return straight_sequence[4].rank == 14
 
     @staticmethod
     def _straight_is_max(straight_sequence):
-        return straight_sequence[0].get_rank() == 14
+        return straight_sequence[0].rank == 14
 
     def __str__(self):
-        return str(self._cards) + " (" + Score.CATEGORIES[self.get_category()] + ")"
+        return str(self._cards) + " (" + Score.CATEGORIES[self.category] + ")"
 
     def dto(self):
-        return {"category": self.get_category(),
-                "cards": [card.dto() for card in self.get_cards()]}
+        return {"category": self.category,
+                "cards": [card.dto() for card in self.cards]}

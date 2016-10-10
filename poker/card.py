@@ -26,12 +26,12 @@ class Card:
             raise ValueError("Invalid card suit")
         self._value = (rank << 2) + suit
 
-    def get_rank(self):
-        """Card rank"""
+    @property
+    def rank(self):
         return self._value >> 2
 
-    def get_suit(self):
-        """Card suit"""
+    @property
+    def suit(self):
         return self._value & 3
 
     def __lt__(self, other):
@@ -41,7 +41,7 @@ class Card:
         return int(self) == int(other)
 
     def __repr__(self):
-        return str(Card.RANKS[self.get_rank()]) + " of " + Card.SUITS[self.get_suit()]
+        return str(Card.RANKS[self.rank]) + " of " + Card.SUITS[self.suit]
 
     def __int__(self):
         return self._value
@@ -51,13 +51,13 @@ class Card:
         lines = [""] * 7
         for card in cards:
             lines[0] += "+-------+"
-            lines[1] += "| {:<2}    |".format(Card.RANKS[card.get_rank()])
+            lines[1] += "| {:<2}    |".format(Card.RANKS[card.rank])
             lines[2] += "|       |"
-            lines[3] += "|   {}   |".format(Card.SUITS[card.get_suit()])
+            lines[3] += "|   {}   |".format(Card.SUITS[card.suit])
             lines[4] += "|       |"
-            lines[5] += "|    {:>2} |".format(Card.RANKS[card.get_rank()])
+            lines[5] += "|    {:>2} |".format(Card.RANKS[card.rank])
             lines[6] += "+-------+"
         return "\n".join(lines)
 
     def dto(self):
-        return self.get_rank(), self.get_suit()
+        return self.rank, self.suit

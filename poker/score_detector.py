@@ -35,7 +35,7 @@ class ScoreDetector:
         # Makes a dictionary keyed by r and valued by list of cards of the same r
         ranks = collections.defaultdict(list)
         for card in cards:
-            ranks[card.get_rank()].append(card)
+            ranks[card.rank].append(card)
 
         # List of four of a kind ranks
         four_oak_rank = sorted([r for (r, c) in ranks.items() if len(c) == 4], reverse=True)
@@ -85,15 +85,15 @@ class ScoreDetector:
         straight = [cards[0]]
 
         for i in range(1, len(cards)):
-            if cards[i].get_rank() == cards[i - 1].get_rank() - 1:
+            if cards[i].rank == cards[i - 1].rank - 1:
                 straight.append(cards[i])
                 if len(straight) == 5:
                     return straight
-            elif cards[i].get_rank() != cards[i - 1].get_rank():
+            elif cards[i].rank != cards[i - 1].rank:
                 straight = [cards[i]]
 
         # The Ace can go under the lowest rank card
-        if len(straight) == 4 and cards[0].get_rank() == 14 and straight[-1].get_rank() == lowest_rank:
+        if len(straight) == 4 and cards[0].rank == 14 and straight[-1].rank == lowest_rank:
             straight.append(cards[0])
             return straight
         return None
@@ -103,10 +103,10 @@ class ScoreDetector:
         """Detects and returns the highest flush from a list of cards sorted in a descending order."""
         suits = collections.defaultdict(list)
         for card in cards:
-            suits[card.get_suit()].append(card)
+            suits[card.suit].append(card)
             # Since cards is sorted, the first flush detected is guaranteed to be the highest one
-            if len(suits[card.get_suit()]) == 5:
-                return suits[card.get_suit()]
+            if len(suits[card.suit]) == 5:
+                return suits[card.suit]
         return None
 
     @staticmethod
@@ -114,9 +114,9 @@ class ScoreDetector:
         """Detects and returns the highest straight flush from a list of cards sorted by rank in a descending order."""
         suits = collections.defaultdict(list)
         for card in cards:
-            suits[card.get_suit()].append(card)
-            if len(suits[card.get_suit()]) >= 5:
-                straight = ScoreDetector._get_straight(suits[card.get_suit()], lowest_rank)
+            suits[card.suit].append(card)
+            if len(suits[card.suit]) >= 5:
+                straight = ScoreDetector._get_straight(suits[card.suit], lowest_rank)
                 # Since cards is sorted, the first straight flush detected is guaranteed to be the highest one
                 if straight:
                     return straight

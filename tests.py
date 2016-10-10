@@ -87,13 +87,13 @@ class ScoreTests(unittest.TestCase):
         category = Score.STRAIGHT_FLUSH
         cards = [Card(14, 2), Card(13, 2), Card(12, 2), Card(11, 2), Card(10, 2)]
         score = Score(category, cards)
-        self.assertEqual(score.get_cards(), cards)
+        self.assertEqual(score.cards, cards)
 
     def test_get_category(self):
         category = Score.STRAIGHT_FLUSH
         cards = [Card(14, 2), Card(13, 2), Card(12, 2), Card(11, 2), Card(10, 2)]
         score = Score(category, cards)
-        self.assertEqual(score.get_category(), category)
+        self.assertEqual(score.category, category)
 
     def _test_cmp(self, score1, score2):
         self.assertGreater(score1.cmp(score2), 0)

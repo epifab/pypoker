@@ -131,6 +131,7 @@ class Game:
         """Do a bet round. Returns the id of the player who made the strongest bet first."""
 
         player_ids = [player_id for player_id, _ in self._active_players_round(dealer_id)]
+        dealer_id = player_ids[0]  # Ensure the current dealer is an active player
         player_ids.reverse()
         for k, player_id in enumerate(player_ids):
             if not bets.has_key(player_id):
@@ -366,6 +367,7 @@ class Game:
                 Game.Event.WINNER_DESIGNATION,
                 {"pot": pot_index}
             )
+            gevent.sleep(Game.WAIT_AFTER_WINNER_DESIGNATION)
 
     def _raise_event(self, event, event_data=None):
         """Broadcast game events"""

@@ -51,14 +51,13 @@ class TraditionalPokerGame(Game):
 
     def _collect_blinds(self):
         # In the traditional poker, the blind is collected from every player
-        for player_id in self._player_ids:
-            if player_id not in self._folder_ids:
-                player = self._players[player_id]
+        for player in self._players.values():
+            if player.id not in self._folder_ids:
                 if player.money < self._blind + 1.0:
-                    self._add_dead_player(player_id, "Not enough money to play this hand")
+                    self._add_dead_player(player.id, "Not enough money to play this hand")
                 else:
                     player.take_money(self._blind)
-                    self._bets[player_id] = self._blind
+                    self._bets[player.id] = self._blind
         self._recalculate_pots()
 
     def _assign_cards(self):
@@ -67,13 +66,13 @@ class TraditionalPokerGame(Game):
         # Assign cards
         for player_id, player in self._active_players_round(self._dealer_id):
             # Distribute cards
-            cards = self._deck.get_cards(5)
+            cards = self._deck.pop_cards(5)
             score = self._score_detector.get_score(cards)
             if score.cmp(min_opening_score) >= 0:
                 self._player_ids_allowed_to_open.add(player_id)
 
             try:
-                player.set_cards(score.get_cards(), score)
+                player.set_cards(score.cards, score)
                 self.init_player_hand(player)
             except ChannelError as e:
                 self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
@@ -180,12 +179,12 @@ class TraditionalPokerGame(Game):
 
                 if discard:
                     # Assign cards to the remote player
-                    new_cards = self._deck.get_cards(len(discard))
-                    self._deck.add_discards(discard)
+                    new_cards = self._deck.pop_cards(len(discard))
+                    self._deck.push_cards(discard)
                     cards = [card for card in player.cards if card not in discard] + new_cards
                     score = self._score_detector.get_score(cards)
                     # Sending cards to the remote player
-                    player.set_cards(score.get_cards(), score)
+                    player.set_cards(score.cards, score)
                     self.init_player_hand(player)
 
                 self._logger.info("{}: {} changed {} cards".format(self, player, len(discard)))
@@ -220,14 +219,10 @@ class TraditionalPokerGame(Game):
             raise MessageFormatError(attribute="cards", desc="Invalid list of cards")
 
     def init_player_hand(self, player):
-        score = player.score
         player.send_message({
             "message_type": "set-cards",
-            "cards": [c.dto() for c in score.get_cards()],
-            "score": {
-                "cards": [c.dto() for c in score.get_cards()],
-                "category": score.get_category()
-            },
+            "cards": [card.dto() for card in player.score.cards],
+            "score": player.score.dto(),
             "allowed_to_open": player.id in self._player_ids_allowed_to_open
         })
 
@@ -291,7 +286,6 @@ class TraditionalPokerGame(Game):
                     if player_id not in self._folder_ids
                 )
             self._detect_winners()
-            gevent.sleep(self.WAIT_AFTER_WINNER_DESIGNATION)
             self._folder_ids = set(self._dead_player_ids)
             self._dealer_id = self._next_active_player_id(self._dealer_id)
             gevent.sleep(self.WAIT_AFTER_HAND)
@@ -305,13 +299,10 @@ class TraditionalPokerGame(Game):
             "dealer_id": self._dealer_id,
         }
 
-        for player_id in self._player_ids:
-            player = self._players[player_id]
-
-            player_dto = player.dto(with_score=player_id in self._player_ids_show_cards)
-            player_dto["alive"] = player_id not in self._folder_ids
-            player_dto["bet"] = self._bets[player_id]
-
-            game_dto["players"][player_id] = player_dto
+        for player in self._players.values():
+            player_dto = player.dto(with_score=player.id in self._player_ids_show_cards)
+            player_dto["alive"] = player.id not in self._folder_ids
+            player_dto["bet"] = self._bets[player.id]
+            game_dto["players"][player.id] = player_dto
 
         return game_dto
