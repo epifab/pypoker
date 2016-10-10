@@ -1,4 +1,4 @@
-from . import Deck, ScoreDetector, Game, TraditionalPokerGame, GameError
+from . import Game, GameError
 import gevent
 import logging
 import threading
@@ -66,7 +66,7 @@ class GameRoom(Game.EventListener):
             is_new_player = True
 
             try:
-                old_player = self._players[player.get_id()]
+                old_player = self._players[player.id]
 
             except KeyError:
                 # New player
@@ -74,9 +74,9 @@ class GameRoom(Game.EventListener):
                 # Sending room initialization message
                 self._send_room_init(player)
                 # Adding player to the room
-                self._player_ids[self._get_free_seat()] = player.get_id()
-                self._players[player.get_id()] = player
-                self._broadcast_room_event("player-added", player.get_id())
+                self._player_ids[self._get_free_seat()] = player.id
+                self._players[player.id] = player
+                self._broadcast_room_event("player-added", player.id)
                 self._logger.info("{}: {} joined".format(self, player))
 
             else:
@@ -97,7 +97,7 @@ class GameRoom(Game.EventListener):
                     player.send_message(self._latest_game_event)
                     if not is_new_player:
                         # Sending cards to the player in case he was already in a game
-                        self._latest_game.send_player_cards(player)
+                        self._latest_game.init_player_hand(player)
             finally:
                 self._game_lock.release()
         finally:

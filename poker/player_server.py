@@ -12,10 +12,11 @@ class PlayerServer(Player):
 
     def dto(self, with_score=False):
         return {
-            "id": self.get_id(),
-            "name": self.get_name(),
-            "money": self.get_money(),
-            "score": self.get_score().dto() if with_score else None
+            "id": self.id,
+            "name": self.name,
+            "money": self.money,
+            "score": self.score.dto() if with_score else None,
+            "cards": [card.dto() for card in self.cards] if with_score else None,
         }
 
     def disconnect(self):

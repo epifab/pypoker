@@ -6,29 +6,37 @@ class Player:
         self._cards = None
         self._score = None
 
-    def get_id(self):
-        """Unique player ID"""
+    @property
+    def id(self):
         return self._id
 
-    def get_name(self):
-        """Player name"""
+    @property
+    def name(self):
         return self._name
 
-    def get_money(self):
-        """Player money"""
+    @property
+    def money(self):
         return self._money
 
-    def set_money(self, money):
-        """Sets player money"""
-        self._money = money
-
-    def get_cards(self):
-        """Gets the list of cards assigned to the player"""
+    @property
+    def cards(self):
         return self._cards
 
-    def get_score(self):
-        """Gets the player score. Returns a Score object."""
+    @property
+    def score(self):
         return self._score
+
+    def take_money(self, money):
+        if money > self._money:
+            raise ValueError("Player does not have enough money")
+        if money <= 0.0:
+            raise ValueError("Money has to be a positive amount")
+        self._money -= money
+
+    def add_money(self, money):
+        if money <= 0.0:
+            raise ValueError("Money has to be a positive amount")
+        self._money += money
 
     def set_cards(self, cards, score):
         """Assigns a list of cards to the player"""

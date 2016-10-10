@@ -159,9 +159,7 @@ Poker5 = {
                     case 'check':
                         this.log(playerName + " " + message.bet_type);
                         break;
-                    case 'open':
-                    case 'call':
-                    case 'raise':
+                    default:
                         this.log(playerName + " bet $" + parseInt(message.bet) + " (" + message.bet_type + ")");
                         break;
                 }
@@ -178,9 +176,7 @@ Poker5 = {
                 // Player will be already flagged as inactive
                 break;
             case 'winner-designation':
-                player = message.players[message.player_id];
-                playerName = player.id == $('#current-player').data('id') ? 'You' : player.name;
-                this.log(playerName + " won!");
+                // @todo: Iterate through the winners of the current pot and display who won
                 break;
         }
     },
@@ -326,7 +322,10 @@ Poker5 = {
     updateGame: function(message) {
         this.gameId = message.game_id;
 
-        $('#pot').text(parseInt(message.pot));
+        $('#pot').empty();
+        for (potIndex in message.pots) {
+            $('#pot').append('<p>$' + parseInt(message.pots[potIndex].money + '</p>'));
+        }
 
         for (k in message.player_ids) {
             playerId = message.player_ids[k]
@@ -388,12 +387,16 @@ Poker5 = {
             $('.player[data-id="' + player.id + '"] .player-money').text("$" + parseInt(player.money));
             $('.player[data-id="' + player.id + '"] .bet').text("$" + parseInt(player.bet));
 
-            winner = message.event == 'winner-designation' && message.player_id == playerId;
+            winner = false;
+            if (message.event == 'winner-designation') {
+                potWinners = message.pots[message.pot].winner_ids;
+                winner = potWinners.indexOf(player.id) != -1;
+            }
             winner
                 ? $player.addClass('winner')
                 : $player.removeClass('winner');
 
-            alive = player.alive && (message.event != 'winner-designation' || message.player_id == playerId);
+            alive = player.alive;
             alive
                 ? $player.removeClass('inactive')
                 : $player.addClass('inactive');
