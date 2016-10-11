@@ -57,7 +57,7 @@ class TraditionalPokerGame(Game):
                     self._add_dead_player(player.id, "Not enough money to play this hand")
                 else:
                     player.take_money(self._blind)
-                    self._bets[player.id] = self._blind
+                    self._bets[player.id] += self._blind
         self._recalculate_pots()
 
     def _assign_cards(self):

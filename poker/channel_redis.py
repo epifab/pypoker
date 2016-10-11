@@ -24,17 +24,13 @@ class RedisListener():
         try:
             for message in self._pubsub.listen():
                 if message["type"] == "message":
-                    break
-        finally:
-            if timeout_epoch:
-                signal.alarm(0)
-
-        try:
-            # Deserialize and return the message
-            return json.loads(message["data"])
+                    return json.loads(message["data"])
         except ValueError:
             # Invalid json
             raise MessageFormatError(desc="Unable to decode the JSON message")
+        finally:
+            if timeout_epoch:
+                signal.alarm(0)
 
 
 class RedisPublisher():
@@ -49,19 +45,19 @@ class RedisPublisher():
         self._redis.publish(self._channel, msg_encoded)
 
 
-# class RedisPubSub(Channel):
-#     def __init__(self, redis, channel_in, channel_out):
-#         self._listener = RedisListener(redis, channel_in)
-#         self._publisher = RedisPublisher(redis, channel_out)
-#
-#     def close(self):
-#         self._listener.close()
-#
-#     def recv_message(self, timeout_epoch=None):
-#         return self._listener.recv_message(timeout_epoch)
-#
-#     def send_message(self, message):
-#         self._publisher.send_message(message)
+class RedisPubSub(Channel):
+    def __init__(self, redis, channel_in, channel_out):
+        self._listener = RedisListener(redis, channel_in)
+        self._publisher = RedisPublisher(redis, channel_out)
+
+    def close(self):
+        self._listener.close()
+
+    def recv_message(self, timeout_epoch=None):
+        return self._listener.recv_message(timeout_epoch)
+
+    def send_message(self, message):
+        self._publisher.send_message(message)
 
 
 class MessageQueue:

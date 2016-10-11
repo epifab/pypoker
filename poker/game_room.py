@@ -180,7 +180,6 @@ class GameRoom(Game.EventListener):
         finally:
             self._players_lock.release()
 
-
     def activate(self):
         self._active = True
         self._logger.info("{}: active".format(self))
