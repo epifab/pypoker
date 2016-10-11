@@ -5,11 +5,31 @@ import redis
 import signal
 import sys
 import time
+import uuid
 import os
 
 
 class InputTimeout(Exception):
     pass
+
+
+def format_cards(cards, compact=False):
+    if compact:
+        return u", ".join(
+            u"{} of {}".format(Card.RANKS[card.rank], Card.SUITS[card.suit])
+            for card in cards
+        )
+    else:
+        lines = [""] * 7
+        for card in cards:
+            lines[0] += u"+-------+"
+            lines[1] += u"| {:<2}    |".format(Card.RANKS[card.rank])
+            lines[2] += u"|       |"
+            lines[3] += u"|   {}   |".format(Card.SUITS[card.suit])
+            lines[4] += u"|       |"
+            lines[5] += u"|    {:>2} |".format(Card.RANKS[card.rank])
+            lines[6] += u"+-------+"
+        return u"\n".join(lines)
 
 
 class PlayerConsole(Player):
@@ -37,7 +57,7 @@ class PlayerConsole(Player):
         """Gives players the opportunity to discard some of their cards.
         Returns a tuple: (remaining cards, discards)."""
         print(str(self))
-        print(Card.format_cards(self._cards))
+        print(format_cards(self._cards))
 
         while True:
             try:
@@ -63,7 +83,10 @@ class PlayerConsole(Player):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
         print(str(self))
-        print(str(self._score))
+        print(u"{}\n({})".format(
+            format_cards(self._score.cards, compact=True),
+            Score.CATEGORIES[self._score.category]
+        ))
 
         if max_bet == -1:
             try:
@@ -111,7 +134,7 @@ class PlayerConsole(Player):
         pass
 
     def __str__(self):
-        return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money())
+        return "\n" + "{} ${:,.2f}".format(self.name, self.money)
 
 
 class PlayerClientConsole(PlayerConsole):
@@ -123,20 +146,23 @@ class PlayerClientConsole(PlayerConsole):
         """Assigns a list of cards to the player"""
         PlayerConsole.set_cards(self, cards, score)
         print(str(self))
-        print(str(self._score))
+        print(u"{} ({})".format(
+            Card.format_cards(self._score.cards, compact=True),
+            Score.CATEGORIES[self._score.category])
+        )
 
     def change_cards(self, timeout_epoch):
         """Gives players the opportunity to discard some of their cards.
         Returns a list of discarded cards."""
         discard_keys, discards = PlayerConsole.change_cards(self, timeout_epoch)
-        self.send_message({'msg_id': 'change-cards', 'cards': discard_keys})
+        self.send_message({'message_type': 'change-cards', 'cards': discard_keys})
         return discard_keys, discards
 
     def bet(self, min_bet, max_bet, opening, timeout_epoch):
         """Bet handling.
         Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
         bet = PlayerConsole.bet(self, min_bet, max_bet, opening, timeout_epoch)
-        self.send_message({'msg_id': 'bet', 'bet': bet})
+        self.send_message({'message_type': 'bet', 'bet': bet})
 
     def try_send_message(self, message):
         try:
@@ -152,7 +178,7 @@ class PlayerClientConsole(PlayerConsole):
         return self._server.recv_message()
 
     def __str__(self):
-        return "\n" + "{} ${:,.2f}".format(self.get_name(), self.get_money())
+        return "\n" + "{} ${:,.2f}".format(self.name, self.money)
 
 
 class GameClientConsole:
@@ -163,22 +189,22 @@ class GameClientConsole:
         while True:
             message = self._player.recv_message()
 
-            if message["msg_id"] == "disconnect":
-                print()
+            if message["message_type"] == "disconnect":
+                print("")
                 print("#" * 80)
-                print()
+                print("")
                 print("DISCONNECTING")
-                print()
+                print("")
                 print("#" * 80)
-                print()
+                print("")
                 break
 
-            elif message["msg_id"] == "game-update":
+            elif message["message_type"] == "game-update":
                 self._print_game_update(message)
                 if message["event"] == "player-action":
-                    action_player = message["players"][message["player"]]
+                    action_player = message["players"][message["player_id"]]
 
-                    if action_player["id"] == self._player.get_id():
+                    if action_player["id"] == self._player.id:
                         timeout_epoch = time.time() + message["timeout"]
 
                         try:
@@ -186,7 +212,7 @@ class GameClientConsole:
                                 self._player.bet(
                                     min_bet=message["min_bet"],
                                     max_bet=message["max_bet"],
-                                    opening=message["opening"],
+                                    opening=message.has_key("opening") and message["opening"],
                                     timeout_epoch=timeout_epoch
                                 )
                             elif message["action"] == "change-cards":
@@ -196,15 +222,15 @@ class GameClientConsole:
                     else:
                         print("Waiting for {}...".format(action_player["name"]))
 
-            elif message["msg_id"] == "set-cards":
+            elif message["message_type"] == "set-cards":
                 cards = [Card(rank, suit) for rank, suit in message["cards"]]
                 score = Score(message["score"]["category"],
                               [Card(rank, suit) for rank, suit in message["score"]["cards"]])
                 self._player.set_cards(cards, score)
                 print(Card.format_cards(cards))
 
-            elif message["msg_id"] == "ping":
-                self._player.send_message({"msg_id": "ping"})
+            elif message["message_type"] == "ping":
+                self._player.send_message({"message_type": "pong"})
 
     def _print_player(self, player):
         print("Player '{}'\n Cash: ${:,.2f}\n Bets: ${:,.2f}".format(
@@ -219,11 +245,11 @@ class GameClientConsole:
             cards = [Card(rank, suit) for (rank, suit) in player["score"]["cards"]]
             score = Score(category=category, cards=cards)
 
-        elif player["id"] == self._player.get_id():
-            score = self._player.get_score()
+        elif player["id"] == self._player.id:
+            score = self._player.score
 
         if score:
-            print(Card.format_cards(score.get_cards()))
+            print(Card.format_cards(score.cards))
         else:
             print("+-------+" * 5)
             print("| ///// |" * 5)
@@ -234,62 +260,66 @@ class GameClientConsole:
             print("+-------+" * 5)
 
     def _print_game_update(self, message):
-        print()
+        print("")
         print("~" * 45)
 
         if message["event"] == "new-game":
-            print()
+            print("")
             print("#" * 80)
-            print()
+            print("")
             print("NEW GAME")
-            print()
+            print("")
             print("#" * 80)
-            print()
+            print("")
 
         elif message["event"] == "game-over":
-            print()
+            print("")
             print("#" * 80)
-            print()
+            print("")
             print("GAME OVER")
-            print()
+            print("")
             print("#" * 80)
-            print()
+            print("")
 
         elif message["event"] == "cards-assignment":
             print("NEW HAND")
-            print()
+            print("")
             print("~" * 45)
-            for player in message["players"]:
+            for player in message["players"].values():
                 self._print_player(player)
 
         elif message["event"] == "bet":
-            player_name = message["players"][message["player"]]["name"]
+            player_name = message["players"][message["player_id"]]["name"]
             if message["bet_type"] == "raise":
                 print("Player '{}' bet ${:,.2f} RAISE".format(player_name, message["bet"], message["bet_type"]))
             else:
                 print("Player '{}' {}".format(player_name, message["bet_type"]))
 
         elif message["event"] == "cards-change":
-            player_name = message["players"][message["player"]]["name"]
+            player_name = message["players"][message["player_id"]]["name"]
             print("Player '{}' changed {} cards".format(player_name, message["num_cards"]))
 
         elif message["event"] == "winner-designation":
-            for player in message["players"]:
+            for player in message["players"].values():
                 self._print_player(player)
 
-            player_name = message["players"][message["player"]]["name"]
-            print()
+            pot = message["pots"][message["pot"]]
+
+            print("")
             print("~" * 45)
-            print("Player '{}' WON!!!".format(player_name))
+            for winner_id in pot["winner_ids"]:
+                winner_name = message["players"][winner_id]["name"]
+                print("Player '{}' WON!!!".format(winner_name))
             print("~" * 45)
-            print()
+            print("")
             print("Waiting...")
         else:
-            print()
+            print("")
             print("~" * 45)
-            print("Pot: ${:,.2f}".format(message["pot"]))
+            for pot in message["pots"]:
+                print("Pot: ${:,.2f}".format(pot["money"]))
             print("~" * 45)
-            print()
+            print("")
             print("Waiting...")
 
 
@@ -297,42 +327,44 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG if 'DEBUG' in os.environ else logging.INFO)
     logger = logging.getLogger()
 
-    server_id = "VEGAS"
+    session_id = str(uuid.uuid4())
 
-    player_id = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
+    player_id = str(uuid.uuid4())
     player_name = sys.argv[1]
     player_money = 1000.0
 
     redis_url = "redis://localhost" if "REDIS_URL" not in os.environ else os.environ["REDIS_URL"]
     redis = redis.from_url(redis_url)
 
-    connection_request = RedisPublisher(redis, "poker5:server:{}".format(server_id))
-    connection_request.send_message({
-        "msg_id": "connect",
-        "player": {
-            "id": player_id,
-            "name": player_name,
-            "money": player_money
-        }
-    })
-
-    server_channel = Chan(
-        RedisMessageReader(redis, "poker5:server-{}:player-{}:R".format(server_id, player_id)),
-        RedisMessageWriter(redis, "poker5:server-{}:player-{}:L".format(server_id, player_id)),
+    server_channel = ChannelRedis(
+        redis,
+        "poker5:player-{}:session-{}:O".format(player_id, session_id),
+        "poker5:player-{}:session-{}:I".format(player_id, session_id)
     )
 
-    connection_response = server_channel.recv_message(time.time() + 1)
-    MessageFormatError.validate_msg_id(connection_response, "connect")
+    message_queue = MessageQueue(redis)
 
-    # host = "localhost" if "POKER5_HOST" not in os.environ else os.environ["POKER5_HOST"]
-    # port = 9000 if "POKER5_PORT" not in os.environ else os.environ["POKER5_PORT"]
-    # server_address = (host, port)
-    #
-    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # sock.connect(server_address)
-    # logger.info("Connection established with the Poker5 server at {}".format(server_address))
-    #
-    # server_channel = SocketChannel(sock, server_address)
+    message_queue.push(
+        "poker5:lobby",
+        {
+            "message_type": "connect",
+            "player": {
+                "id": player_id,
+                "name": player_name,
+                "money": player_money
+            },
+            "session_id": session_id
+        }
+    )
+
+    connection_message = server_channel.recv_message(time.time() + 5)  # 5 seconds
+
+    # Validating message id
+    MessageFormatError.validate_message_type(connection_message, "connect")
+
+    server_id = str(connection_message["server_id"])
+
+    print("player {}: connected to server {}".format(player_id, server_id))
 
     player = PlayerClientConsole(
                 server_channel,
@@ -342,7 +374,7 @@ if __name__ == "__main__":
 
     game = GameClientConsole(player)
 
-    logger.info("Player {} '{}' ${:,.2f} CONNECTED".format(player.get_id(), player.get_name(), player.get_money()))
+    logger.info("Player {} '{}' ${:,.2f} CONNECTED".format(player.id, player.name, player.money))
 
     try:
         game.play()

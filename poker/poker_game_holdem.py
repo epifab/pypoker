@@ -1,8 +1,6 @@
-from . import Game, GameFactory, Card, Deck, ScoreDetector, EndGameException, \
-    ChannelError, MessageTimeout, MessageFormatError
+from . import Game, GameFactory, Deck, ScoreDetector, EndGameException, ChannelError
 import gevent
 import logging
-import time
 
 
 class HoldEmPokerGameFactory(GameFactory):

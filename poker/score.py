@@ -17,7 +17,8 @@ class Score:
         5: "Full House",
         6: "Flush",
         7: "Four of a Kind",
-        8: "Straight Flush"}
+        8: "Straight Flush",
+    }
 
     def __init__(self, category, cards):
         self._category = category
@@ -100,9 +101,6 @@ class Score:
     @staticmethod
     def _straight_is_max(straight_sequence):
         return straight_sequence[0].rank == 14
-
-    def __str__(self):
-        return str(self._cards) + " (" + Score.CATEGORIES[self.category] + ")"
 
     def dto(self):
         return {"category": self.category,
