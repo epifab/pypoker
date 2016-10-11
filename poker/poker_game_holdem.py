@@ -1,4 +1,4 @@
-from . import Game, GameFactory, Deck, ScoreDetector, EndGameException, ChannelError
+from . import Game, GameFactory, Deck, HoldemPokerScoreDetector, EndGameException, ChannelError
 import gevent
 import logging
 
@@ -14,7 +14,7 @@ class HoldEmPokerGameFactory(GameFactory):
             players=players,
             dealer_id=dealer_id,
             deck=Deck(2),
-            score_detector=ScoreDetector(2),
+            score_detector=HoldemPokerScoreDetector(),
             small_blind=self._small_blind,
             big_blind=self._big_blind,
             logger=self._logger

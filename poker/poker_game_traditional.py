@@ -1,4 +1,4 @@
-from . import Game, GameFactory, Card, Deck, ScoreDetector, EndGameException, \
+from . import Game, GameFactory, Card, Deck, TraditionalPokerScoreDetector, EndGameException, \
     ChannelError, MessageTimeout, MessageFormatError
 import gevent
 import time
@@ -22,7 +22,7 @@ class TraditionalPokerGameFactory(GameFactory):
             players=players,
             dealer_id=dealer_id,
             deck=Deck(lowest_rank),
-            score_detector=ScoreDetector(lowest_rank),
+            score_detector=TraditionalPokerScoreDetector(lowest_rank),
             blind=self._blind,
             logger=self._logger
         )
