@@ -2,15 +2,17 @@ import random
 from . import Card
 
 
-class Deck:
+class DeckFactory:
     def __init__(self, lowest_rank):
         self._lowest_rank = lowest_rank
-        self._cards = None
-        self._discard = None
 
-    def initialize(self):
-        """Creates and shuffle cards"""
-        self._cards = [Card(rank, suit) for rank in range(self._lowest_rank, 15) for suit in range(0, 4)]
+    def create_deck(self):
+        return Deck(self._lowest_rank)
+
+
+class Deck:
+    def __init__(self, lowest_rank):
+        self._cards = [Card(rank, suit) for rank in range(lowest_rank, 15) for suit in range(0, 4)]
         self._discard = []
         random.shuffle(self._cards)
 

@@ -1,4 +1,4 @@
-from . import Game, GameFactory, Card, Deck, TraditionalPokerScoreDetector, EndGameException, \
+from . import Game, GameFactory, Card, DeckFactory, TraditionalPokerScoreDetector, EndGameException, \
     ChannelError, MessageTimeout, MessageFormatError
 import gevent
 import time
@@ -21,7 +21,7 @@ class TraditionalPokerGameFactory(GameFactory):
         return TraditionalPokerGame(
             players=players,
             dealer_id=dealer_id,
-            deck=Deck(lowest_rank),
+            deck_factory=DeckFactory(lowest_rank),
             score_detector=TraditionalPokerScoreDetector(lowest_rank),
             blind=self._blind,
             logger=self._logger
@@ -29,7 +29,7 @@ class TraditionalPokerGameFactory(GameFactory):
 
 
 class TraditionalPokerGame(Game):
-    def __init__(self, players, deck, score_detector, blind=10.0, dealer_id=None, logger=None):
+    def __init__(self, players, deck_factory, score_detector, blind=10.0, dealer_id=None, logger=None):
         Game.__init__(
             self,
             score_detector=score_detector,
@@ -37,7 +37,8 @@ class TraditionalPokerGame(Game):
             dealer_id=dealer_id,
             logger=logger
         )
-        self._deck = deck
+        self._deck_factory = deck_factory
+        self._deck = None
         # List of minimum scores required for very first bet (pair of J, Q, K, A)
         self._min_opening_scores = [score_detector.get_score([Card(r, 0), Card(r, 1)]) for r in [11, 12, 13, 14]]
         # Players whose score exceed the minimum opening score required for the current hand
@@ -229,7 +230,7 @@ class TraditionalPokerGame(Game):
     def play_hand(self):
         try:
             # Initialization
-            self._deck.initialize()
+            self._deck = self._deck_factory.create_deck()
             self._player_ids_allowed_to_open = set()
 
             self._check_active_players()

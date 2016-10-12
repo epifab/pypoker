@@ -1,5 +1,5 @@
 from .card import Card
-from .deck import Deck
+from .deck import DeckFactory, Deck
 from .score_detector import TraditionalPokerScoreDetector, TraditionalPokerScore, \
     HoldemPokerScoreDetector, HoldemPokerScore
 from .channel import Channel, ChannelError, MessageTimeout, MessageFormatError

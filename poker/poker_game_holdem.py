@@ -1,4 +1,4 @@
-from . import Game, GameFactory, Deck, HoldemPokerScoreDetector, EndGameException, ChannelError
+from . import Game, GameFactory, DeckFactory, HoldemPokerScoreDetector, EndGameException, ChannelError
 import gevent
 import logging
 
@@ -13,7 +13,7 @@ class HoldEmPokerGameFactory(GameFactory):
         return HoldEmPokerGame(
             players=players,
             dealer_id=dealer_id,
-            deck=Deck(2),
+            deck_factory=DeckFactory(2),
             score_detector=HoldemPokerScoreDetector(),
             small_blind=self._small_blind,
             big_blind=self._big_blind,
@@ -22,7 +22,7 @@ class HoldEmPokerGameFactory(GameFactory):
 
 
 class HoldEmPokerGame(Game):
-    def __init__(self, players, deck, score_detector, small_blind, big_blind, dealer_id=None, logger=None):
+    def __init__(self, players, deck_factory, score_detector, small_blind, big_blind, dealer_id=None, logger=None):
         Game.__init__(
             self,
             score_detector=score_detector,
@@ -30,7 +30,8 @@ class HoldEmPokerGame(Game):
             dealer_id=dealer_id,
             logger=logger
         )
-        self._deck = deck
+        self._deck_factory = deck_factory
+        self._deck = None
         # Players who must show their cards at the end of the game
         self._player_ids_show_cards = set()
         self._small_blind = small_blind
@@ -87,7 +88,7 @@ class HoldEmPokerGame(Game):
     def play_hand(self):
         try:
             # Initialization
-            self._deck.initialize()
+            self._deck = self._deck_factory.create_deck()
             self._shared_cards = []
 
             self._check_active_players()
