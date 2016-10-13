@@ -1,23 +1,14 @@
-from . import Player, MessageFormatError, ChannelError, MessageTimeout
+from . import MessageFormatError, ChannelError, MessageTimeout
 import logging
 import time
 
 
-class PlayerServer(Player):
-    def __init__(self, channel, id, name, money, logger=None):
-        Player.__init__(self, id=id, name=name, money=money)
+class PlayerServer:
+    def __init__(self, player, channel, logger=None):
+        self._player = player
         self._channel = channel
         self._connected = True
         self._logger = logger if logger else logging
-
-    def dto(self, with_score=False):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "money": self.money,
-            "score": self.score.dto() if with_score else None,
-            "cards": [card.dto() for card in self.cards] if with_score else None,
-        }
 
     def disconnect(self):
         """Disconnect the client"""
@@ -25,6 +16,21 @@ class PlayerServer(Player):
             self.try_send_message({"message_type": "disconnect"})
             self._channel.close()
             self._connected = False
+
+    @property
+    def id(self):
+        return self._player.id
+
+    @property
+    def name(self):
+        return self._player.name
+
+    @property
+    def money(self):
+        return self._player.money
+
+    def __str__(self):
+        return str(self._player)
 
     @property
     def channel(self):
