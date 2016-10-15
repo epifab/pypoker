@@ -1,4 +1,4 @@
-from . import GameServer, PlayerServer, \
+from . import GameServer, Player, PlayerServer, \
     MessageQueue, ChannelRedis, MessageFormatError
 
 
@@ -51,10 +51,10 @@ class GameServerRedis(GameServer):
                     "poker5:player-{}:session-{}:I".format(player_id, session_id),
                     "poker5:player-{}:session-{}:O".format(player_id, session_id)
                 ),
+                logger=self._logger,
                 id=player_id,
                 name=player_name,
                 money=player_money,
-                logger=self._logger
             )
 
             # Acknowledging the connection

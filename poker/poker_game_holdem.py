@@ -1,160 +1,182 @@
-from . import Game, GameFactory, DeckFactory, HoldemPokerScoreDetector, EndGameException, ChannelError
+from . import DeckFactory, HoldemPokerScoreDetector
+from poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher
 import gevent
-import logging
 
 
-class HoldEmPokerGameFactory(GameFactory):
-    def __init__(self, small_blind=10.0, big_blind=20.0, logger=None):
-        self._small_blind = small_blind
+class HoldemPokerGameFactory(GameFactory):
+    def __init__(self, big_blind, small_blind):
         self._big_blind = big_blind
-        self._logger = logger if logger else logging
+        self._small_blind = small_blind
 
-    def create_game(self, players, dealer_id):
-        return HoldEmPokerGame(
-            players=players,
-            dealer_id=dealer_id,
+    def create_game(self, players):
+        return HoldemPokerGame(
+            self._big_blind,
+            self._small_blind,
+            game_players=GamePlayers(players),
+            event_dispatcher=GameEventDispatcher(),
             deck_factory=DeckFactory(2),
-            score_detector=HoldemPokerScoreDetector(),
-            small_blind=self._small_blind,
-            big_blind=self._big_blind,
-            logger=self._logger
+            score_detector=HoldemPokerScoreDetector()
         )
 
 
-class HoldEmPokerGame(Game):
-    def __init__(self, players, deck_factory, score_detector, small_blind, big_blind, dealer_id=None, logger=None):
-        Game.__init__(
-            self,
-            score_detector=score_detector,
-            players=players,
-            dealer_id=dealer_id,
-            logger=logger
+class HoldemPokerGameEventDispatcher(GameEventDispatcher):
+    def new_game_event(self, game_id, players, dealer_id, blind_bets):
+        self.raise_event(
+            "new-game",
+            {
+                "game_id": game_id,
+                "game_type": "texas-holdem",
+                "player_ids": [player.id for player in players],
+                "dealer_id": dealer_id,
+                "blind_bets": blind_bets
+            }
         )
-        self._deck_factory = deck_factory
-        self._deck = None
-        # Players who must show their cards at the end of the game
-        self._player_ids_show_cards = set()
+
+    def game_over_event(self):
+        self.raise_event(
+            "game-over",
+            {}
+        )
+
+    def shared_cards_event(self, cards):
+        self.raise_event(
+            "shared-cards",
+            {
+                "cards": [card.dto() for card in cards]
+            }
+        )
+
+
+class HoldemPokerGame(PokerGame):
+    TIMEOUT_TOLERANCE = 2
+    BET_TIMEOUT = 30
+
+    WAIT_AFTER_CARDS_ASSIGNMENT = 0
+    WAIT_AFTER_BET = 2
+    WAIT_AFTER_WINNER_DESIGNATION = 5
+    WAIT_AFTER_HAND = 0
+
+    def __init__(self, small_blind, big_blind, *args, **kwargs):
+        PokerGame.__init__(self, *args, **kwargs)
         self._small_blind = small_blind
         self._big_blind = big_blind
-        self._shared_cards = []
 
-    def _collect_blinds(self):
+    def _add_shared_cards(self, new_shared_cards, scores):
+        self._event_dispatcher.shared_cards_event(new_shared_cards)
+        # Adds the new shared cards
+        scores.add_shared_cards(new_shared_cards)
+        # Broadcasts players their up-to-date score
+        for player in self._game_players.active:
+            self._send_player_score(player, scores)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Blinds
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _collect_blinds(self, dealer_id):
         # Kicking out players with no money
-        for player in self._players.values():
+        for player in self._game_players.active:
             if player.money < self._big_blind:
-                self._add_dead_player(player.id, "Not enough money to play this hand")
+                self._event_dispatcher.dead_player_event(player, "Not enough money")
+                self._game_players.remove(player.id)
 
-        player_ids = [player_id for player_id, _ in self._active_players_round(self._dealer_id)]
-        player_ids.reverse()
+        if self._game_players.count_active() < 2:
+            raise GameError("Not enough players")
 
-        self._players[player_ids[0]].take_money(self._big_blind)
-        self._bets[player_ids[0]] -= self._big_blind
+        active_players = self._game_players.round(dealer_id)
 
-        self._players[player_ids[1]].take_money(self._small_blind)
-        self._bets[player_ids[1]] -= self._small_blind
+        bb_player = active_players[-1]
+        bb_player.take_money(self._big_blind)
 
-        self._recalculate_pots()
+        sb_player = active_players[-2]
+        sb_player.take_money(self._small_blind)
 
-    def _assign_cards(self):
-        # Assign cards
-        for player_id, player in self._active_players_round(self._dealer_id):
-            # Distribute cards
-            cards = self._deck.pop_cards(2)
-            score = self._score_detector.get_score(cards)
+        return {
+            bb_player.id: self._big_blind,
+            sb_player.id: self._small_blind
+        }
 
-            try:
-                player.set_cards(cards, score)
-                self.init_player_hand(player)
-            except ChannelError as e:
-                self._logger.info("{}: {} error: {}".format(self, player, e.args[0]))
-                self._add_dead_player(player_id, e.args[0])
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Game logic
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        self._raise_event(Game.Event.CARDS_ASSIGNMENT)
+    def play_hand(self, dealer_id):
 
-    def init_player_hand(self, player):
-        player.send_message({
-            "message_type": "set-cards",
-            "cards": [card.dto() for card in player.score.cards],
-            "score": player.score.dto(),
-        })
+        def bet_rounder(dealer_id, pots, scores, blind_bets):
+            skip_next_rounds = False
+            bets = blind_bets
 
-    def _add_shared_cards(self, number_of_cards):
-        self._shared_cards.append(self._deck.pop_cards(number_of_cards))
-        for player in self._players.values():
-            cards = player.cards
-            score = self._score_detector.get_score(cards + self._shared_cards)
-            player.set_cards(cards, score)
+            while True:
+                if skip_next_rounds:
+                    yield False
 
-    def play_hand(self):
+                # Bet round
+                self._bet_handler.bet_round(dealer_id, bets, pots)
+                gevent.sleep(self.WAIT_AFTER_BET)
+
+                # Only the pre-flop bet has blind bets
+                bets = {}
+
+                # Not fun to play alone
+                if self._game_players.count_active() < 2:
+                    raise EndGameException
+
+                # If everyone is all-in (possibly except 1 player) then showdown and skip next bet rounds
+                skip_next_rounds = self._game_players.count_active_with_money() < 2
+                if skip_next_rounds:
+                    self._showdown(scores)
+
+                yield skip_next_rounds
+
+        # Initialization
+        self._game_players.reset()
+        deck = self._deck_factory.create_deck()
+        scores = self._create_scores()
+        pots = self._create_pots()
+
+        # Collecting small and big blinds
+        blind_bets = self._collect_blinds(dealer_id)
+
+        # Initializing a bet rounder
+        bet_rounds = bet_rounder(dealer_id, pots, scores, blind_bets)
+
+        self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id, blind_bets)
+
+        # Cards assignment
+        self._assign_cards(2, deck, dealer_id, scores)
+        gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+
         try:
-            # Initialization
-            self._deck = self._deck_factory.create_deck()
-            self._shared_cards = []
-
-            self._check_active_players()
-
-            # Initial bet for every player
-            self._collect_blinds()
-
-            # Cards assignment
-            self._logger.info("{}: [[cards assignment]]".format(self))
-            self._assign_cards()
-            gevent.sleep(Game.WAIT_AFTER_CARDS_ASSIGNMENT)
-
-            # Pre-flop
-            self._logger.info("{}: [[pre-flop bet]]".format(self))
-            self._bet_round(self._dealer_id, self._bets)
-            gevent.sleep(Game.WAIT_AFTER_BET)
+            # Pre-flop bet round
+            bet_rounds.next()
 
             # Flop
-            self._logger.info("{}: [[flop]]".format(self))
-            self._add_shared_cards(3)
-            self._bet_round(self._dealer_id, self._bets)
-            gevent.sleep(Game.WAIT_AFTER_BET)
+            self._add_shared_cards(deck.pop_cards(3), scores)
+            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+
+            # Flop bet round
+            bet_rounds.next()
 
             # Turn
-            self._logger.info("{}: [[turn]]".format(self))
-            self._add_shared_cards(1)
-            self._bet_round(self._dealer_id, self._bets)
-            gevent.sleep(Game.WAIT_AFTER_BET)
+            self._add_shared_cards(deck.pop_cards(1), scores)
+            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+
+            # Turn bet round
+            bet_rounds.next()
 
             # River
-            self._logger.info("{}: [[river]]".format(self))
-            self._add_shared_cards(1)
-            self._bet_round(self._dealer_id, self._bets)
-            gevent.sleep(Game.WAIT_AFTER_BET)
+            self._add_shared_cards(deck.pop_cards(1), scores)
+            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
 
-            # Winner detection
+            # River bet round
+            bet_rounds.next()
+
             raise EndGameException
 
         except EndGameException:
-            self._logger.info("{}: [[winners detection]]".format(self))
-            if len(self._player_ids) - len(self._folder_ids) > 1:
-                self._player_ids_show_cards = set(
-                    player_id
-                    for player_id in self._player_ids
-                    if player_id not in self._folder_ids
-                )
-            self._detect_winners()
-            gevent.sleep(self.WAIT_AFTER_WINNER_DESIGNATION)
-            self._folder_ids = set(self._dead_player_ids)
-            self._dealer_id = self._next_active_player_id(self._dealer_id)
+            if self._game_players.count_active() > 1:
+                self._showdown(scores)
+            self._detect_winners(pots, scores)
             gevent.sleep(self.WAIT_AFTER_HAND)
 
-    def dto(self):
-        game_dto = {
-            "game_id": self._id,
-            "players": {},
-            "player_ids": self._player_ids,
-            "pots": self._pots,
-            "dealer_id": self._dealer_id,
-            "shared_cards": [card.dto() for card in self._shared_cards],
-        }
-
-        for player in self._players.values():
-            player_dto = player.dto(with_score=player.id in self._player_ids_show_cards)
-            player_dto["alive"] = player.id not in self._folder_ids
-            player_dto["bet"] = self._bets[player.id]
-            game_dto["players"][player.id] = player_dto
-
-        return game_dto
+        self._event_dispatcher.game_over_event()

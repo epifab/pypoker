@@ -1,8 +1,7 @@
-from . import Card, ChannelError, MessageTimeout, MessageFormatError
+from . import ChannelError, MessageTimeout, MessageFormatError
 import gevent
-import logging
-import uuid
 import time
+import uuid
 
 
 class GameError(Exception):
@@ -14,367 +13,555 @@ class EndGameException(Exception):
 
 
 class GameFactory:
-    def create_game(self, players, dealer_id):
+    def create_game(self, players):
         raise NotImplemented
 
 
-class Game:
-    WAIT_AFTER_CARDS_ASSIGNMENT = 1
-    WAIT_AFTER_CARDS_CHANGE = 0
-    WAIT_AFTER_BET = 0
-    WAIT_AFTER_WINNER_DESIGNATION = 2
-    WAIT_AFTER_HAND = 4
+class GameEventDispatcher:
+    def __init__(self):
+        self._subscribers = []
 
-    CHANGE_CARDS_TIMEOUT = 45
-    BET_TIMEOUT = 45
-    TIMEOUT_TOLERANCE = 2
+    def subscribe(self, subscriber):
+        self._subscribers.append(subscriber)
 
-    class Event:
-        NEW_GAME = "new-game"
-        GAME_OVER = "game-over"
-        CARDS_ASSIGNMENT = "cards-assignment"
-        PLAYER_ACTION = "player-action"
-        DEAD_PLAYER = "dead-player"
-        BET = "bet"
-        CARDS_CHANGE = "cards-change"
-        DEAD_HAND = "dead-hand"
-        WINNER_DESIGNATION = "winner-designation"
+    def unsubscribe(self, subscriber):
+        self._subscribers.remove(subscriber)
 
-    class EventListener:
-        def game_event(self, event, event_data, game_data):
-            raise NotImplemented
+    def raise_event(self, event, event_data):
+        gevent.joinall([
+            gevent.spawn(subscriber.game_event, event, event_data)
+            for subscriber in self._subscribers
+        ])
 
-    def __init__(self, players, score_detector, dealer_id=None, logger=None):
-        self._id = str(uuid.uuid4())
-        self._score_detector = score_detector
-        self._logger = logger if logger else logging
+    def pots_update_event(self, players, pots):
+        self.raise_event(
+            "pots-update",
+            {
+                "pots": [
+                    {
+                        "money": pot.money,
+                        "player_ids": [player.id for player in pot.players],
+                    }
+                    for pot in pots
+                ],
+                "players": {player.id: player.dto() for player in players}
+            }
+        )
+
+    def winner_designation_event(self, players, pot, winners, money_split, upcoming_pots):
+        self.raise_event(
+            "winner-designation",
+            {
+                "pot": {
+                    "money": pot.money,
+                    "player_ids": [player.id for player in pot.players],
+                    "winner_ids": [winner.id for winner in winners],
+                    "money_split": money_split
+                },
+                "pots": [
+                    {
+                        "money": upcoming_pot.money,
+                        "player_ids": [player.id for player in upcoming_pot.players]
+                    }
+                    for upcoming_pot in upcoming_pots
+                ],
+                "players": {player.id: player.dto() for player in players}
+            }
+        )
+
+    def bet_action_event(self, player, min_bet, max_bet, timeout, timeout_epoch):
+        self.raise_event(
+            "player-action",
+            {
+                "action": "bet",
+                "player": player.dto(),
+                "min_bet": min_bet,
+                "max_bet": max_bet,
+                "timeout": timeout,
+                "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
+            }
+        )
+
+    def bet_event(self, player, bet, bet_type, bets):
+        self.raise_event(
+            "bet",
+            {
+                "player": player.dto(),
+                "bet": bet,
+                "bet_type": bet_type,
+                "bets": bets
+            }
+        )
+
+    def dead_player_event(self, player):
+        self.raise_event(
+            "dead-player",
+            {
+                "player": player.dto()
+            }
+        )
+
+    def fold_event(self, player):
+        self.raise_event(
+            "fold",
+            {
+                "player": player.dto()
+            }
+        )
+
+    def showdown_event(self, players, scores):
+        self.raise_event(
+            "showdown",
+            {
+                "players": {
+                    player.id: {
+                        "cards": [card.dto() for card in scores.player_cards(player.id)],
+                        "score": scores.player_score(player.id).dto(),
+                    }
+                    for player in players
+                }
+            }
+        )
+
+
+class GamePlayers:
+    def __init__(self, players):
         # Dictionary of players keyed by their ids
         self._players = {player.id: player for player in players}
         # List of player ids sorted according to the original players list
         self._player_ids = [player.id for player in players]
-        # Current dealer
-        self._dealer_id = dealer_id if dealer_id else self._player_ids[0]
-        # Players who fold
+        # List of folder ids
         self._folder_ids = set()
-        # Players who timed out or died
+        # Dead players
         self._dead_player_ids = set()
-        # Game event subscribers
-        self._event_subscribers = set()
-        # Bets and pots
-        self._bets = {player_id: 0.0 for player_id in self._player_ids}
-        self._pots = []
 
-    def __str__(self):
-        return "game {}".format(self._id)
-
-    def subscribe(self, subscriber):
-        self._event_subscribers.add(subscriber)
-
-    def unsubscribe(self, subscriber):
-        self._event_subscribers.remove(subscriber)
-
-    def play_game(self):
-        self._raise_event(Game.Event.NEW_GAME)
-        try:
-            self.play_hand()
-        finally:
-            self._raise_event(Game.Event.GAME_OVER)
-
-    def play_hand(self):
-        raise NotImplemented
-
-    def init_player_hand(self, player):
-        raise NotImplemented
-
-    def dto(self):
-        raise NotImplemented
-
-    def _add_dead_player(self, player_id, error_message):
-        player = self._players[player_id]
-        self._logger.info("{}: {} error: {}".format(self, player, error_message))
-        player.try_send_message({"message_type": "error", "error": error_message})
-        self._dead_player_ids.add(player_id)
-        self._raise_event(Game.Event.DEAD_PLAYER, {"player_id": player_id})
-        self._add_folder(player_id)
-
-    def _add_folder(self, player_id):
+    def fold(self, player_id):
         self._folder_ids.add(player_id)
-        self._check_active_players()
 
-    def _check_active_players(self):
-        active_player_ids = [player_id for player_id in self._player_ids if player_id not in self._folder_ids]
-        if len(active_player_ids) == 0:
-            raise GameError("No active players")
-        elif len(active_player_ids) == 1:
-            # Not fun to play alone
-            raise EndGameException()
+    def remove(self, player_id):
+        self.fold(player_id)
+        self._dead_player_ids.add(player_id)
 
-    def _active_players_round(self, start_player_id):
+    def reset(self):
+        self._folder_ids = set(self._dead_player_ids)
+
+    def round(self, start_player_id, reverse=False):
         start_item = self._player_ids.index(start_player_id)
+        step_multiplier = -1 if reverse else 1
         for i in range(len(self._player_ids)):
-            next_item = (i + start_item) % len(self._player_ids)
+            next_item = (start_item + (i * step_multiplier)) % len(self._player_ids)
             player_id = self._player_ids[next_item]
             if player_id not in self._folder_ids:
-                yield player_id, self._players[player_id]
+                yield self._players[player_id]
         raise StopIteration
 
-    def _next_active_player_id(self, start_player_id):
-        start_item = self._player_ids.index(start_player_id)
-        for i in range(len(self._player_ids)):
-            next_item = (i + start_item + 1) % len(self._player_ids)
-            player_id = self._player_ids[next_item]
-            if player_id not in self._folder_ids:
-                return player_id
+    # def rounder(self, start_player_id):
+    #     def decorator(action):
+    #         def perform():
+    #             start_item = self._player_ids.index(start_player_id)
+    #             try:
+    #                 while True:
+    #                     player_id = self._player_ids[start_item]
+    #                     if player_id not in self._folder_ids:
+    #                         action(self._players[player_id])
+    #                     start_item = (start_item + 1) % len(self._player_ids)
+    #             except StopIteration:
+    #                 pass
+    #         return perform
+    #     return decorator
+
+    def get_next(self, player_id):
+        if player_id in self._folder_ids:
+            raise ValueError("Inactive player")
+        start_item = self._player_ids.index(player_id)
+        for i in range(len(self._player_ids) - 1):
+            next_index = (start_item + i + 1) % len(self._player_ids)
+            next_id = self._player_ids[next_index]
+            if next_id not in self._folder_ids:
+                return self._players[next_id]
         return None
 
-    def _bet_round(self, dealer_id, bets):
-        """Do a bet round. Returns the id of the player who made the strongest bet first."""
+    def get_previous(self, player_id):
+        if player_id in self._folder_ids:
+            raise ValueError("Inactive player")
+        start_index = self._player_ids.index(player_id)
+        for i in range(len(self._player_ids) - 1):
+            previous_index = (start_index - i - 1) % len(self._player_ids)
+            previous_id = self._player_ids[previous_index]
+            if previous_id not in self._folder_ids:
+                return self._players[previous_id]
+        return None
 
-        player_ids = [player_id for player_id, _ in self._active_players_round(dealer_id)]
-        dealer_id = player_ids[0]  # Ensure the current dealer is an active player
-        player_ids.reverse()
-        for k, player_id in enumerate(player_ids):
-            if not bets.has_key(player_id):
-                bets[player_id] = 0.0
-            elif bets[player_id] < 0.0 or (k > 0 and bets[player_id] > bets[player_ids[k - 1]]):
-                # Ensuring the bets dictionary makes sense
-                raise ValueError("Invalid bets dictionary")
+    def is_active(self, player_id):
+        return player_id not in self._folder_ids
 
-        # The player seated immediately before the dealer made the strongest bet (if any bet was made)
-        best_player_id = player_ids[0] if bets[player_ids[0]] > 0.0 else None
+    def count_active(self):
+        return len(self._player_ids) - len(self._folder_ids)
 
-        while dealer_id != best_player_id:
+    def count_active_with_money(self):
+        return len(filter(lambda player: player.money > 0, self.active))
 
-            if len(self._player_ids) - len(self._folder_ids) == 1:
-                # Only one player left, break and do not ask for a bet
-                # This can happen if during a bet round everybody fold and only the last player was left
-                raise EndGameException
+    @property
+    def all(self):
+        return [self._players[player_id] for player_id in self._player_ids if player_id not in self._dead_player_ids]
 
-            # Two or more players still alive
+    @property
+    def folders(self):
+        return [self._players[player_id] for player_id in self._folder_ids]
 
-            max_bet = self._get_max_bet(dealer_id, bets)
+    @property
+    def dead(self):
+        return [self._players[player_id] for player_id in self._dead_player_ids]
 
-            min_bet = min(
-                0.0 if best_player_id is None else bets[best_player_id] - bets[dealer_id],
-                self._players[dealer_id].money
-            )
+    @property
+    def active(self):
+        return [self._players[player_id] for player_id in self._player_ids if player_id not in self._folder_ids]
 
-            if max_bet == 0.0:
-                # No bet required to this player
-                bet = 0.0
-            else:
-                # This player isn't all in, and there's at least one other player who is not all-in
-                bet, _ = self._player_bet(player_id=dealer_id, min_bet=min_bet, max_bet=max_bet)
 
-            if bet != -1:
-                bets[dealer_id] += bet
+class GamePots:
+    class GamePot:
+        def __init__(self):
+            self._money = 0.0
+            self._players = []
 
-                if best_player_id is None or bet > min_bet:
-                    best_player_id = dealer_id
+        def add_money(self, money):
+            self._money += money
 
-            dealer_id = self._next_active_player_id(dealer_id)
+        def add_player(self, player):
+            self._players.append(player)
 
-        # Pots have been modified
-        self._recalculate_pots()
+        @property
+        def money(self):
+            return self._money
 
-        return best_player_id
+        @property
+        def players(self):
+            return self._players
 
-    def _get_max_bet(self, dealer_id, bets):
-        # Max raise:
-        # Maximum amount of money that other players bet (or can still bet) during this round
-        highest_stake = max(
-            self._players[player_id].money + bets[player_id]
-            for player_id in self._player_ids
-            if player_id != dealer_id and player_id not in self._folder_ids
-        )
+    def __len__(self):
+        return len(self._pots)
 
-        return min(
-            highest_stake - bets[dealer_id],
-            self._players[dealer_id].money
-        )
+    def __getitem__(self, item):
+        return self._pots[item]
 
-    def _player_bet(self, player_id, min_bet, max_bet):
-        try:
-            player = self._players[player_id]
-            timeout_epoch = time.time() + self.BET_TIMEOUT
+    def __iter__(self):
+        return iter(self._pots)
 
-            self._logger.info("{}: {} betting...".format(self, player))
-            self._raise_event(
-                Game.Event.PLAYER_ACTION,
-                {
-                    "action": "bet",
-                    "min_bet": min_bet,
-                    "max_bet": max_bet,
-                    "player_id": player_id,
-                    "timeout": self.BET_TIMEOUT,
-                    "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
-                }
-            )
+    def __init__(self, game_players):
+        self._game_players = game_players
+        self._pots = []
+        self._bets = {player.id: 0.0 for player in game_players.all}
 
-            bet = self._get_player_bet(
-                player,
-                min_bet=min_bet,
-                max_bet=max_bet,
-                timeout_epoch=timeout_epoch + self.TIMEOUT_TOLERANCE
-            )
-            bet_type = None
+    def add_bets(self, bets):
+        for player in self._game_players.all:
+            self._bets[player.id] += bets[player.id] if bets.has_key(player.id) else 0.0
 
-            if bet == -1:
-                bet_type = "fold"
-            elif bet == 0:
-                bet_type = "check"
-            else:
-                player.take_money(bet)
-                self._bets[player_id] += bet
-
-                if not player.money:
-                    bet_type = "all-in"
-                elif bet == min_bet:
-                    bet_type = "call"
-                else:
-                    bet_type = "raise"
-
-            self._logger.info("{}: {} bet: {} ({})".format(self, player, bet, bet_type))
-            self._raise_event(
-                Game.Event.BET,
-                {
-                    "event": "bet",
-                    "bet": bet,
-                    "bet_type": bet_type,
-                    "player_id": player_id
-                }
-            )
-
-            if bet_type == "fold":
-                self._add_folder(player_id)
-
-            return bet, bet_type
-
-        except (ChannelError, MessageFormatError, MessageTimeout) as e:
-            self._add_dead_player(player_id, e.args[0])
-            return -1, "fold"
-
-    def _get_player_bet(self, player, min_bet=0.0, max_bet=0.0, timeout_epoch=None):
-        """Bet handling.
-        Returns the player bet. -1 to fold (or to skip the bet round during the opening phase)."""
-        message = player.recv_message(timeout_epoch=timeout_epoch)
-        if "message_type" not in message:
-            raise MessageFormatError(attribute="message_type", desc="Attribute missing")
-
-        MessageFormatError.validate_message_type(message, "bet")
-
-        # No bet actually required (opening phase, score is too weak)
-        if max_bet == -1:
-            return -1
-
-        if "bet" not in message:
-            raise MessageFormatError(attribute="bet", desc="Attribute is missing")
-
-        try:
-            bet = float(message["bet"])
-
-            # Fold
-            if bet == -1.0:
-                return bet
-
-            # Bet range
-            if bet < min_bet or bet > max_bet:
-                raise MessageFormatError(
-                    attribute="bet",
-                    desc="Bet out of range. min: {} max: {}, actual: {}".format(min_bet, max_bet, bet))
-
-            return bet
-
-        except ValueError:
-            raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
-
-    def _recalculate_pots(self):
         bets = dict(self._bets)
 
         # List of players sorted by their bets
-        player_ids = sorted(
-            self._player_ids,
-            cmp=lambda player1_id, player2_id: cmp(bets[player1_id], bets[player2_id])
+        players = sorted(
+            self._game_players.all,
+            cmp=lambda player1, player2: cmp(bets[player1.id], bets[player2.id])
         )
 
-        pots = []
+        self._pots = []
 
-        spare_money = 0.0
+        for i, player in enumerate(players):
+            if bets[player.id] > 0.0:
+                pot_bet = bets[player.id]
+                current_pot = GamePots.GamePot()
+                for j in range(i, len(players)):
+                    current_pot.add_player(players[j])
+                    current_pot.add_money(pot_bet)
+                    bets[players[j].id] -= pot_bet
+                self._pots.append(current_pot)
 
-        for i in range(len(player_ids)):
-            if player_ids[i] in self._folder_ids:
-                # Current player fold, let's just put his money in the next pot
-                spare_money += bets[player_ids[i]]
-                bets[player_ids[i]] -= spare_money
 
-            elif bets[player_ids[i]] > 0.0:
-                # Current player is still active: there will be a new pot
-                pot_player_ids = []
-                pot_money = spare_money  # Money from previous players who fold will end up in this pot
-                spare_money = 0.0
+class GameScores:
+    def __init__(self, score_detector):
+        self._score_detector = score_detector
+        self._players_cards = {}
+        self._shared_cards = []
 
-                # The amount that every player participating to this pot will have to put
-                pot_bet = bets[player_ids[i]]
+    @property
+    def shared_cards(self):
+        return self._shared_cards
 
-                # Going through all the remaining players who bet more than the current player
-                # and collect money from them to build the current pot
-                for j in range(i, len(player_ids)):
-                    if player_ids[j] not in self._folder_ids:
-                        # This player fold, he will not participate to this pot
-                        pot_player_ids.append(player_ids[j])
-                    pot_money += pot_bet
-                    bets[player_ids[j]] -= pot_bet
-                pots.append({
-                    "player_ids": pot_player_ids,
-                    "money": pot_money
-                })
+    def player_cards(self, player_id):
+        return self._players_cards[player_id]
 
-        self._pots = pots
+    def player_score(self, player_id):
+        return self._score_detector.get_score(self._players_cards[player_id] + self._shared_cards)
 
-    def _detect_winners(self):
-        # Ensure pots are up to date
-        self._recalculate_pots()
+    def assign_cards(self, player_id, cards):
+        self._players_cards[player_id] = cards
 
-        for pot_index, pot in enumerate(self._pots):
-            winners = []
+    def add_shared_cards(self, cards):
+        self._shared_cards += cards
 
-            for player_id in pot["player_ids"]:
-                player = self._players[player_id]
 
-                if not winners:
+class GameWinnersDetector:
+    def __init__(self, game_players):
+        self._game_players = game_players
+
+    def get_winners(self, players, scores):
+        winners = []
+
+        for player in players:
+            if not self._game_players.is_active(player.id):
+                continue
+            if not winners:
+                winners.append(player)
+            else:
+                score_diff = scores.player_score(player.id).cmp(scores.player_score(winners[0].id))
+                if score_diff == 0:
                     winners.append(player)
-                else:
-                    score_diff = player.score.cmp(winners[0].score)
-                    if score_diff == 0:
-                        winners.append(player)
-                    elif score_diff > 0:
-                        winners = [player]
+                elif score_diff > 0:
+                    winners = [player]
 
-            # Split pot between the winners
-            money = round(pot["money"] / len(winners), 2)
-            for winner in winners:
-                winner.add_money(money)
+        return winners
 
-            self._logger.info("{}: pot {} (${}) won by {}".format(
-                self,
-                pot_index,
-                pot["money"],
-                ", ".join(str(winner) for winner in winners)
-            ))
-            pot["winner_ids"] = [player.id for player in winners]
 
-            self._raise_event(
-                Game.Event.WINNER_DESIGNATION,
-                {"pot": pot_index}
+class GameBetRounder:
+    def __init__(self, game_players):
+        self._game_players = game_players
+
+    def _get_max_bet(self, dealer, bets):
+        # Max raise:
+        # Maximum amount of money that other players bet (or can still bet) during this round
+        try:
+            highest_stake = max(
+                player.money + bets[player.id]
+                for player in self._game_players.round(dealer.id)
+                if player is not dealer
             )
-            gevent.sleep(Game.WAIT_AFTER_WINNER_DESIGNATION)
+        except ValueError:
+            return 0.0
 
-    def _raise_event(self, event, event_data=None):
-        """Broadcast game events"""
-        event_data = event_data if event_data else {}
-        event_data["event"] = event
-        game_data = self.dto()
-        gevent.joinall([
-            gevent.spawn(subscriber.game_event, event, event_data, game_data)
-            for subscriber in self._event_subscribers
-        ])
+        return min(
+            highest_stake - bets[dealer.id],
+            dealer.money
+        )
+
+    def _get_min_bet(self, dealer, bets):
+        return min(
+            max(bets.values()) - bets[dealer.id],
+            dealer.money
+        )
+
+    def bet_round(self, dealer_id, bets, get_bet_function, on_bet_function=None):
+        players_round = list(self._game_players.round(dealer_id))
+
+        if len(players_round) == 0:
+            raise GameError("No active players in this game")
+
+        # The dealer might be inactive. Moving to the first active player
+        dealer = players_round[0]
+
+        for k, player in enumerate(players_round):
+            if not bets.has_key(player.id):
+                bets[player.id] = 0.0
+            if bets[player.id] < 0.0 or (k > 0 and bets[player.id] < bets[players_round[k - 1].id]):
+                # Ensuring the bets dictionary makes sense
+                raise ValueError("Invalid bets dictionary")
+
+        best_player = None
+
+        while dealer is not None and dealer != best_player:
+            next_player = self._game_players.get_next(dealer.id)
+
+            max_bet = self._get_max_bet(dealer, bets)
+            min_bet = self._get_min_bet(dealer, bets)
+
+            if max_bet == 0.0:
+                # No bet required to this player (either he is all-in or all other players are all-in)
+                bet = 0.0
+            else:
+                # This player isn't all in, and there's at least one other player who is not all-in
+                bet = get_bet_function(player=dealer, min_bet=min_bet, max_bet=max_bet, bets=bets)
+
+            if bet is None:
+                self._game_players.remove(dealer.id)
+            elif bet == -1:
+                self._game_players.fold(dealer.id)
+            else:
+                if bet < min_bet or bet > max_bet:
+                    raise ValueError("Invalid bet")
+                dealer.take_money(bet)
+                bets[dealer.id] += bet
+                if best_player is None or bet > min_bet:
+                    best_player = dealer
+
+            if on_bet_function:
+                on_bet_function(dealer, bet, min_bet, max_bet, bets)
+
+            dealer = next_player
+        return best_player
+
+
+class GameBetHandler:
+    def __init__(self, game_players, bet_rounder, event_dispatcher, bet_timeout, timeout_tolerance, wait_after_round):
+        self._game_players = game_players
+        self._bet_rounder = bet_rounder
+        self._event_dispatcher = event_dispatcher
+        self._bet_timeout = bet_timeout
+        self._timeout_tolerance = timeout_tolerance
+        self._wait_after_round = wait_after_round
+
+    def bet_round(self, dealer_id, bets, pots):
+        self._bet_rounder.bet_round(dealer_id, bets, self._get_bet, self._on_bet)
+        if any(k for k in bets if bets[k] > 0):
+            gevent.sleep(self._wait_after_round)
+            pots.add_bets(bets)
+            self._event_dispatcher.pots_update_event(self._game_players.active, pots)
+
+    def _get_bet(self, player, min_bet, max_bet, bets):
+        timeout_epoch = time.time() + self._bet_timeout
+
+        self._event_dispatcher.bet_action_event(player, min_bet, max_bet, self._bet_timeout, timeout_epoch)
+
+        try:
+            message = player.recv_message(timeout_epoch=timeout_epoch)
+
+            MessageFormatError.validate_message_type(message, "bet")
+
+            # No bet actually required (opening phase, score is too weak)
+            if max_bet == -1:
+                return -1
+
+            if "bet" not in message:
+                raise MessageFormatError(attribute="bet", desc="Attribute is missing")
+
+            try:
+                bet = float(message["bet"])
+            except ValueError:
+                raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
+            else:
+                # Validating bet
+                if bet != -1 and (bet < min_bet or bet > max_bet):
+                    raise MessageFormatError(
+                        attribute="bet",
+                        desc="Bet out of range. min: {} max: {}, actual: {}".format(min_bet, max_bet, bet)
+                    )
+                return bet
+
+        except (ChannelError, MessageFormatError, MessageTimeout) as e:
+            player.send_message({"message_type": "error", "error": e.args[0]})
+            return None
+
+    def _on_bet(self, player, bet, min_bet, max_bet, bets):
+        def get_bet_type(bet):
+            if bet == 0:
+                return "check"
+            elif bet == player.money:
+                return "all-in"
+            elif bet == min_bet:
+                return "call"
+            else:
+                return "raise"
+
+        if bet is None:
+            self._event_dispatcher.dead_player_event(player)
+        elif bet == -1:
+            self._event_dispatcher.fold_event(player)
+        else:
+            self._event_dispatcher.bet_event(player, bet, get_bet_type(bet), bets)
+
+
+class PokerGame:
+    TIMEOUT_TOLERANCE = 2
+    BET_TIMEOUT = 30
+
+    WAIT_AFTER_CARDS_ASSIGNMENT = 0
+    WAIT_AFTER_BET = 2
+    WAIT_AFTER_WINNER_DESIGNATION = 5
+    WAIT_AFTER_HAND = 0
+
+    def __init__(self, game_players, event_dispatcher, deck_factory, score_detector):
+        self._id = str(uuid.uuid4())
+        self._game_players = game_players
+        self._event_dispatcher = event_dispatcher
+        self._deck_factory = deck_factory
+        self._score_detector = score_detector
+        self._bet_handler = self._create_bet_handler()
+        self._winners_detector = self._create_winners_detector()
+
+    @property
+    def event_dispatcher(self):
+        return self._event_dispatcher
+
+    def play_hand(self, dealer_id):
+        raise NotImplemented
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Factory methods
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _create_bet_handler(self):
+        return GameBetHandler(
+            self._game_players,
+            GameBetRounder(self._game_players),
+            self._event_dispatcher,
+            self.BET_TIMEOUT,
+            self.TIMEOUT_TOLERANCE,
+            self.WAIT_AFTER_BET
+        )
+
+    def _create_winners_detector(self):
+        return GameWinnersDetector(self._game_players)
+
+    def _create_pots(self):
+        return GamePots(self._game_players)
+
+    def _create_scores(self):
+        return GameScores(self._score_detector)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Cards handler
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _assign_cards(self, number_of_cards, dealer_id, deck, scores):
+        # Assign cards
+        for player in self._game_players.round(dealer_id):
+            # Distribute cards
+            scores.assign_cards(player.id, deck.pop_cards(number_of_cards))
+            self._send_player_score(player, scores)
+
+    def _send_player_score(self, player, scores):
+        player.send_message({
+            "message_type": "set-cards",
+            "cards": [card.dto() for card in scores.player_cards(player.id)],
+            "score": scores.player_score(player.id).dto(),
+        })
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Winners designation
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _game_over_detection(self):
+        if self._game_players.count_active() < 2:
+            raise EndGameException
+
+    def _detect_winners(self, pots, scores):
+        for i, pot in enumerate(pots):
+            winners = self._winners_detector.get_winners(pot.players, scores)
+            try:
+                money_split = round(pot.money / len(winners), 2)
+            except ZeroDivisionError:
+                raise GameError("No players left")
+            else:
+                for winner in winners:
+                    winner.add_money(money_split)
+
+                self._event_dispatcher.winner_designation_event(
+                    self._game_players.active,
+                    pot,
+                    winners,
+                    money_split,
+                    pots[(i + 1):]
+                )
+
+                gevent.sleep(self.WAIT_AFTER_WINNER_DESIGNATION)
+
+    def _showdown(self, scores):
+        self._event_dispatcher.showdown_event(self._game_players.active, scores)

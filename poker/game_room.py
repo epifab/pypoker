@@ -8,7 +8,7 @@ class FullGameRoomException(Exception):
     pass
 
 
-class GameRoom(Game.EventListener):
+class GameRoom():
     room_number = 1
 
     def __init__(self, id, game_factory, max_room_size=5, logger=None):
@@ -93,11 +93,13 @@ class GameRoom(Game.EventListener):
             # Updating the client
             self._game_lock.acquire()
             try:
-                if self._latest_game_event:
-                    player.send_message(self._latest_game_event)
-                    if not is_new_player:
-                        # Sending cards to the player in case he was already in a game
-                        self._latest_game.init_player_hand(player)
+                # @todo: Dropping support for game re-joining (for now)
+                # if self._latest_game_event:
+                #     player.send_message(self._latest_game_event)
+                #     if not is_new_player:
+                #         # Sending cards to the player in case he was already in a game
+                #         self._latest_game._send_player_score(player)
+                pass
             finally:
                 self._game_lock.release()
         finally:
@@ -122,20 +124,18 @@ class GameRoom(Game.EventListener):
         finally:
             self._players_lock.release()
 
-    def game_event(self, event, event_data, game_data):
+    def game_event(self, event, event_data):
         # Updating the latest event message
         self._game_lock.acquire()
         try:
             # Broadcast the event to the room
-            event_message = {"message_type": "game-update"}
+            event_message = {"message_type": "game-update", "event": event}
             event_message.update(event_data)
-            event_message.update(game_data)
             self._broadcast(event_message)
 
-            if event == Game.Event.CARDS_ASSIGNMENT:
-                self._dealer_index = self._player_ids.index(game_data["dealer_id"])
+            self._logger.info("GAME EVENT: {}\n{}".format(event, event_data))
 
-            if event == Game.Event.GAME_OVER:
+            if event == "game-over":
                 self._latest_game = None
                 self._latest_game_event = None
             else:
@@ -144,8 +144,8 @@ class GameRoom(Game.EventListener):
         finally:
             self._game_lock.release()
 
-        if event == Game.Event.DEAD_PLAYER:
-            self.leave(event_data["player_id"])
+        if event == "dead-player":
+            self.leave(event_data["player"]["id"])
 
     @property
     def active(self):
@@ -165,17 +165,15 @@ class GameRoom(Game.EventListener):
             if len(self._players) < 2:
                 raise GameError("Not enough players")
 
-            else:
-                # Dealer
-                for i in range(self._max_room_size):
-                    self._dealer_index = (self._dealer_index + 1) % self._max_room_size
-                    if self._player_ids[self._dealer_index] is not None:
-                        break
+            # Dealer
+            for i in range(self._max_room_size):
+                self._dealer_index = (self._dealer_index + 1 + i) % self._max_room_size
+                if self._player_ids[self._dealer_index] is not None:
+                    break
 
-                return self._game_factory.create_game(
-                    players=[self._players[player_id] for player_id in self._player_ids if player_id is not None],
-                    dealer_id=self._player_ids[self._dealer_index],
-                )
+            return self._game_factory.create_game(
+                players=[self._players[player_id] for player_id in self._player_ids if player_id is not None]
+            )
 
         finally:
             self._players_lock.release()
@@ -184,14 +182,16 @@ class GameRoom(Game.EventListener):
         self._active = True
         self._logger.info("{}: active".format(self))
 
-        while self._active:
-            try:
-                self._game = self.new_game()
-                self._game.subscribe(self)
-                self._game.play_game()
-                self._game.unsubscribe(self)
-                self._game = None
-            except GameError:
-                self._active = False
-
-        self._logger.info("{}: inactive".format(self))
+        try:
+            while True:
+                try:
+                    self._game = self.new_game()
+                    self._game.event_dispatcher.subscribe(self)
+                    self._game.play_hand(self._player_ids[self._dealer_index])
+                    self._game.event_dispatcher.unsubscribe(self)
+                    self._game = None
+                except GameError:
+                    break
+        finally:
+            self._active = False
+            self._logger.info("{}: inactive".format(self))

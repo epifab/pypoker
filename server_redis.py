@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     server = GameServerRedis(
         redis=redis.from_url(redis_url),
-        game_factory=TraditionalPokerGameFactory(blind=10.0, logger=logger),
+        game_factory=TraditionalPokerGameFactory(blind=10.0),
         logger=logger
     )
     server.start()

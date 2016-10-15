@@ -1,11 +1,11 @@
-from . import MessageFormatError, ChannelError, MessageTimeout
+from . import Player, MessageFormatError, ChannelError, MessageTimeout
 import logging
 import time
 
 
-class PlayerServer:
-    def __init__(self, player, channel, logger=None):
-        self._player = player
+class PlayerServer(Player):
+    def __init__(self, channel, logger, *args, **kwargs):
+        Player.__init__(self, *args, **kwargs)
         self._channel = channel
         self._connected = True
         self._logger = logger if logger else logging
@@ -16,21 +16,6 @@ class PlayerServer:
             self.try_send_message({"message_type": "disconnect"})
             self._channel.close()
             self._connected = False
-
-    @property
-    def id(self):
-        return self._player.id
-
-    @property
-    def name(self):
-        return self._player.name
-
-    @property
-    def money(self):
-        return self._player.money
-
-    def __str__(self):
-        return str(self._player)
 
     @property
     def channel(self):
