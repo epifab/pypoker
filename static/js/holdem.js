@@ -1,85 +1,24 @@
 Game = {
     gameId: null,
-
+    
     players: null,
-
+    
     getPlayers: function() {
         return $('#players .player');
     },
-
+    
     getPlayer: function(playerId) {
         return $('#players .player[data-id="' + playerId + '"]');
     },
-
-    setCard: function($card, rank, suit) {
-        x = 0;
-        y = 0;
-
-        if ($card.hasClass('small')) {
-            url = "static/images/cards-small.png";
-            width = 24;
-            height = 40;
-        }
-        else if ($card.hasClass('medium')) {
-            url = "static/images/cards-medium.png";
-            width = 45;
-            height = 75;
-        }
-        else {
-            url = "static/images/cards-large.png";
-            width = 75;
-            height = 125;
-        }
-
-        if (rank !== undefined || suit !== undefined) {
-            switch (suit) {
-                case 0:
-                    // Spades
-                    x -= width;
-                    y -= height;
-                    break;
-                case 1:
-                    // Clubs
-                    y -= height;
-                    break;
-                case 2:
-                    // Diamonds
-                    x -= width;
-                    break;
-                case 3:
-                    // Hearts
-                    break;
-                default:
-                    throw "Invalid suit";
-            }
-
-            if (rank == 14) {
-                rank = 1;
-            }
-            else if (rank < 1 || rank > 13) {
-                throw "Invalid rank";
-            }
-
-            x -= (rank - 1) * 2 * width + width;
-        }
-
-        $card.css('background-position', x + "px " + y + "px");
-        $card.css('background-image', 'url(' + url + ')');
-    },
-
+    
     newGame: function(message) {
         this.gameId = message.game_id;
         this.players = message.players;
 
-        for (playerIdKey in message.player_ids) {
-            $player = this.getPlayer(message.player_ids[playerIdKey]);
-            $cards = $('.cards', $player);
-            $cards.append('<div class="card small pull-left" data-key="0"></div>');
-            $cards.append('<div class="card small pull-left" data-key="1"></div>');
-            $cards.append('<div class="card small pull-left" data-key="2"></div>');
-            $cards.append('<div class="card small pull-left" data-key="3"></div>');
-            $cards.append('<div class="card small pull-left" data-key="4"></div>');
-
+        for (playerId in message.players) {
+            $player = this.getPlayer(playerId);
+            $player.append($('<div class="cards"></div>'));
+            $player.append($('<div class="bet"></div>'));
             if (playerId == message.dealer_id) {
                 $player.addClass('dealer');
             }
@@ -87,89 +26,85 @@ Game = {
                 $player.addClass('current');
             }
         }
-        $('#current-player').show();
     },
-
+    
     gameOver: function(message) {
-        $('.player').removeClass('fold');
         $('.player').removeClass('winner');
-        $('.player').removeClass('looser');
         $('.player').removeClass('dealer');
         $('#pots').empty();
-        $('.cards', this.getPlayers()).empty();
-        $('.bet-wrapper', this.getPlayers()).empty();
-        $('#current-player').hide();
+        $('.player .cards').remove();
+        $('.player .bet').remove();
     },
-
+    
     updatePlayer: function(player) {
         $player = this.getPlayer(player.id);
         $('.player-money', $player).text('$' + parseInt(player.money));
         $('.player-name', $player).text(player.name);
     },
 
-    playerFold: function(player) {
-        this.getPlayer(player.id).addClass('fold');
-    },
-
-    updatePlayers: function(players) {
-        for (k in players) {
-            this.updatePlayer(players[k]);
-        }
-    },
-
     updatePlayersBet: function(bets) {
-        // Remove bets
-        $('.bet-wrapper', this.getPlayers()).empty();
+        $('.bet', this.getPlayers()).empty();
         if (bets !== undefined) {
             for (playerId in bets) {
-                bet = parseInt(bets[playerId]);
-                if (bet > 0) {
-                    $bet = $('<div class="bet"></div>');
-                    $bet.text('$' + parseInt(bets[playerId]));
-                    $('.bet-wrapper', this.getPlayer(playerId)).append($bet);
-                }
+                $('.bet', this.getPlayer(playerId)).text('$' + parseInt(bets[playerId]));
             }
         }
     },
-
-    updatePlayersCards: function(players) {
-        for (playerId in players) {
+    
+    updatePlayersCards: function(cards) {
+        for (playerId in cards) {
             $cards = $('.cards', this.getPlayer(playerId));
-            for (cardKey in players[playerId].cards) {
-                $card = $('.card[data-key=' + cardKey + ']', $cards);
-                this.setCard(
-                    $card,
-                    players[playerId].cards[cardKey][0],
-                    players[playerId].cards[cardKey][1]
-                );
+            $cards.empty();
+            for (cardKey in cards[playerId].cards) {
+                rank = this.getRank(cards[playerId][cardKey]);
+                suit = this.getSuit(cards[playerId][cardKey]);
+                $cards.append($(
+                    '<div class="card text" data-suit="' + suit + '">' +
+                    '<div class="rank">' + rank + '</div>' +
+                    '<div class="suit">&' + suit + ';</div>' +
+                    '</div>'
+                ));
             }
         }
     },
-
+    
     updatePots: function(pots) {
         $('#pots').empty();
         for (potIndex in pots) {
             $('#pots').append($(
                 '<div class="pot">' +
-                '$' + parseInt(pots[potIndex].money) +
+                '$' + parseInt(message.pots[potIndex].money) +
                 '</div>'
             ));
         }
     },
-
-    setWinners: function(pot) {
-        this.getPlayers().removeClass('winner');
-        this.getPlayers().removeClass('looser');
-        for (playerIdKey in pot.player_ids) {
-            playerId = pot.player_ids[playerIdKey];
-
-            $player = this.getPlayer(playerId);
-            if (pot.winner_ids.indexOf(playerId) != -1) {
-                $player.addClass('winner');
-            }
-            else {
-                $player.addClass('looser');
-            }
+    
+    getRank: function(card) {
+        switch (card[0]) {
+            case 11:
+                return 'J';
+            case 12:
+                return 'Q';
+            case 13:
+                return 'K';
+            case 1:
+            case 14:
+                return 'A';
+            default:
+                return card[0];
+        }
+    },
+    
+    getSuit: function(card) {
+        switch (card[1]) {
+            case 3:
+                return "hearts";
+            case 2:
+                return "diams";
+            case 1:
+                return "clubs";
+            default:
+                return "spades";
         }
     }
 }
@@ -180,7 +115,7 @@ Poker5 = {
 
     betMode: false,
 
-    cardsChangeMode: false,
+    cardsChangeMode: true,
 
     roomId: null,
 
@@ -251,7 +186,10 @@ Poker5 = {
                     Poker5.onGameUpdate(data);
                     break;
                 case 'error':
-                    Poker5.log(data.error);
+                    Poker5.log('Error received: ' + data.error);
+                    break;
+                case 'timeout':
+                    Poker5.log('Timed out');
                     break;
             }
         };
@@ -295,27 +233,23 @@ Poker5 = {
     },
 
     onGameUpdate: function(message) {
+        if (message.event == 'game-over') {
+            this.destroyGame();
+        }
+
         this.resetControls();
         this.resetTimers();
+
+        HoldemGame.updatePlayersBet(message.bets);
 
         switch (message.event) {
             case 'new-game':
                 Game.newGame(message);
-                break;
-            case 'game-over':
-                Game.gameOver();
-                break;
-            case 'fold':
-                Game.playerFold(message.player);
-                break;
             case 'bet':
                 Game.updatePlayer(message.player);
-                Game.updatePlayersBet(message.bets);
                 break;
             case 'pots-update':
-                Game.updatePlayers(message.players);
                 Game.updatePots(message.pots);
-                Game.updatePlayersBet();  // Reset the bets
                 break;
             case 'player-action':
                 this.onPlayerAction(message);
@@ -328,9 +262,8 @@ Poker5 = {
                 // Game.addSharedCards(message.cards);
                 break;
             case 'winner-designation':
-                Game.updatePlayers(message.players);
                 Game.updatePots(message.pots);
-                Game.setWinners(message.pot);
+                Game.showPotWinners(message.pot);
                 break;
             case 'showdown':
                 Game.updatePlayersCards(message.players);
@@ -375,16 +308,16 @@ Poker5 = {
 
         $player = $('<div class="player' + (isCurrentPlayer ? ' current' : '') + '"></div>');
         $player.attr('data-id', player.id);
-        $player.append($playerInfo);
-        $player.append($('<div class="bet-wrapper"></div>'));
         $player.append($('<div class="cards"></div>'));
+        $player.append($playerInfo);
         $player.append($('<div class="timer"></div>'));
+        $player.append($('<div class="bet"></div>'));
 
         return $player;
     },
 
     destroyRoom: function() {
-        Game.gameOver();
+        this.destroyGame();
         this.roomId = null;
         $('#players').empty();
     },
@@ -455,12 +388,10 @@ Poker5 = {
 
     onSetCards: function(message) {
         for (cardKey in message.cards) {
-            $card = $('#current-player .card[data-key=' + cardKey + ']');
-            Game.setCard(
-                $card,
+            Poker5.setCard(
+                cardKey,
                 message.cards[cardKey][0],
-                message.cards[cardKey][1]
-            );
+                message.cards[cardKey][1]);
         }
         $('#current-player .cards .category').text(Poker5.scoreCategories[message.score.category]);
         $('#current-player').data('allowed-to-open', message.allowed_to_open);
@@ -477,6 +408,7 @@ Poker5 = {
     },
 
     onPlayerAction: function(message) {
+    console.log(message.player);
         isCurrentPlayer = message.player.id == $('#current-player').data('id');
 
         switch (message.action) {
@@ -500,7 +432,7 @@ Poker5 = {
                 break;
         }
 
-        $timers = $('.player[data-id="' + message.player.id + '"] .timer');
+        $timers = $('.player[data-id="' + message.player_id + '"] .timer');
         $timers.data('timer', message.timeout);
         $timers.TimeCircles({
             "start": true,
@@ -595,6 +527,57 @@ Poker5 = {
             $('#change-cards-controls').hide();
             $('#current-player .card.selected').removeClass('selected');
         }
+    },
+
+    setCard: function(cardKey, rank, suit) {
+        $card = $('#current-player .card[data-key="' + cardKey + '"]');
+
+        x = 0;
+        y = 0;
+
+        if ($card.hasClass('small')) {
+            url = "static/images/cards-small.png";
+            width = 45;
+            height = 75;
+        }
+        else {
+            url = "static/images/cards.png";
+            width = 75;
+            height = 125;
+        }
+
+        switch (suit) {
+            case 0:
+                // Spades
+                x -= width;
+                y -= height;
+                break;
+            case 1:
+                // Clubs
+                y -= height;
+                break;
+            case 2:
+                // Diamonds
+                x -= width;
+                break;
+            case 3:
+                // Hearts
+                break;
+            default:
+                throw "Invalid suit";
+        }
+
+        if (rank == 14) {
+            rank = 1;
+        }
+        else if (rank < 1 || rank > 13) {
+            throw "Invalid rank";
+        }
+
+        x -= (rank - 1) * 2 * width;
+
+        $card.css('background-position', x + "px " + y + "px");
+        $card.css('background-image', 'url(' + url + ')');
     },
 
     resetCards: function() {

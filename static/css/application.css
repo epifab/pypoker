@@ -63,28 +63,53 @@ body {
 }
 
 #players .seat[data-key="0"] {
-    top: -40px;
+    top: -70px;
     left: 0%;
 }
 
+#players .seat[data-key="0"] .bet-wrapper {
+    top: 125px;
+    left: 50px;
+}
+
 #players .seat[data-key="1"] {
-    top: -70px;
+    top: -100px;
     left: 20%;
 }
 
+#players .seat[data-key="1"] .bet-wrapper {
+    top: 125px;
+    left: 0px;
+}
+
 #players .seat[data-key="2"] {
-    top: -70px;
+    top: -100px;
     left: 40%;
 }
 
+#players .seat[data-key="2"] .bet-wrapper {
+    top: 125px;
+    left: -10px;
+}
+
 #players .seat[data-key="3"] {
-    top: -70px;
+    top: -100px;
     left: 60%;
 }
 
+#players .seat[data-key="3"] .bet-wrapper {
+    top: 125px;
+    left: -25px;
+}
+
 #players .seat[data-key="4"] {
-    top: -40px;
+    top: -70px;
     left: 80%;
+}
+
+#players .seat[data-key="4"] .bet-wrapper {
+    top: 125px;
+    right: 80px;
 }
 
 #players .seat[data-key="5"] {
@@ -119,7 +144,7 @@ body {
     overflow: hidden;
 }
 
-#players .player.inactive {
+#players .player.fold .cards {
     opacity: 0.5;
 }
 
@@ -160,16 +185,17 @@ body {
     float: left;
 }
 
-#players .player .bet {
+#players .player .bet-wrapper {
     position: absolute;
-    top: 90px;
-    text-align: center;
     width: 60px;
     height: 25px;
-    left: 0px;
-    background-color: #194996;
-    padding: 5px;
-    border-radius: 20px;
+}
+
+#players .player .bet-wrapper .bet {
+    background-image: url(../images/chips-small.png);
+    background-repeat: no-repeat;
+    background-position: left;
+    padding: 5px 0px 0px 30px;
 }
 
 #players .player .timer .textDiv_Seconds {
@@ -182,35 +208,18 @@ body {
 
 #players .player .cards {
     position: absolute;
-    top: 75px;
-    left: -15px;
+    top: 80px;
+    left: -8px;
     width: 90px;
     z-index: 20;
 }
 
+#players .player .cards .card {
+    margin-left: -8px;
+}
+
 #players .player .cards .category {
     background-color: #333;
-}
-
-#players .card {
-    font-weight: bold;
-    width: 16px;
-    padding: 3px;
-    height: 40px;
-    background-color: #FFF;
-    margin: 0px 1px 0px 1px;
-}
-
-#players .card .suit {
-    margin-top: -8px;
-    font-size: 11pt;
-}
-
-#players .card[data-suit="hearts"], #players .card[data-suit="diams"] {
-    color: #F00;
-}
-#players .card[data-suit="clubs"], #players .card[data-suit="spades"] {
-    color: #000;
 }
 
 
@@ -225,16 +234,27 @@ body {
     background-repeat: no-repeat;
 }
 
-.card.small {
-    width: 45px;
-    height: 75px;
-    background-image: url(../images/card-back-small.png);
-}
 
-.card.medium {
+.card.large {
+    background-image: url(../images/cards-large.png);
+    background-position: 0px 0px;
+    background-repeat: no-repeat;
     width: 75px;
     height: 125px;
-    background-image: url(../images/card-back.png);
+}
+.card.medium {
+    background-image: url(../images/cards-medium.png);
+    background-position: 0px 0px;
+    background-repeat: no-repeat;
+    width: 45px;
+    height: 75px;
+}
+.card.small {
+    background-image: url(../images/cards-small.png);
+    background-position: 0px 0px;
+    background-repeat: no-repeat;
+    width: 24px;
+    height: 40px;
 }
 
 .card.selected {
@@ -250,9 +270,9 @@ body {
 #table-wrapper {
     position: relative;
     height: 300px;
-    margin-top: 80px;
+    margin-top: 110px;
     margin-bottom: 80px;
-    min-width: 400px;
+    width: 500px;
 }
 
 #table {
@@ -278,14 +298,18 @@ body {
     margin-right: 0px;
 }
 
-#table #pot {
-    background-image: url(../images/chip-100.png);
-    background-repeat: no-repeat;
-    height: 100px;
+#table #pots {
     width: 100px;
-    padding: 40px 0px;
     text-align: center;
     float: left;
+}
+
+#table #pots .pot {
+    background-image: url(../images/chips-50.png);
+    background-repeat: no-repeat;
+    padding: 15px 0px 10px 40px;
+    height: 45px;
+    font-size: 12pt;
 }
 
 #table #game-status {
