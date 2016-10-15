@@ -136,6 +136,8 @@ class GamePlayers:
         self._dead_player_ids = set()
 
     def fold(self, player_id):
+        if player_id not in self._player_ids:
+            raise ValueError("Unknown player id")
         self._folder_ids.add(player_id)
 
     def remove(self, player_id):
@@ -171,6 +173,8 @@ class GamePlayers:
     #     return decorator
 
     def get_next(self, player_id):
+        if player_id not in self._player_ids:
+            raise ValueError("Unknown player id")
         if player_id in self._folder_ids:
             raise ValueError("Inactive player")
         start_item = self._player_ids.index(player_id)
@@ -182,6 +186,8 @@ class GamePlayers:
         return None
 
     def get_previous(self, player_id):
+        if player_id not in self._player_ids:
+            raise ValueError("Unknown player id")
         if player_id in self._folder_ids:
             raise ValueError("Inactive player")
         start_index = self._player_ids.index(player_id)
@@ -193,6 +199,8 @@ class GamePlayers:
         return None
 
     def is_active(self, player_id):
+        if player_id not in self._player_ids:
+            raise ValueError("Unknown player id")
         return player_id not in self._folder_ids
 
     def count_active(self):
@@ -266,15 +274,30 @@ class GamePots:
 
         self._pots = []
 
+        spare_money = 0.0
+
         for i, player in enumerate(players):
-            if bets[player.id] > 0.0:
+            if not self._game_players.is_active(player.id):
+                # Inactive players don't take part to any pot
+                spare_money += bets[player.id]
+                bets[player.id] = 0.0
+            elif bets[player.id] > 0.0:
                 pot_bet = bets[player.id]
                 current_pot = GamePots.GamePot()
+                # Collecting spare money coming from previous inactive players
+                current_pot.add_money(spare_money)
+                spare_money = 0.0
                 for j in range(i, len(players)):
-                    current_pot.add_player(players[j])
+                    if self._game_players.is_active(players[j].id):
+                        # This player will participate to this pot only if currently active
+                        current_pot.add_player(players[j])
                     current_pot.add_money(pot_bet)
                     bets[players[j].id] -= pot_bet
                 self._pots.append(current_pot)
+
+        if spare_money:
+            # The players who bet more is actually inactive
+            raise ValueError("Invalid bets")
 
 
 class GameScores:
