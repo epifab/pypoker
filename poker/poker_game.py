@@ -431,26 +431,26 @@ class GameBetHandler:
         self._timeout_tolerance = timeout_tolerance
         self._wait_after_round = wait_after_round
 
+    def any_bet(self, bets):
+        return any(k for k in bets if bets[k] > 0)
+
     def bet_round(self, dealer_id, bets, pots):
-        self._bet_rounder.bet_round(dealer_id, bets, self._get_bet, self._on_bet)
-        if any(k for k in bets if bets[k] > 0):
+        self._bet_rounder.bet_round(dealer_id, bets, self.get_bet, self.on_bet)
+        if self.any_bet(bets):
             gevent.sleep(self._wait_after_round)
             pots.add_bets(bets)
             self._event_dispatcher.pots_update_event(self._game_players.active, pots)
 
-    def _get_bet(self, player, min_bet, max_bet, bets):
+    def get_bet(self, player, min_bet, max_bet, bets):
         timeout_epoch = time.time() + self._bet_timeout
-
         self._event_dispatcher.bet_action_event(player, min_bet, max_bet, self._bet_timeout, timeout_epoch)
+        return self.receive_bet(player, min_bet, max_bet, bets, timeout_epoch)
 
+    def receive_bet(self, player, min_bet, max_bet, bets, timeout_epoch):
         try:
             message = player.recv_message(timeout_epoch=timeout_epoch)
 
             MessageFormatError.validate_message_type(message, "bet")
-
-            # No bet actually required (opening phase, score is too weak)
-            if max_bet == -1:
-                return -1
 
             if "bet" not in message:
                 raise MessageFormatError(attribute="bet", desc="Attribute is missing")
@@ -472,7 +472,7 @@ class GameBetHandler:
             player.send_message({"message_type": "error", "error": e.args[0]})
             return None
 
-    def _on_bet(self, player, bet, min_bet, max_bet, bets):
+    def on_bet(self, player, bet, min_bet, max_bet, bets):
         def get_bet_type(bet):
             if bet == 0:
                 return "check"
@@ -522,12 +522,12 @@ class PokerGame:
 
     def _create_bet_handler(self):
         return GameBetHandler(
-            self._game_players,
-            GameBetRounder(self._game_players),
-            self._event_dispatcher,
-            self.BET_TIMEOUT,
-            self.TIMEOUT_TOLERANCE,
-            self.WAIT_AFTER_BET
+            game_players=self._game_players,
+            bet_rounder=GameBetRounder(self._game_players),
+            event_dispatcher=self._event_dispatcher,
+            bet_timeout=self.BET_TIMEOUT,
+            timeout_tolerance=self.TIMEOUT_TOLERANCE,
+            wait_after_round=self.WAIT_AFTER_BET
         )
 
     def _create_winners_detector(self):

@@ -1,6 +1,6 @@
 import unittest
 from poker import Player
-from poker.solid_game import *
+from poker.poker_game import *
 
 
 class GamePlayersTest(unittest.TestCase):
@@ -143,15 +143,13 @@ class GamePotsTest(unittest.TestCase):
 
         game_pots.add_bets({"player-1": 500, "player-2": 0.0, "player-3": 800, "player-4": 800})
 
-        pots = game_pots.pots
+        self.assertEqual(2, len(game_pots))
 
-        self.assertEqual(2, len(pots))
+        self.assertEquals(1500, game_pots[0].money)
+        self.assertEquals([player1, player3, player4], game_pots[0].players)
 
-        self.assertEquals(1500, pots[0].money)
-        self.assertEquals([player1, player3, player4], pots[0].players)
-
-        self.assertEquals(600, pots[1].money)
-        self.assertEquals([player3, player4], pots[1].players)
+        self.assertEquals(600, game_pots[1].money)
+        self.assertEquals([player3, player4], game_pots[1].players)
 
     def test_add_bets_with_two_rounds(self):
         player1 = Player("player-1", "Player One", 1000)
@@ -165,18 +163,93 @@ class GamePotsTest(unittest.TestCase):
         game_pots.add_bets({"player-1": 100, "player-2": 200.0, "player-3": 200, "player-4": 200})
         game_pots.add_bets({"player-1": 0, "player-2": 50.0, "player-3": 100, "player-4": 100})
 
-        pots = game_pots.pots
+        self.assertEqual(3, len(game_pots))
 
-        self.assertEqual(3, len(pots))
+        self.assertEquals(400, game_pots[0].money)
+        self.assertEquals([player1, player2, player3, player4], game_pots[0].players)
 
-        self.assertEquals(400, pots[0].money)
-        self.assertEquals([player1, player2, player3, player4], pots[0].players)
+        self.assertEquals(450, game_pots[1].money)
+        self.assertEquals([player2, player3, player4], game_pots[1].players)
 
-        self.assertEquals(450, pots[1].money)
-        self.assertEquals([player2, player3, player4], pots[1].players)
+        self.assertEquals(100, game_pots[2].money)
+        self.assertEquals([player2, player3, player4], game_pots[1].players)
 
-        self.assertEquals(100, pots[2].money)
-        self.assertEquals([player2, player3, player4], pots[1].players)
+    def test_add_bets_with_folders(self):
+        player1 = Player("player-1", "Player One", 1000)
+        player2 = Player("player-2", "Player Two", 1000)
+        player3 = Player("player-3", "Player Three", 1000)
+        player4 = Player("player-4", "Player Four", 1000)
+
+        game_players = GamePlayers([player1, player2, player3, player4])
+        game_pots = GamePots(game_players)
+
+        game_players.fold("player-1")
+        game_pots.add_bets({"player-1": 100.0, "player-2": 200.0, "player-3": 200.0, "player-4": 200.0})
+
+        self.assertEqual(1, len(game_pots))
+        self.assertEquals(700, game_pots[0].money)
+        self.assertListEqual([player2, player3, player4], game_pots[0].players)
+
+    def test_add_bets_with_folders_two_rounds(self):
+        player1 = Player("player-1", "Player One", 1000)
+        player2 = Player("player-2", "Player Two", 1000)
+        player3 = Player("player-3", "Player Three", 1000)
+        player4 = Player("player-4", "Player Four", 1000)
+
+        game_players = GamePlayers([player1, player2, player3, player4])
+        game_pots = GamePots(game_players)
+
+        game_players.fold("player-1")
+        game_pots.add_bets({"player-1": 100.0, "player-2": 200.0, "player-3": 200.0, "player-4": 200.0})
+
+        self.assertEqual(1, len(game_pots))
+        self.assertEquals(700, game_pots[0].money)
+        self.assertListEqual([player2, player3, player4], game_pots[0].players)
+
+        game_players.fold("player-2")
+        game_pots.add_bets({"player-2": 50.0, "player-3": 100, "player-4": 100})
+
+        self.assertEqual(1, len(game_pots))
+        self.assertEquals(950.0, game_pots[0].money)
+        self.assertEquals([player3, player4], game_pots[0].players)
+
+    def test_add_bets_with_folders_two_rounds_all_in_players(self):
+        player1 = Player("player-1", "Player One", 1000)
+        player2 = Player("player-2", "Player Two", 1000)
+        player3 = Player("player-3", "Player Three", 1000)
+        player4 = Player("player-4", "Player Four", 1000)
+
+        game_players = GamePlayers([player1, player2, player3, player4])
+        game_pots = GamePots(game_players)
+
+        game_pots.add_bets({"player-1": 100.0, "player-2": 200.0, "player-3": 200.0, "player-4": 200.0})
+
+        self.assertEqual(2, len(game_pots))
+        self.assertEquals(400, game_pots[0].money)
+        self.assertListEqual([player1, player2, player3, player4], game_pots[0].players)
+        self.assertEquals(300, game_pots[1].money)
+        self.assertListEqual([player2, player3, player4], game_pots[1].players)
+
+        game_players.fold("player-2")
+        game_pots.add_bets({"player-1": 0, "player-2": 50.0, "player-3": 100, "player-4": 100})
+
+        self.assertEqual(2, len(game_pots))
+        self.assertEquals(400, game_pots[0].money)
+        self.assertListEqual([player1, player3, player4], game_pots[0].players)
+        self.assertEquals(550, game_pots[1].money)
+        self.assertListEqual([player3, player4], game_pots[1].players)
+
+    def test_add_bets_when_strongest_player_fold(self):
+        player1 = Player("player-1", "Player One", 1000)
+        player2 = Player("player-2", "Player Two", 1000)
+        player3 = Player("player-3", "Player Three", 1000)
+        player4 = Player("player-4", "Player Four", 1000)
+
+        game_players = GamePlayers([player1, player2, player3, player4])
+        game_pots = GamePots(game_players)
+
+        game_players.fold("player-4")
+        self.assertRaises(ValueError, game_pots.add_bets, {"player-3": 200.0, "player-4": 400.0})
 
 
 class GameScoresTest(unittest.TestCase):
@@ -764,6 +837,24 @@ class GameBetRounderTest(unittest.TestCase):
         bet_rounder = GameBetRounder(game_players)
 
         bet_rounder.bet_round("player-1", bets, bet_function_mock)
+
+    def test_bet_round_valid_bet_dictionary_3(self):
+        bets = {
+            "player-1": 1000,
+            "player-2": 500
+        }
+
+        game_players = GamePlayers([
+            Player("player-1", "Player One", 1000.0),
+            Player("player-2", "Player Two", 1000.0)
+        ])
+
+        def bet_function_mock(player, min_bet, max_bet, bets):
+            return -1
+
+        bet_rounder = GameBetRounder(game_players)
+
+        bet_rounder.bet_round("player-2", bets, bet_function_mock)
 
 
 class GameBetHandlerTest(unittest.TestCase):
