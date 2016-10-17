@@ -20,7 +20,11 @@ class GameRoomPlayers:
 
     @property
     def players(self):
-        return self._players.values()
+        self._lock.acquire()
+        try:
+            return [self._players[player_id] for player_id in self._seats if player_id is not None]
+        finally:
+            self._lock.release()
 
     @property
     def seats(self):
