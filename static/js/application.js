@@ -173,17 +173,18 @@ Game = {
     },
 
     setWinners: function(pot) {
+        $('#players .player').addClass('fold');
         $('#players .player').removeClass('winner');
-        $('#players .player').removeClass('looser');
         for (playerIdKey in pot.player_ids) {
             playerId = pot.player_ids[playerIdKey];
 
             $player = $('#players .player[data-player-id=' + playerId + ']');
             if (pot.winner_ids.indexOf(playerId) != -1) {
+                $player.removeClass('fold');
                 $player.addClass('winner');
             }
             else {
-                $player.addClass('looser');
+                $player.addClass('fold');
             }
         }
     }
@@ -347,7 +348,7 @@ Poker5 = {
                 this.onPlayerAction(message);
                 break;
             case 'dead-player':
-                // Will be handled by an upcoming room-update message
+                Game.playerFold(message.player);
                 break;
             case 'shared-cards':
                 Game.addSharedCards(message.cards);
