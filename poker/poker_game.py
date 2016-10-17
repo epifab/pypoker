@@ -332,7 +332,7 @@ class GameScores:
         return self._score_detector.get_score(self._players_cards[player_id] + self._shared_cards)
 
     def assign_cards(self, player_id, cards):
-        self._players_cards[player_id] = cards
+        self._players_cards[player_id] = self._score_detector.get_score(cards).cards
 
     def add_shared_cards(self, cards):
         self._shared_cards += cards

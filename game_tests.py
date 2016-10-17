@@ -253,9 +253,14 @@ class GamePotsTest(unittest.TestCase):
 
 
 class GameScoresTest(unittest.TestCase):
+    class ScoreMock:
+        def __init__(self, category, cards):
+            self.category = category
+            self.cards = cards
+
     class ScoreDetectorMock:
         def get_score(self, cards):
-            return "score({})".format(",".join(cards))
+            return GameScoresTest.ScoreMock(123, sorted(cards, reverse=True))
 
     def test_get_shared_cards(self):
         scores = GameScores(self.ScoreDetectorMock())
@@ -285,13 +290,14 @@ class GameScoresTest(unittest.TestCase):
         cards = ["1", "2", "3", "4", "5"]
         scores = GameScores(self.ScoreDetectorMock())
         scores.assign_cards("player-1", cards)
-        self.assertListEqual(cards, scores.player_cards("player-1"))
+        self.assertListEqual(["5", "4", "3", "2", "1"], scores.player_cards("player-1"))
 
     def test_assign_and_get_score(self):
         cards = ["1", "2", "3", "4", "5"]
         scores = GameScores(self.ScoreDetectorMock())
         scores.assign_cards("player-1", cards)
-        self.assertEquals("score(1,2,3,4,5)", scores.player_score("player-1"))
+        self.assertEquals(123, scores.player_score("player-1").category)
+        self.assertEquals(["5", "4", "3", "2", "1"], scores.player_score("player-1").cards)
 
     def test_assign_and_get_score_with_shared_cards(self):
         cards = ["1", "2"]
@@ -299,7 +305,8 @@ class GameScoresTest(unittest.TestCase):
         scores = GameScores(self.ScoreDetectorMock())
         scores.add_shared_cards(shared_cards)
         scores.assign_cards("player-1", cards)
-        self.assertEquals("score(1,2,3,4,5)", scores.player_score("player-1"))
+        self.assertEquals(123, scores.player_score("player-1").category)
+        self.assertListEqual(["5", "4", "3", "2", "1"], scores.player_score("player-1").cards)
 
 
 class GameWinnersDetectorTest(unittest.TestCase):
