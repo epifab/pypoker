@@ -1,6 +1,7 @@
 Flask==0.10.1
 Flask-OAuthlib==0.9.3
 Flask-Sockets==0.2.0
+funcsigs==1.0.2
 gevent==1.0.2
 gevent-websocket==0.9.5
 greenlet==0.4.9
@@ -8,8 +9,11 @@ gunicorn==19.4.5
 itsdangerous==0.24
 Jinja2==2.8
 MarkupSafe==0.23
+mock==2.0.0
 oauthlib==2.0.0
+pbr==1.10.0
 redis==2.10.5
 requests==2.11.1
 requests-oauthlib==0.7.0
+six==1.10.0
 Werkzeug==0.11.3
