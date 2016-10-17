@@ -112,13 +112,9 @@ class GameRoom(GameEventListener):
         self._room_players = GameRoomPlayers(room_size)
         self._room_event_handler = GameRoomEventHandler(self._room_players, self._id, logger)
         self._event_messages = []
-        self._active = False
         self._logger = logger
         self._lock = threading.Lock()
-
-    @property
-    def active(self):
-        return self._active
+        self.active = False
 
     def join(self, player):
         self._lock.acquire()
@@ -181,7 +177,7 @@ class GameRoom(GameEventListener):
                 self.leave(player.id)
 
     def activate(self):
-        self._active = True
+        self.active = True
         try:
             self._logger.info("Activating room {}...".format(self._id))
             dealer_key = -1
@@ -204,4 +200,4 @@ class GameRoom(GameEventListener):
                     break
         finally:
             self._logger.info("Deactivating room {}...".format(self._id))
-            self._active = False
+            self.active = False

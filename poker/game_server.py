@@ -49,6 +49,7 @@ class GameServer:
                     self._logger.info("{}: {} connected".format(self, player))
                     room = self._join_room(player)
                     if not room.active:
+                        room.active = True
                         gevent.spawn(room.activate)
                 except:
                     # Close bad connections and ignore the connection
