@@ -1,4 +1,4 @@
-from . import Game, GameError
+from . import GameEventListener, GameError
 import gevent
 import logging
 import threading
@@ -8,190 +8,180 @@ class FullGameRoomException(Exception):
     pass
 
 
-class GameRoom():
-    room_number = 1
+class DuplicatePlayerException(Exception):
+    pass
 
-    def __init__(self, id, game_factory, max_room_size=5, logger=None):
-        self._id = id
-        self._max_room_size = max_room_size
-        self._game_factory = game_factory
-        self._game = None
-        self._game_lock = threading.Lock()
-        self._dealer_index = -1
-        self._latest_game_event = None
-        self._latest_game = None
+
+class GameRoomPlayers:
+    def __init__(self, room_size):
+        self._seats = [None] * room_size
         self._players = {}
-        self._players_lock = threading.Lock()
-        self._player_ids = [None] * max_room_size
-        self._active = False
-        self._logger = logger if logger else logging
+        self._lock = threading.Lock()
 
-    def __str__(self):
-        return "room {}".format(self._id)
+    @property
+    def players(self):
+        return self._players.values()
 
-    def _get_free_seat(self):
+    @property
+    def seats(self):
+        return list(self._seats)
+
+    def get_player(self, player_id):
+        return self._players[player_id]
+
+    def get_free_seat(self):
         try:
-            return self._player_ids.index(None)
-        except ValueError:
+            return self._seats.index(None)
+        except KeyError:
             raise FullGameRoomException
 
-    def _send_room_init(self, player):
-        player.send_message({
-            "message_type": "room-update",
-            "event": "init",
-            "room_id": self._id,
-            "players": {k: self._players[k].dto() for k in self._players},
-            "player_ids": self._player_ids
-        })
+    def is_full(self):
+        try:
+            self.get_free_seat()
+            return False
+        except FullGameRoomException:
+            return True
 
-    def _broadcast_room_event(self, event, player_id):
-        self._broadcast({
+    def add_player(self, player):
+        self._lock.acquire()
+        try:
+            if self._players.has_key(player.id):
+                raise DuplicatePlayerException
+            free_seat = self.get_free_seat()
+            self._seats[free_seat] = player.id
+            self._players[player.id] = player
+        finally:
+            self._lock.release()
+
+    def remove_player(self, player_id):
+        self._lock.acquire()
+        try:
+            seat = self._seats.index(player_id)
+            self._seats[seat] = None
+            del self._players[player_id]
+        finally:
+            self._lock.release()
+
+
+class GameRoomEventHandler:
+    def __init__(self, room_players, room_id, logger):
+        self._room_players = room_players
+        self._room_id = room_id
+        self._logger = logger
+
+    def room_event(self, event, player_id):
+        self.broadcast({
             "message_type": "room-update",
             "event": event,
-            "room_id": self._id,
-            "players": {k: self._players[k].dto() for k in self._players},
-            "player_ids": self._player_ids,
+            "room_id": self._room_id,
+            "players": {player.id: player.dto() for player in self._room_players.players},
+            "player_ids": self._room_players.seats,
             "player_id": player_id
         })
 
-    def _broadcast(self, message):
-        gevent.joinall([
-            gevent.spawn(player.send_message, message)
-            for player in self._players.values()
-        ])
+    def broadcast(self, message):
+        self._logger.info(message)
+        for player in self._room_players.players:
+            player.try_send_message(message)
 
-    def join(self, player):
-        self._players_lock.acquire()
-        try:
-            is_new_player = True
 
-            try:
-                old_player = self._players[player.id]
-
-            except KeyError:
-                # New player
-                is_new_player = True
-                # Sending room initialization message
-                self._send_room_init(player)
-                # Adding player to the room
-                self._player_ids[self._get_free_seat()] = player.id
-                self._players[player.id] = player
-                self._broadcast_room_event("player-added", player.id)
-                self._logger.info("{}: {} joined".format(self, player))
-
-            else:
-                # Player already connected to this room
-                # In case he is currently in a game, we replace the old channel with the new one
-                # so he will magically rejoin the game
-                is_new_player = False
-                old_player.update_channel(player)
-                # Throwing away the new player object
-                player = old_player
-                self._send_room_init(player)
-                self._logger.info("{}: {} re-joined".format(self, player))
-
-            # Updating the client
-            self._game_lock.acquire()
-            try:
-                # @todo: Dropping support for game re-joining (for now)
-                # if self._latest_game_event:
-                #     player.send_message(self._latest_game_event)
-                #     if not is_new_player:
-                #         # Sending cards to the player in case he was already in a game
-                #         self._latest_game._send_player_score(player)
-                pass
-            finally:
-                self._game_lock.release()
-        finally:
-            self._players_lock.release()
-
-    def leave(self, player_id):
-        self._players_lock.acquire()
-        try:
-            try:
-                player = self._players[player_id]
-            except KeyError:
-                # Player wasn't actually in the room
-                pass
-            else:
-                player.disconnect()
-                del self._players[player_id]
-                player_key = self._player_ids.index(player_id)
-                self._player_ids[player_key] = None
-                self._logger.info("{}: {} left".format(self, player))
-                self._broadcast_room_event("player-removed", player_id)
-
-        finally:
-            self._players_lock.release()
-
-    def game_event(self, event, event_data):
-        # Updating the latest event message
-        self._game_lock.acquire()
-        try:
-            # Broadcast the event to the room
-            event_message = {"message_type": "game-update", "event": event}
-            event_message.update(event_data)
-            self._broadcast(event_message)
-
-            self._logger.info("GAME EVENT: {}\n{}".format(event, event_data))
-
-            if event == "game-over":
-                self._latest_game = None
-                self._latest_game_event = None
-            else:
-                self._latest_game = self._game
-                self._latest_game_event = event_message
-        finally:
-            self._game_lock.release()
-
-        if event == "dead-player":
-            self.leave(event_data["player"]["id"])
+class GameRoom(GameEventListener):
+    def __init__(self, id, game_factory, room_size, logger):
+        self._id = id
+        self._game_factory = game_factory
+        self._room_players = GameRoomPlayers(room_size)
+        self._room_event_handler = GameRoomEventHandler(self._room_players, self._id, logger)
+        self._event_messages = []
+        self._active = False
+        self._logger = logger
+        self._lock = threading.Lock()
 
     @property
     def active(self):
         return self._active
 
-    def ping_all_players(self):
-        for player_id in self._players.keys():
-            if not self._players[player_id].ping():
-                self.leave(player_id)
-
-    def new_game(self):
-        # Remove unresponsive players
-        self.ping_all_players()
-
-        self._players_lock.acquire()
+    def join(self, player):
+        self._lock.acquire()
         try:
-            if len(self._players) < 2:
-                raise GameError("Not enough players")
+            try:
+                self._room_players.add_player(player)
+                self._room_event_handler.room_event("player-added", player.id)
+            except DuplicatePlayerException:
+                old_player = self._room_players.get_player(player.id)
+                old_player.update_channel(player)
+                player = old_player
+                self._room_event_handler.room_event("player-rejoined", player.id)
 
-            # Dealer
-            for i in range(self._max_room_size):
-                self._dealer_index = (self._dealer_index + 1 + i) % self._max_room_size
-                if self._player_ids[self._dealer_index] is not None:
-                    break
-
-            return self._game_factory.create_game(
-                players=[self._players[player_id] for player_id in self._player_ids if player_id is not None]
-            )
-
+            for event_message in self._event_messages:
+                if "target" not in event_message or event_message["target"] == player.id:
+                    player.send_message(event_message)
         finally:
-            self._players_lock.release()
+            self._lock.release()
+
+    def leave(self, player_id):
+        self._lock.acquire()
+        try:
+            self._leave(player_id)
+        finally:
+            self._lock.release()
+
+    def _leave(self, player_id):
+        player = self._room_players.get_player(player_id)
+        player.disconnect()
+        self._room_players.remove_player(player.id)
+        self._room_event_handler.room_event("player-removed", player.id)
+
+    def game_event(self, event, event_data):
+        self._lock.acquire()
+        try:
+            # Broadcast the event to the room
+            event_message = {"message_type": "game-update", "event": event}
+            event_message.update(event_data)
+
+            if "target" in event_data:
+                player = self._room_players.get_player(event_data["target"])
+                player.send_message(event_message)
+            else:
+                # Broadcasting message
+                self._room_event_handler.broadcast(event_message)
+
+            if event == "game-over":
+                self._event_messages = []
+            else:
+                self._event_messages.append(event_message)
+
+            if event == "dead-player":
+                self._leave(event_data["player"]["id"])
+        finally:
+            self._lock.release()
+
+    def ping_all_players(self):
+        for player in self._room_players.players:
+            if not player.ping():
+                self.leave(player.id)
 
     def activate(self):
         self._active = True
-        self._logger.info("{}: active".format(self))
-
         try:
+            self._logger.info("Activating room {}...".format(self._id))
+            dealer_key = -1
             while True:
                 try:
-                    self._game = self.new_game()
-                    self._game.event_dispatcher.subscribe(self)
-                    self._game.play_hand(self._player_ids[self._dealer_index])
-                    self._game.event_dispatcher.unsubscribe(self)
-                    self._game = None
+                    self.ping_all_players()
+
+                    players = self._room_players.players
+                    if len(players) < 2:
+                        raise GameError("At least two players needed to start a new game")
+
+                    dealer_key = (dealer_key + 1) % len(players)
+
+                    game = self._game_factory.create_game(players)
+                    game.event_dispatcher.subscribe(self)
+                    game.play_hand(players[dealer_key].id)
+                    game.event_dispatcher.unsubscribe(self)
+
                 except GameError:
                     break
         finally:
+            self._logger.info("Deactivating room {}...".format(self._id))
             self._active = False
-            self._logger.info("{}: inactive".format(self))

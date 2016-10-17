@@ -31,13 +31,10 @@ class GameServer:
                 except FullGameRoomException:
                     pass
 
-            room_number = GameRoom.room_number
-            room_id = "{}/{}".format(self._id, room_number)
-
-            GameRoom.room_number += 1
+            room_id = str(uuid4())
 
             # All rooms are full: creating new room
-            room = GameRoom(id=room_id, max_room_size=5, game_factory=self._game_factory, logger=self._logger)
+            room = GameRoom(id=room_id, room_size=5, game_factory=self._game_factory, logger=self._logger)
             room.join(player)
             self._rooms.append(room)
             return room

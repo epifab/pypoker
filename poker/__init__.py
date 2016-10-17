@@ -5,7 +5,8 @@ from .score_detector import TraditionalPokerScoreDetector, TraditionalPokerScore
 from .channel import Channel, ChannelError, MessageTimeout, MessageFormatError
 from .channel_redis import MessageQueue, ChannelRedis, RedisListener, RedisPublisher
 from .channel_websocket import ChannelWebSocket
-from .poker_game import PokerGame, GameError
+from .poker_game import PokerGame, GameEventListener, GameError
+from .poker_game_holdem import HoldemPokerGameFactory, HoldemPokerGame
 from .poker_game_traditional import TraditionalPokerGameFactory, TraditionalPokerGame
 from .game_room import GameRoom, FullGameRoomException
 from .player import Player

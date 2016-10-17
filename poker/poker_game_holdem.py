@@ -13,7 +13,7 @@ class HoldemPokerGameFactory(GameFactory):
             self._big_blind,
             self._small_blind,
             game_players=GamePlayers(players),
-            event_dispatcher=GameEventDispatcher(),
+            event_dispatcher=HoldemPokerGameEventDispatcher(),
             deck_factory=DeckFactory(2),
             score_detector=HoldemPokerScoreDetector()
         )
@@ -56,10 +56,10 @@ class HoldemPokerGame(PokerGame):
     WAIT_AFTER_WINNER_DESIGNATION = 5
     WAIT_AFTER_HAND = 0
 
-    def __init__(self, small_blind, big_blind, *args, **kwargs):
+    def __init__(self, big_blind, small_blind, *args, **kwargs):
         PokerGame.__init__(self, *args, **kwargs)
-        self._small_blind = small_blind
         self._big_blind = big_blind
+        self._small_blind = small_blind
 
     def _add_shared_cards(self, new_shared_cards, scores):
         self._event_dispatcher.shared_cards_event(new_shared_cards)
@@ -77,13 +77,13 @@ class HoldemPokerGame(PokerGame):
         # Kicking out players with no money
         for player in self._game_players.active:
             if player.money < self._big_blind:
-                self._event_dispatcher.dead_player_event(player, "Not enough money")
+                self._event_dispatcher.dead_player_event(player)
                 self._game_players.remove(player.id)
 
         if self._game_players.count_active() < 2:
             raise GameError("Not enough players")
 
-        active_players = self._game_players.round(dealer_id)
+        active_players = list(self._game_players.round(dealer_id))
 
         bb_player = active_players[-1]
         bb_player.take_money(self._big_blind)
@@ -143,7 +143,7 @@ class HoldemPokerGame(PokerGame):
         self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id, blind_bets)
 
         # Cards assignment
-        self._assign_cards(2, deck, dealer_id, scores)
+        self._assign_cards(2, dealer_id, deck, scores)
         gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
 
         try:

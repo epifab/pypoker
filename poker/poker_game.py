@@ -17,6 +17,11 @@ class GameFactory:
         raise NotImplemented
 
 
+class GameEventListener:
+    def game_event(self, event, event_data):
+        raise NotImplemented
+
+
 class GameEventDispatcher:
     def __init__(self):
         self._subscribers = []
@@ -32,6 +37,16 @@ class GameEventDispatcher:
             gevent.spawn(subscriber.game_event, event, event_data)
             for subscriber in self._subscribers
         ])
+
+    def set_cards_event(self, player, cards, score):
+        self.raise_event(
+            "set-cards",
+            {
+                "target": player.id,
+                "cards": [card.dto() for card in cards],
+                "score": score.dto()
+            }
+        )
 
     def pots_update_event(self, players, pots):
         self.raise_event(
@@ -551,11 +566,7 @@ class PokerGame:
             self._send_player_score(player, scores)
 
     def _send_player_score(self, player, scores):
-        player.send_message({
-            "message_type": "set-cards",
-            "cards": [card.dto() for card in scores.player_cards(player.id)],
-            "score": scores.player_score(player.id).dto(),
-        })
+        self._event_dispatcher.set_cards_event(player, scores.player_cards(player.id), scores.player_score(player.id))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Winners designation
