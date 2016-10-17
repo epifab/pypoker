@@ -1,4 +1,4 @@
-from poker import GameServerRedis, TraditionalPokerGameFactory
+from poker import GameServerRedis, GameRoomFactory, TraditionalPokerGameFactory
 import logging
 import redis
 import os
@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     server = GameServerRedis(
         redis=redis.from_url(redis_url),
-        game_factory=TraditionalPokerGameFactory(blind=10.0),
+        room_factory=GameRoomFactory(room_size=5, game_factory=TraditionalPokerGameFactory(blind=10.0)),
         logger=logger
     )
     server.start()

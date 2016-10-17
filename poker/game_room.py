@@ -1,6 +1,4 @@
 from . import GameEventListener, GameError
-import gevent
-import logging
 import threading
 
 
@@ -8,7 +6,11 @@ class FullGameRoomException(Exception):
     pass
 
 
-class DuplicatePlayerException(Exception):
+class DuplicateRoomPlayerException(Exception):
+    pass
+
+
+class UnknownRoomPlayerException(Exception):
     pass
 
 
@@ -28,32 +30,34 @@ class GameRoomPlayers:
 
     @property
     def seats(self):
-        return list(self._seats)
+        self._lock.acquire()
+        try:
+            return list(self._seats)
+        finally:
+            self._lock.release()
 
     def get_player(self, player_id):
-        return self._players[player_id]
-
-    def get_free_seat(self):
+        self._lock.acquire()
         try:
-            return self._seats.index(None)
+            return self._players[player_id]
         except KeyError:
-            raise FullGameRoomException
-
-    def is_full(self):
-        try:
-            self.get_free_seat()
-            return False
-        except FullGameRoomException:
-            return True
+            raise UnknownRoomPlayerException
+        finally:
+            self._lock.release()
 
     def add_player(self, player):
         self._lock.acquire()
         try:
             if self._players.has_key(player.id):
-                raise DuplicatePlayerException
-            free_seat = self.get_free_seat()
-            self._seats[free_seat] = player.id
-            self._players[player.id] = player
+                raise DuplicateRoomPlayerException
+
+            try:
+                free_seat = self._seats.index(None)
+            except ValueError:
+                raise FullGameRoomException
+            else:
+                self._seats[free_seat] = player.id
+                self._players[player.id] = player
         finally:
             self._lock.release()
 
@@ -61,6 +65,9 @@ class GameRoomPlayers:
         self._lock.acquire()
         try:
             seat = self._seats.index(player_id)
+        except ValueError:
+            raise UnknownRoomPlayerException
+        else:
             self._seats[seat] = None
             del self._players[player_id]
         finally:
@@ -89,6 +96,15 @@ class GameRoomEventHandler:
             player.try_send_message(message)
 
 
+class GameRoomFactory:
+    def __init__(self, room_size, game_factory):
+        self._room_size = room_size
+        self._game_factory = game_factory
+
+    def create_room(self, id, logger):
+        return GameRoom(id=id, game_factory=self._game_factory, room_size=self._room_size, logger=logger)
+
+
 class GameRoom(GameEventListener):
     def __init__(self, id, game_factory, room_size, logger):
         self._id = id
@@ -110,7 +126,7 @@ class GameRoom(GameEventListener):
             try:
                 self._room_players.add_player(player)
                 self._room_event_handler.room_event("player-added", player.id)
-            except DuplicatePlayerException:
+            except DuplicateRoomPlayerException:
                 old_player = self._room_players.get_player(player.id)
                 old_player.update_channel(player)
                 player = old_player
