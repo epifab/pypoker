@@ -120,10 +120,11 @@ def poker5(ws):
 
         app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
 
-        message_queue = MessageQueue(redis)
+        connection_timeout = 10
+
+        message_queue = MessageQueue(redis, "poker:lobby", expire=10)
 
         message_queue.push(
-            "poker5:lobby",
             {
                 "message_type": "connect",
                 "player": {
@@ -135,7 +136,7 @@ def poker5(ws):
             }
         )
 
-        connection_message = server_channel.recv_message(time.time() + 5)  # 5 seconds
+        connection_message = server_channel.recv_message(time.time() + connection_timeout)  # 5 seconds
 
         # Validating message id
         MessageFormatError.validate_message_type(connection_message, "connect")

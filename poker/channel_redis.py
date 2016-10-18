@@ -61,18 +61,20 @@ class RedisPubSub(Channel):
 
 
 class MessageQueue:
-    def __init__(self, redis):
+    def __init__(self, redis, queue_name, expire=300):
         self._redis = redis
+        self._queue_name = queue_name
+        self._expire = expire
 
-    def push(self, name, message):
+    def push(self, message):
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
-        self._redis.lpush(name, msg_encoded)
-        self._redis.expire(name, 5 * 60)
+        self._redis.lpush(self._queue_name, msg_encoded)
+        self._redis.expire(self._queue_name, self._expire)
 
-    def pop(self, name, timeout_epoch=None):
+    def pop(self, timeout_epoch=None):
         while timeout_epoch is None or time.time() < timeout_epoch:
-            response = self._redis.rpop(name)
+            response = self._redis.rpop(self._queue_name)
             if response is not None:
                 try:
                     # Deserialize and return the message
@@ -82,18 +84,17 @@ class MessageQueue:
                     raise MessageFormatError(desc="Unable to decode the JSON message")
             else:
                 # Context switching
-                gevent.sleep(0.1)
+                gevent.sleep(0.01)
         raise MessageTimeout("Timed out")
 
 
-class ChannelRedis(MessageQueue, Channel):
+class ChannelRedis(Channel):
     def __init__(self, redis, channel_in, channel_out):
-        MessageQueue.__init__(self, redis)
-        self._channel_in = channel_in
-        self._channel_out = channel_out
+        self._queue_in = MessageQueue(redis, channel_in)
+        self._queue_out = MessageQueue(redis, channel_out)
 
     def send_message(self, message):
-        self.push(self._channel_out, message)
+        self._queue_out.push(message)
 
     def recv_message(self, timeout_epoch=None):
-        return self.pop(self._channel_in, timeout_epoch)
+        return self._queue_in.pop(timeout_epoch)
