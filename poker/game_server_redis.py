@@ -3,11 +3,11 @@ from . import GameServer, Player, PlayerServer, \
 
 
 class GameServerRedis(GameServer):
-    def __init__(self, redis, room_factory, logger=None):
+    def __init__(self, redis, connection_channel, room_factory, logger=None):
         GameServer.__init__(self, room_factory, logger)
         self._redis = redis
         self._message_queue = MessageQueue(redis)
-        self._connection_channel = "poker5:lobby"
+        self._connection_channel = connection_channel
 
     def new_players(self):
         while True:
