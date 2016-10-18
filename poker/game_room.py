@@ -81,6 +81,17 @@ class GameRoomEventHandler:
         self._logger = logger
 
     def room_event(self, event, player_id):
+        self._logger.debug(
+            "\n" +
+            ("-" * 80) + "\n"
+            "ROOM: {}\nEVENT: {}\nPLAYER: {}\nSEATS:\n - {}".format(
+                self._room_id,
+                event,
+                player_id,
+                "\n - ".join([seat if seat is not None else "(empty seat)" for seat in self._room_players.seats])
+            ) + "\n" +
+            ("-" * 80) + "\n"
+        )
         self.broadcast({
             "message_type": "room-update",
             "event": event,
@@ -91,7 +102,6 @@ class GameRoomEventHandler:
         })
 
     def broadcast(self, message):
-        self._logger.info(message)
         for player in self._room_players.players:
             player.try_send_message(message)
 

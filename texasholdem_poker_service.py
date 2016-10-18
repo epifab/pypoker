@@ -12,8 +12,11 @@ if __name__ == '__main__':
 
     server = GameServerRedis(
         redis=redis.from_url(redis_url),
-        connection_channel="texas:lobby",
-        room_factory=GameRoomFactory(room_size=5, game_factory=HoldemPokerGameFactory(big_blind=40.0, small_blind=20)),
+        connection_channel="holdem-poker:lobby",
+        room_factory=GameRoomFactory(
+            room_size=5,
+            game_factory=HoldemPokerGameFactory(big_blind=40.0, small_blind=20, logger=logger)
+        ),
         logger=logger
     )
     server.start()

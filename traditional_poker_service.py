@@ -12,8 +12,11 @@ if __name__ == '__main__':
 
     server = GameServerRedis(
         redis=redis.from_url(redis_url),
-        connection_channel="poker5:lobby",
-        room_factory=GameRoomFactory(room_size=5, game_factory=TraditionalPokerGameFactory(blind=10.0)),
+        connection_channel="traditional-poker:lobby",
+        room_factory=GameRoomFactory(
+            room_size=5,
+            game_factory=TraditionalPokerGameFactory(blind=10.0, logger=logger)
+        ),
         logger=logger
     )
     server.start()

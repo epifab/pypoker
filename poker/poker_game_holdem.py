@@ -1,34 +1,37 @@
 from . import DeckFactory, HoldemPokerScoreDetector
 from poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher
 import gevent
+import uuid
 
 
 class HoldemPokerGameFactory(GameFactory):
-    def __init__(self, big_blind, small_blind):
+    def __init__(self, big_blind, small_blind, logger):
         self._big_blind = big_blind
         self._small_blind = small_blind
+        self._logger = logger
 
     def create_game(self, players):
+        game_id = str(uuid.uuid4())
         return HoldemPokerGame(
             self._big_blind,
             self._small_blind,
+            id=game_id,
             game_players=GamePlayers(players),
-            event_dispatcher=HoldemPokerGameEventDispatcher(),
+            event_dispatcher=HoldemPokerGameEventDispatcher(game_id=game_id, logger=self._logger),
             deck_factory=DeckFactory(2),
             score_detector=HoldemPokerScoreDetector()
         )
 
 
 class HoldemPokerGameEventDispatcher(GameEventDispatcher):
-    def new_game_event(self, game_id, players, dealer_id, blind_bets):
+    def new_game_event(self, game_id, players, dealer_id):
         self.raise_event(
             "new-game",
             {
                 "game_id": game_id,
                 "game_type": "texas-holdem",
                 "player_ids": [player.id for player in players],
-                "dealer_id": dealer_id,
-                "blind_bets": blind_bets
+                "dealer_id": dealer_id
             }
         )
 
@@ -85,16 +88,31 @@ class HoldemPokerGame(PokerGame):
 
         active_players = list(self._game_players.round(dealer_id))
 
-        bb_player = active_players[-1]
-        bb_player.take_money(self._big_blind)
+        bets = {}
 
         sb_player = active_players[-2]
         sb_player.take_money(self._small_blind)
+        bets[sb_player.id] = self._small_blind
 
-        return {
-            bb_player.id: self._big_blind,
-            sb_player.id: self._small_blind
-        }
+        self._event_dispatcher.bet_event(
+            player=sb_player,
+            bet=self._small_blind,
+            bet_type="blind",
+            bets=bets
+        )
+
+        bb_player = active_players[-1]
+        bb_player.take_money(self._big_blind)
+        bets[bb_player.id] = self._big_blind
+
+        self._event_dispatcher.bet_event(
+            player=bb_player,
+            bet=self._big_blind,
+            bet_type="blind",
+            bets=bets
+        )
+
+        return bets
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Game logic
@@ -134,13 +152,13 @@ class HoldemPokerGame(PokerGame):
         scores = self._create_scores()
         pots = self._create_pots()
 
+        self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id)
+
         # Collecting small and big blinds
         blind_bets = self._collect_blinds(dealer_id)
 
         # Initializing a bet rounder
         bet_rounds = bet_rounder(dealer_id, pots, scores, blind_bets)
-
-        self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id, blind_bets)
 
         # Cards assignment
         self._assign_cards(2, dealer_id, deck, scores)

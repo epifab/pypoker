@@ -1,7 +1,6 @@
 from . import ChannelError, MessageTimeout, MessageFormatError
 import gevent
 import time
-import uuid
 
 
 class GameError(Exception):
@@ -23,8 +22,10 @@ class GameEventListener:
 
 
 class GameEventDispatcher:
-    def __init__(self):
+    def __init__(self, game_id, logger):
         self._subscribers = []
+        self._game_id = game_id
+        self._logger = logger
 
     def subscribe(self, subscriber):
         self._subscribers.append(subscriber)
@@ -33,6 +34,14 @@ class GameEventDispatcher:
         self._subscribers.remove(subscriber)
 
     def raise_event(self, event, event_data):
+        event_data["game_id"] = self._game_id
+        self._logger.debug(
+            "\n" +
+            ("-" * 80) + "\n"
+            "GAME: {}\nEVENT: {}".format(self._game_id, event) + "\n" +
+            str(event_data) + "\n" +
+            ("-" * 80) + "\n"
+        )
         gevent.joinall([
             gevent.spawn(subscriber.game_event, event, event_data)
             for subscriber in self._subscribers
@@ -84,7 +93,7 @@ class GameEventDispatcher:
             }
         )
 
-    def bet_action_event(self, player, min_bet, max_bet, timeout, timeout_epoch):
+    def bet_action_event(self, player, min_bet, max_bet, bets, timeout, timeout_epoch):
         self.raise_event(
             "player-action",
             {
@@ -92,6 +101,7 @@ class GameEventDispatcher:
                 "player": player.dto(),
                 "min_bet": min_bet,
                 "max_bet": max_bet,
+                "bets": bets,
                 "timeout": timeout,
                 "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
             }
@@ -186,6 +196,12 @@ class GamePlayers:
     #                 pass
     #         return perform
     #     return decorator
+
+    def get(self, player_id):
+        try:
+            return self._players[player_id]
+        except KeyError:
+            raise ValueError("Unknown player id")
 
     def get_next(self, player_id):
         if player_id not in self._player_ids:
@@ -458,7 +474,14 @@ class GameBetHandler:
 
     def get_bet(self, player, min_bet, max_bet, bets):
         timeout_epoch = time.time() + self._bet_timeout
-        self._event_dispatcher.bet_action_event(player, min_bet, max_bet, self._bet_timeout, timeout_epoch)
+        self._event_dispatcher.bet_action_event(
+            player=player,
+            min_bet=min_bet,
+            max_bet=max_bet,
+            bets=bets,
+            timeout=self._bet_timeout,
+            timeout_epoch=timeout_epoch
+        )
         return self.receive_bet(player, min_bet, max_bet, bets, timeout_epoch)
 
     def receive_bet(self, player, min_bet, max_bet, bets, timeout_epoch):
@@ -515,8 +538,8 @@ class PokerGame:
     WAIT_AFTER_WINNER_DESIGNATION = 5
     WAIT_AFTER_HAND = 0
 
-    def __init__(self, game_players, event_dispatcher, deck_factory, score_detector):
-        self._id = str(uuid.uuid4())
+    def __init__(self, id, game_players, event_dispatcher, deck_factory, score_detector):
+        self._id = id
         self._game_players = game_players
         self._event_dispatcher = event_dispatcher
         self._deck_factory = deck_factory

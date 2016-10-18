@@ -122,7 +122,7 @@ def poker5(ws):
 
         connection_timeout = 10
 
-        message_queue = MessageQueue(redis, "poker:lobby", expire=10)
+        message_queue = MessageQueue(redis, "holdem-poker:lobby", expire=10)
 
         message_queue.push(
             {

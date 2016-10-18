@@ -2,6 +2,7 @@ from . import ChannelError, MessageFormatError, MessageTimeout, DeckFactory, Tra
 from poker_game import PokerGame, GameFactory, EndGameException, GameError, GamePlayers, GameEventDispatcher
 import gevent
 import time
+import uuid
 
 
 class DeadHandException(Exception):
@@ -9,17 +10,20 @@ class DeadHandException(Exception):
 
 
 class TraditionalPokerGameFactory(GameFactory):
-    def __init__(self, blind=10.0):
+    def __init__(self, blind, logger):
         self._blind = blind
+        self._logger = logger
 
     def create_game(self, players):
         # In a traditional poker game, the lowest rank is 9 with 2 players, 8 with three, 7 with four, 6 with five
         lowest_rank = 11 - len(players)
+        game_id = str(uuid.uuid4())
 
         return TraditionalPokerGame(
             self._blind,
+            id=game_id,
             game_players=GamePlayers(players),
-            event_dispatcher=TraditionalPokerGameEventDispatcher(),
+            event_dispatcher=TraditionalPokerGameEventDispatcher(game_id=game_id, logger=self._logger),
             deck_factory=DeckFactory(lowest_rank),
             score_detector=TraditionalPokerScoreDetector(lowest_rank)
         )
