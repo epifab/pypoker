@@ -54,10 +54,12 @@ class HoldemPokerGame(PokerGame):
     TIMEOUT_TOLERANCE = 2
     BET_TIMEOUT = 30
 
-    WAIT_AFTER_CARDS_ASSIGNMENT = 0
-    WAIT_AFTER_BET = 2
-    WAIT_AFTER_WINNER_DESIGNATION = 5
-    WAIT_AFTER_HAND = 0
+    # WAIT_AFTER_CARDS_ASSIGNMENT = 1
+    # WAIT_AFTER_BET_ROUND = 1
+    # WAIT_AFTER_SHOWDOWN = 2
+    # WAIT_AFTER_WINNER_DESIGNATION = 5
+
+    WAIT_AFTER_FLOP_TURN_RIVER = 1
 
     def __init__(self, big_blind, small_blind, *args, **kwargs):
         PokerGame.__init__(self, *args, **kwargs)
@@ -121,30 +123,29 @@ class HoldemPokerGame(PokerGame):
     def play_hand(self, dealer_id):
 
         def bet_rounder(dealer_id, pots, scores, blind_bets):
-            skip_next_rounds = False
+            next_bet_round = True
             bets = blind_bets
 
             while True:
-                if skip_next_rounds:
-                    yield False
+                if next_bet_round:
+                    # Bet round
+                    self._bet_handler.bet_round(dealer_id, bets, pots)
 
-                # Bet round
-                self._bet_handler.bet_round(dealer_id, bets, pots)
-                gevent.sleep(self.WAIT_AFTER_BET)
+                    # Only the pre-flop bet has blind bets
+                    bets = {}
 
-                # Only the pre-flop bet has blind bets
-                bets = {}
+                    # Not fun to play alone
+                    if self._game_players.count_active() < 2:
+                        raise EndGameException
 
-                # Not fun to play alone
-                if self._game_players.count_active() < 2:
-                    raise EndGameException
+                    # If everyone is all-in (possibly except 1 player) then showdown and skip next bet rounds
+                    next_bet_round = self._game_players.count_active_with_money() > 1
 
-                # If everyone is all-in (possibly except 1 player) then showdown and skip next bet rounds
-                skip_next_rounds = self._game_players.count_active_with_money() < 2
-                if skip_next_rounds:
-                    self._showdown(scores)
+                    # There won't be a next bet round: showdown
+                    if not next_bet_round:
+                        self._showdown(scores)
 
-                yield skip_next_rounds
+                yield next_bet_round
 
         # Initialization
         self._game_players.reset()
@@ -154,47 +155,46 @@ class HoldemPokerGame(PokerGame):
 
         self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id)
 
-        # Collecting small and big blinds
-        blind_bets = self._collect_blinds(dealer_id)
-
-        # Initializing a bet rounder
-        bet_rounds = bet_rounder(dealer_id, pots, scores, blind_bets)
-
-        # Cards assignment
-        self._assign_cards(2, dealer_id, deck, scores)
-        gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
-
         try:
+            # Collecting small and big blinds
+            blind_bets = self._collect_blinds(dealer_id)
+
+            # Initializing a bet rounder
+            bet_rounds = bet_rounder(dealer_id, pots, scores, blind_bets)
+
+            # Cards assignment
+            self._assign_cards(2, dealer_id, deck, scores)
+
             # Pre-flop bet round
             bet_rounds.next()
 
             # Flop
             self._add_shared_cards(deck.pop_cards(3), scores)
-            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+            gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # Flop bet round
             bet_rounds.next()
 
             # Turn
             self._add_shared_cards(deck.pop_cards(1), scores)
-            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+            gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # Turn bet round
             bet_rounds.next()
 
             # River
             self._add_shared_cards(deck.pop_cards(1), scores)
-            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
+            gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # River bet round
-            bet_rounds.next()
+            if bet_rounds.next() and self._game_players.count_active() > 1:
+                # There are still active players in the match and no showdown yet
+                self._showdown(scores)
 
             raise EndGameException
 
         except EndGameException:
-            if self._game_players.count_active() > 1:
-                self._showdown(scores)
             self._detect_winners(pots, scores)
-            gevent.sleep(self.WAIT_AFTER_HAND)
 
-        self._event_dispatcher.game_over_event()
+        finally:
+            self._event_dispatcher.game_over_event()

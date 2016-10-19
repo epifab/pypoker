@@ -467,8 +467,8 @@ class GameBetHandler:
 
     def bet_round(self, dealer_id, bets, pots):
         self._bet_rounder.bet_round(dealer_id, bets, self.get_bet, self.on_bet)
+        gevent.sleep(self._wait_after_round)
         if self.any_bet(bets):
-            gevent.sleep(self._wait_after_round)
             pots.add_bets(bets)
             self._event_dispatcher.pots_update_event(self._game_players.active, pots)
 
@@ -533,10 +533,10 @@ class PokerGame:
     TIMEOUT_TOLERANCE = 2
     BET_TIMEOUT = 30
 
-    WAIT_AFTER_CARDS_ASSIGNMENT = 0
-    WAIT_AFTER_BET = 2
+    WAIT_AFTER_CARDS_ASSIGNMENT = 1
+    WAIT_AFTER_BET_ROUND = 1
+    WAIT_AFTER_SHOWDOWN = 2
     WAIT_AFTER_WINNER_DESIGNATION = 5
-    WAIT_AFTER_HAND = 0
 
     def __init__(self, id, game_players, event_dispatcher, deck_factory, score_detector):
         self._id = id
@@ -565,7 +565,7 @@ class PokerGame:
             event_dispatcher=self._event_dispatcher,
             bet_timeout=self.BET_TIMEOUT,
             timeout_tolerance=self.TIMEOUT_TOLERANCE,
-            wait_after_round=self.WAIT_AFTER_BET
+            wait_after_round=self.WAIT_AFTER_BET_ROUND
         )
 
     def _create_winners_detector(self):
@@ -587,6 +587,7 @@ class PokerGame:
             # Distribute cards
             scores.assign_cards(player.id, deck.pop_cards(number_of_cards))
             self._send_player_score(player, scores)
+        gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
 
     def _send_player_score(self, player, scores):
         self._event_dispatcher.set_cards_event(player, scores.player_cards(player.id), scores.player_score(player.id))
@@ -622,3 +623,4 @@ class PokerGame:
 
     def _showdown(self, scores):
         self._event_dispatcher.showdown_event(self._game_players.active, scores)
+        gevent.sleep(self.WAIT_AFTER_SHOWDOWN)

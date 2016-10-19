@@ -7,7 +7,7 @@ import redis
 import uuid
 import os
 import time
-from poker import ChannelWebSocket, ChannelRedis, MessageQueue, ChannelError, MessageFormatError, MessageTimeout
+from poker import ChannelWebSocket, PlayerClientConnector, Player, ChannelError, MessageFormatError, MessageTimeout
 
 
 app = Flask(__name__)
@@ -107,51 +107,25 @@ def poker5(ws):
     player_name = session["player-name"]
     player_money = session["player-money"]
 
-    server_channel = ChannelRedis(
-        redis,
-        "poker5:player-{}:session-{}:O".format(player_id, session_id),
-        "poker5:player-{}:session-{}:I".format(player_id, session_id)
-    )
+    player_connector = PlayerClientConnector(redis, "holdem-poker:lobby", app.logger)
 
     try:
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #  Player connection
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        app.logger.info("Connecting player {} to a poker5 server...".format(player_id))
-
-        connection_timeout = 10
-
-        message_queue = MessageQueue(redis, "holdem-poker:lobby", expire=10)
-
-        message_queue.push(
-            {
-                "message_type": "connect",
-                "player": {
-                    "id": player_id,
-                    "name": player_name,
-                    "money": player_money
-                },
-                "session_id": session_id
-            }
+        server_channel = player_connector.connect(
+            player=Player(
+                id=player_id,
+                name=player_name,
+                money=player_money
+            ),
+            session_id=session_id
         )
-
-        connection_message = server_channel.recv_message(time.time() + connection_timeout)  # 5 seconds
-
-        # Validating message id
-        MessageFormatError.validate_message_type(connection_message, "connect")
-
-        server_id = str(connection_message["server_id"])
-
-        app.logger.info("player {}: connected to server {}".format(player_id, server_id))
-
-        # Forwarding connection message to the client
-        client_channel.send_message(connection_message)
 
     except (ChannelError, MessageFormatError, MessageTimeout) as e:
         app.logger.error("Unable to connect player {} to a poker5 server: {}".format(player_id, e.args[0]))
 
     else:
+        # Forwarding connection to the client
+        client_channel.send_message(server_channel.connection_message)
+
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #  Game service communication
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
