@@ -74,11 +74,12 @@ class TraditionalPokerGame(PokerGame):
     BET_TIMEOUT = 30
     CHANGE_CARDS_TIMEOUT = 30
 
-    WAIT_AFTER_CARDS_ASSIGNMENT = 0
-    WAIT_AFTER_BET = 2
-    WAIT_AFTER_WINNER_DESIGNATION = 5
-    WAIT_AFTER_HAND = 0
-    WAIT_AFTER_CARDS_CHANGE = 0
+    # WAIT_AFTER_CARDS_ASSIGNMENT = 1
+    # WAIT_AFTER_BET_ROUND = 1
+    # WAIT_AFTER_SHOWDOWN = 2
+    # WAIT_AFTER_WINNER_DESIGNATION = 5
+
+    WAIT_AFTER_CARDS_CHANGE = 1
 
     def __init__(self, blind, *args, **kwargs):
         PokerGame.__init__(self, *args, **kwargs)
@@ -135,6 +136,7 @@ class TraditionalPokerGame(PokerGame):
                     self._send_player_score(player, scores)
 
                 self._event_dispatcher.change_cards_event(player, len(discard))
+        gevent.sleep(self.WAIT_AFTER_CARDS_CHANGE)
 
     def _get_player_discard(self, player, scores, timeout_epoch):
         message = player.recv_message(timeout_epoch=timeout_epoch)
@@ -176,15 +178,13 @@ class TraditionalPokerGame(PokerGame):
 
         self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id, blind_bets)
 
-        # In the traditional poker game, the blinds are immediately collected
-        pots.add_bets(blind_bets)
-        self._event_dispatcher.pots_update_event(self._game_players.active, pots)
-
         try:
+            # In the traditional poker game, the blinds are immediately collected
+            pots.add_bets(blind_bets)
+            self._event_dispatcher.pots_update_event(self._game_players.active, pots)
+
             # Cards assignment
             self._assign_cards(5, dealer_id, deck, scores)
-            detect_game_over()
-            gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
 
             # First bet round
             self._bet_handler.bet_round(dealer_id, {}, pots)
@@ -193,21 +193,16 @@ class TraditionalPokerGame(PokerGame):
             # Change cards
             self._change_cards_round(dealer_id, deck, scores)
             detect_game_over()
-            gevent.sleep(self.WAIT_AFTER_CARDS_CHANGE)
 
-            if self._game_players.count_active_with_money() < 2:
-                raise EndGameException
+            if self._game_players.count_active_with_money() > 1:
+                self._bet_handler.bet_round(dealer_id, {}, pots)
+                detect_game_over()
 
-            # Final bet round
-            self._bet_handler.bet_round(dealer_id, {}, pots)
-            self._game_over_detection()
-
+            self._showdown(scores)
             raise EndGameException
 
         except EndGameException:
-            if self._game_players.count_active() > 1:
-                self._showdown(scores)
             self._detect_winners(pots, scores)
-            gevent.sleep(self.WAIT_AFTER_HAND)
 
-        self._event_dispatcher.game_over_event()
+        finally:
+            self._event_dispatcher.game_over_event()

@@ -466,11 +466,12 @@ class GameBetHandler:
         return any(k for k in bets if bets[k] > 0)
 
     def bet_round(self, dealer_id, bets, pots):
-        self._bet_rounder.bet_round(dealer_id, bets, self.get_bet, self.on_bet)
+        best_player = self._bet_rounder.bet_round(dealer_id, bets, self.get_bet, self.on_bet)
         gevent.sleep(self._wait_after_round)
         if self.any_bet(bets):
             pots.add_bets(bets)
             self._event_dispatcher.pots_update_event(self._game_players.active, pots)
+        return best_player
 
     def get_bet(self, player, min_bet, max_bet, bets):
         timeout_epoch = time.time() + self._bet_timeout
