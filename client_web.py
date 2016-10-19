@@ -6,7 +6,6 @@ import random
 import redis
 import uuid
 import os
-import time
 from poker import ChannelWebSocket, PlayerClientConnector, Player, ChannelError, MessageFormatError, MessageTimeout
 
 
@@ -92,8 +91,17 @@ def get_facebook_oauth_token():
     return session.get("oauth-token")
 
 
-@sockets.route("/poker5")
-def poker5(ws):
+@sockets.route("/poker/texas-holdem")
+def texasholdem_poker_game(ws):
+    return poker_game(ws, "texas-holdem-poker:lobby")
+
+
+@sockets.route("/poker/traditional")
+def traditional_poker_game(ws):
+    return poker_game(ws, "traditional-poker:lobby")
+
+
+def poker_game(ws, connection_channel):
     client_channel = ChannelWebSocket(ws)
 
     if "player-id" not in session:
@@ -107,7 +115,7 @@ def poker5(ws):
     player_name = session["player-name"]
     player_money = session["player-money"]
 
-    player_connector = PlayerClientConnector(redis, "holdem-poker:lobby", app.logger)
+    player_connector = PlayerClientConnector(redis, connection_channel, app.logger)
 
     try:
         server_channel = player_connector.connect(
