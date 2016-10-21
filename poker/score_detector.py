@@ -1,4 +1,5 @@
 import collections
+from poker import Card
 
 
 class Cards:
@@ -281,3 +282,77 @@ class HoldemPokerScoreDetector(ScoreDetector):
                 return HoldemPokerScore(score_category, score)
 
         raise RuntimeError("Unable to detect the score")
+
+
+class HandEvaluator:
+    BOARD_SIZE = 5
+
+    def __init__(self, score_detector):
+        self.score_detector = score_detector
+
+    def evaluate(self, my_cards, board_cards, look_ahead):
+        rest = filter(
+            lambda card: card not in my_cards and card not in board_cards,
+            [Card(rank, suit) for rank in range(2, 15) for suit in range(0, 4)]
+        )
+        return self._evaluate(my_cards, board_cards, rest, look_ahead)
+
+    def _evaluate(self, my_cards, board, deck, look_ahead, start_key=0):
+        if look_ahead <= 0 or len(board) == self.BOARD_SIZE:
+            my_score = self.score_detector.get_score(my_cards + board)
+            return self._evaluate_base(
+                my_cards=my_cards,
+                my_score=my_score,
+                board=board,
+                deck=filter(lambda card: card not in board, deck),
+                opponent_cards=[]
+            )
+
+        wins = 0
+        ties = 0
+        defeats = 0
+
+        for key in range(start_key, len(deck)):
+            sub_wins, sub_ties, sub_defeats = self._evaluate(
+                my_cards=my_cards,
+                board=board + [deck[key]],
+                deck=deck,
+                look_ahead=look_ahead - 1,
+                start_key=key + 1
+            )
+            wins += sub_wins
+            ties += sub_ties
+            defeats += sub_defeats
+
+        return wins, ties, defeats
+
+    def _evaluate_base(self, my_cards, my_score, board, deck, opponent_cards, start_key=0):
+        wins = 0
+        ties = 0
+        defeats = 0
+
+        if len(opponent_cards) == len(my_cards):
+            opponent_score = self.score_detector.get_score(opponent_cards + board)
+            score_diff = my_score.cmp(opponent_score)
+            if score_diff < 0:
+                defeats += 1
+            elif score_diff == 0:
+                ties += 1
+            else:
+                wins += 1
+
+        else:
+            for key in range(start_key, len(deck)):
+                sub_wins, sub_ties, sub_defeats = self._evaluate_base(
+                    my_cards=my_cards,
+                    my_score=my_score,
+                    board=board,
+                    deck=deck,
+                    opponent_cards=opponent_cards + [deck[key]],
+                    start_key=key + 1
+                )
+                wins += sub_wins
+                ties += sub_ties
+                defeats += sub_defeats
+
+        return wins, ties, defeats

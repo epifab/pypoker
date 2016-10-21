@@ -242,7 +242,7 @@ PyPoker = {
                 case 'new-game':
                     PyPoker.Game.newGame(message);
                     break;
-                case 'set-cards':
+                case 'cards-assignment':
                     $cards = $('#current-player .cards');
                     $cards.empty();
                     for (i = 0; i < PyPoker.Game.numCards; i++) {
@@ -276,7 +276,7 @@ PyPoker = {
                 case 'dead-player':
                     PyPoker.Game.playerFold(message.player);
                     break;
-                case 'change-cards':
+                case 'cards-change':
                     PyPoker.Game.changeCards(message.player, message.num_cards);
                     break;
                 case 'shared-cards':
@@ -386,10 +386,10 @@ PyPoker = {
             PyPoker.Player.cardsChangeMode = changeMode;
 
             if (changeMode) {
-                $('#change-cards-controls').show();
+                $('#cards-change-controls').show();
             }
             else {
-                $('#change-cards-controls').hide();
+                $('#cards-change-controls').hide();
                 $('#current-player .card.selected').removeClass('selected');
             }
         },
@@ -403,7 +403,7 @@ PyPoker = {
                         PyPoker.Player.onBet(message);
                     }
                     break;
-                case 'change-cards':
+                case 'cards-change':
                     if (isCurrentPlayer) {
                         PyPoker.Player.onChangeCards(message);
                     }
@@ -580,13 +580,13 @@ PyPoker = {
             }
         };
 
-        $('#change-cards-cmd').click(function() {
+        $('#cards-change-cmd').click(function() {
             discards = [];
             $('#current-player .card.selected').each(function() {
                 discards.push($(this).data('key'))
             });
             PyPoker.socket.send(JSON.stringify({
-                'message_type': 'change-cards',
+                'message_type': 'cards-change',
                 'cards': discards
             }));
             PyPoker.Player.setCardsChangeMode(false);

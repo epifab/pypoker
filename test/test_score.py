@@ -1,5 +1,7 @@
 import unittest
-from poker import TraditionalPokerScoreDetector, TraditionalPokerScore, HoldemPokerScore, HoldemPokerScoreDetector, Card
+from poker import HandEvaluator, Card, \
+    TraditionalPokerScoreDetector, TraditionalPokerScore, \
+    HoldemPokerScore, HoldemPokerScoreDetector
 
 
 class TraditionalPokerScoreDetectorTests(unittest.TestCase):
@@ -149,6 +151,12 @@ class HoldemPokerScoreDetectorTests(unittest.TestCase):
         expected_category = HoldemPokerScore.STRAIGHT_FLUSH
         cards = [Card(10, 2), Card(13, 2), Card(11, 2), Card(14, 2), Card(12, 2)]
         expected_cards = [Card(14, 2), Card(13, 2), Card(12, 2), Card(11, 2), Card(10, 2)]
+        self._test_detect(cards, expected_category, expected_cards)
+
+    def test_detect_min_straight_flush(self):
+        expected_category = HoldemPokerScore.STRAIGHT_FLUSH
+        cards = [Card(14, 2), Card(3, 2), Card(2, 2), Card(5, 2), Card(4, 2)]
+        expected_cards = [Card(5, 2), Card(4, 2), Card(3, 2), Card(2, 2), Card(14, 2)]
         self._test_detect(cards, expected_category, expected_cards)
 
     def test_detect_longer_sequence(self):
@@ -423,6 +431,118 @@ class HoldemPokerScoreTests(unittest.TestCase):
             [Card(13, 3), Card(11, 3), Card(10, 3), Card(9, 2)]
         )
         self._test_cmp(score1, score2)
+
+    def test_cmp_AA_with_AA(self):
+        score1 = HoldemPokerScore(
+            HoldemPokerScore.PAIR,
+            [Card(14, 3), Card(14, 2)]
+        )
+        score2 = HoldemPokerScore(
+            HoldemPokerScore.PAIR,
+            [Card(14, 1), Card(14, 0)]
+        )
+        self.assertEquals(0, score1.cmp(score2))
+        self.assertEquals(0, score2.cmp(score1))
+
+
+class HandEvaluatorTests(unittest.TestCase):
+    def test_evaluate_AA_no_board_no_lookahead(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            0
+        )
+        # Number of combinations:
+        # 50! / 2! (50 - 2)! = 1225
+        # Only 1 tie is possible (the other pair of As)
+        self.assertEquals(0, defeats)
+        self.assertEquals(1, ties)
+        self.assertEquals(1224, wins)
+
+    def test_evaluate_KK_no_board_no_lookahead(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(13, 3), Card(13, 2)],
+            [],
+            0
+        )
+        # Number of combinations:
+        # 50! / 2! (50 - 2)! = 1225
+        # 6 defeats are possible (every AA combination)
+        # Only 1 tie is possible (the other pair of Ks)
+        self.assertEquals(6, defeats)
+        self.assertEquals(1, ties)
+        self.assertEquals(1218, wins)
+
+    def test_evaluate_AA_with_AA_board_no_lookahead(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            0
+        )
+        # Number of combinations:
+        # 48! / 2! (48 - 2)! = 1128
+        # No defeats and no ties are possible
+        self.assertEquals(0, defeats)
+        self.assertEquals(0, ties)
+        self.assertEquals(1128, wins)
+
+    def test_evaluate_AA_with_AAK_board_0_lookahead(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0), Card(13, 3)],
+            0
+        )
+        # Number of combinations:
+        # C(47,2) = 1081
+        # No defeats and no ties are possible
+        self.assertEquals(0, defeats)
+        self.assertEquals(0, ties)
+        self.assertEquals(1081, wins)
+
+    def test_evaluate_AA_with_AA_board_1_lookahead(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            1
+        )
+        # Number of combinations:
+        # 48 * C(47,2) = 51888
+        # No defeats and no ties are possible
+        self.assertEquals(0, defeats)
+        self.assertEquals(0, ties)
+        self.assertEquals(51888, wins)
+
+    def test_evaluate_AA_with_AA_board_2_lookahead(self):
+        # The calculation for 2 lookahead is too expensive
+        self.skipTest("Too slow")
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        wins, ties, defeats = evaluator.evaluate(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            2
+        )
+        # Number of combinations:
+        # C(48,2) * C(46,2) = 1167480
+        # It's possible to have a royal flush (either clubs or spades) or a straight flush (A to 5)
+        # To have a royal flush, you will need a very specific combination:
+        # - K, Q on the board, J, 10 in your hole cards
+        # - K, J on the board, Q, 10 in your hole cards
+        # ...
+        #   => Royal flush combinations: C(4,2) * C(2,2): 6
+        # - 2, 3 on the board, 4, 5 in your hole cards
+        # - 2, 4 on the board, 3, 5 in your hole cards
+        # ...
+        #   => Straight flush combinations: C(4,2) * C(2,2): 6
+        # This is a C(4,2) * C(2,2) = 12
+        # Since there are 2 possible royal flushes (either clubs or spades) it goes to 24
+        self.assertEquals(24, defeats)
+        self.assertEquals(0, ties)
+        self.assertEquals(1167456, wins)
 
 
 if __name__ == '__main__':

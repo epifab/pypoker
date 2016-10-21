@@ -47,9 +47,9 @@ class GameEventDispatcher:
             for subscriber in self._subscribers
         ])
 
-    def set_cards_event(self, player, cards, score):
+    def cards_assignment_event(self, player, cards, score):
         self.raise_event(
-            "set-cards",
+            "cards-assignment",
             {
                 "target": player.id,
                 "cards": [card.dto() for card in cards],
@@ -591,7 +591,11 @@ class PokerGame:
         gevent.sleep(self.WAIT_AFTER_CARDS_ASSIGNMENT)
 
     def _send_player_score(self, player, scores):
-        self._event_dispatcher.set_cards_event(player, scores.player_cards(player.id), scores.player_score(player.id))
+        self._event_dispatcher.cards_assignment_event(
+            player=player,
+            cards=scores.player_cards(player.id),
+            score=scores.player_score(player.id)
+        )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Winners designation

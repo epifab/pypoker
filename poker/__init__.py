@@ -1,6 +1,7 @@
 from .card import Card
 from .deck import DeckFactory, Deck
-from .score_detector import TraditionalPokerScoreDetector, TraditionalPokerScore, \
+from .score_detector import HandEvaluator, \
+    TraditionalPokerScoreDetector, TraditionalPokerScore, \
     HoldemPokerScoreDetector, HoldemPokerScore
 from .channel import Channel, ChannelError, MessageTimeout, MessageFormatError
 from .channel_redis import MessageQueue, ChannelRedis, RedisListener, RedisPublisher

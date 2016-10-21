@@ -52,7 +52,7 @@ class TraditionalPokerGameEventDispatcher(GameEventDispatcher):
         self.raise_event(
             "player-action",
             {
-                "action": "change-cards",
+                "action": "cards-change",
                 "player": player.dto(),
                 "timeout": timeout,
                 "timeout_date": time.strftime("%Y-%m-%d %H:%M:%S+0000", time.gmtime(timeout_epoch))
@@ -61,7 +61,7 @@ class TraditionalPokerGameEventDispatcher(GameEventDispatcher):
     
     def change_cards_event(self, player, num_cards):
         self.raise_event(
-            "change-cards",
+            "cards-change",
             {
                 "player": player.dto(),
                 "num_cards": num_cards
@@ -141,7 +141,7 @@ class TraditionalPokerGame(PokerGame):
     def _get_player_discard(self, player, scores, timeout_epoch):
         message = player.recv_message(timeout_epoch=timeout_epoch)
 
-        MessageFormatError.validate_message_type(message, "change-cards")
+        MessageFormatError.validate_message_type(message, "cards-change")
 
         if "cards" not in message:
             raise MessageFormatError(attribute="cards", desc="Attribute is missing")
