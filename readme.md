@@ -15,7 +15,7 @@ During a game session, other players can leave and join the table.
 
 A live demo of this application can be found at: https://pypoker.herokuapp.com
 
-![image](https://cloud.githubusercontent.com/assets/3248824/19188689/4ed266d2-8c8b-11e6-859d-124b829cd3b8.png)
+![image](https://cloud.githubusercontent.com/assets/3248824/19602814/950fcbd2-97a6-11e6-9e9d-faabeac2307f.png)
 
 
 ### Architecture
