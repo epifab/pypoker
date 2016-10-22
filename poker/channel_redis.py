@@ -14,7 +14,7 @@ class RedisListener():
         self._pubsub.unsubscribe()
 
     def recv_message(self, timeout_epoch=None):
-        def timeout_handler():
+        def timeout_handler(signum, frame):
             raise MessageTimeout("Timed out")
 
         if timeout_epoch:
@@ -65,6 +65,10 @@ class MessageQueue:
         self._redis = redis
         self._queue_name = queue_name
         self._expire = expire
+
+    @property
+    def name(self):
+        return self._queue_name
 
     def push(self, message):
         msg_serialized = json.dumps(message)

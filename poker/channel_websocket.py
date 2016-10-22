@@ -25,7 +25,7 @@ class ChannelWebSocket(Channel):
             raise ChannelError("Unable to send data to the remote host")
 
     def recv_message(self, timeout_epoch=None):
-        def timeout_handler():
+        def timeout_handler(signum, frame):
             raise MessageTimeout("Timed out")
 
         if self._ws.closed:
