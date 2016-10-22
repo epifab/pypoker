@@ -1,5 +1,10 @@
 import collections
+import random
+import gevent
+import time
 from poker import Card
+from multiprocessing import Process, Queue, Value, Lock
+from Queue import Empty
 
 
 class Cards:
@@ -285,74 +290,125 @@ class HoldemPokerScoreDetector(ScoreDetector):
 
 
 class HandEvaluator:
+    MAX_WORKERS = 4
     BOARD_SIZE = 5
 
     def __init__(self, score_detector):
         self.score_detector = score_detector
 
-    def evaluate(self, my_cards, board_cards, look_ahead):
-        rest = filter(
-            lambda card: card not in my_cards and card not in board_cards,
+    def hand_strength(self, my_cards, board_cards, look_ahead=None, timeout=None):
+        wins, ties, defeats = self.evaluate(my_cards, board_cards, look_ahead=look_ahead, timeout=timeout)
+        return float(wins + ties) / float(wins + ties + defeats)
+
+    def evaluate(self, my_cards, board, look_ahead=None, timeout=None):
+        deck = filter(
+            lambda card: card not in my_cards and card not in board,
             [Card(rank, suit) for rank in range(2, 15) for suit in range(0, 4)]
         )
-        return self._evaluate(my_cards, board_cards, rest, look_ahead)
+        random.shuffle(deck)
 
-    def _evaluate(self, my_cards, board, deck, look_ahead, start_key=0):
-        if look_ahead <= 0 or len(board) == self.BOARD_SIZE:
-            my_score = self.score_detector.get_score(my_cards + board)
-            return self._evaluate_base(
-                my_cards=my_cards,
-                my_score=my_score,
-                board=board,
-                deck=filter(lambda card: card not in board, deck),
-                opponent_cards=[]
+        if look_ahead is None:
+            look_ahead = HandEvaluator.BOARD_SIZE - len(board)
+        assert(look_ahead <= HandEvaluator.BOARD_SIZE)
+
+        timeout_epoch = None if timeout is None else time.time() + timeout
+
+        request_queue = Queue(10)
+        in_progress = Value("b", True)
+
+        lock = Lock()
+        wins = Value("i", 0)
+        ties = Value("i", 0)
+        defeats = Value("i", 0)
+
+        # Generating queue items
+        requests_process = Process(
+            target=self._evaluate_boards,
+            args=(request_queue, deck, look_ahead, timeout_epoch, in_progress)
+        )
+        requests_process.start()
+
+        workers = []
+        for i in range(HandEvaluator.MAX_WORKERS):
+            worker = Process(
+                target=self._evaluate_worker,
+                args=(my_cards, board, deck, request_queue, in_progress, wins, ties, defeats, lock)
             )
+            worker.start()
+            workers.append(worker)
 
-        wins = 0
-        ties = 0
-        defeats = 0
+        # Waiting for every process to finish
+        requests_process.join()
+        for worker in workers:
+            worker.join()
 
-        for key in range(start_key, len(deck)):
-            sub_wins, sub_ties, sub_defeats = self._evaluate(
-                my_cards=my_cards,
-                board=board + [deck[key]],
-                deck=deck,
-                look_ahead=look_ahead - 1,
-                start_key=key + 1
-            )
-            wins += sub_wins
-            ties += sub_ties
-            defeats += sub_defeats
+        return wins.value, ties.value, defeats.value
 
-        return wins, ties, defeats
+    def _evaluate_boards(self, request_queue, deck, size, timeout_epoch, in_progress):
+        class Timeout(Exception):
+            pass
 
-    def _evaluate_base(self, my_cards, my_score, board, deck, opponent_cards, start_key=0):
-        wins = 0
-        ties = 0
-        defeats = 0
-
-        if len(opponent_cards) == len(my_cards):
-            opponent_score = self.score_detector.get_score(opponent_cards + board)
-            score_diff = my_score.cmp(opponent_score)
-            if score_diff < 0:
-                defeats += 1
-            elif score_diff == 0:
-                ties += 1
+        def generate(future_board, iteration):
+            if timeout_epoch is not None and time.time() > timeout_epoch:
+                raise Timeout
+            if len(future_board) == size:
+                request_queue.put(future_board)
             else:
-                wins += 1
+                for key in range(iteration, len(deck)):
+                    generate(future_board + [deck[key]], key + 1)
 
-        else:
-            for key in range(start_key, len(deck)):
-                sub_wins, sub_ties, sub_defeats = self._evaluate_base(
-                    my_cards=my_cards,
-                    my_score=my_score,
-                    board=board,
-                    deck=deck,
-                    opponent_cards=opponent_cards + [deck[key]],
-                    start_key=key + 1
+        try:
+            generate([], 0)
+        except Timeout:
+            pass
+        finally:
+            in_progress.value = False
+
+    def _evaluate_worker(self, my_cards, board, deck, requests_queue, in_progress, wins, ties, defeats, lock):
+        while True:
+            try:
+                future_board = requests_queue.get_nowait()
+                tmp_wins, tmp_ties, tmp_defeats = self.evaluate_base(
+                    my_cards,
+                    board + future_board,
+                    filter(lambda card: card not in future_board, deck)
                 )
-                wins += sub_wins
-                ties += sub_ties
-                defeats += sub_defeats
+                with lock:
+                    wins.value += tmp_wins
+                    ties.value += tmp_ties
+                    defeats.value += tmp_defeats
+            except Empty:
+                if not in_progress.value:
+                    break
+                gevent.sleep(0.1)
 
-        return wins, ties, defeats
+    def evaluate_base(self, my_cards, board, deck):
+        my_score = self.score_detector.get_score(my_cards + board)
+
+        def evaluate(opponent_cards, start_key):
+            wins = 0
+            ties = 0
+            defeats = 0
+
+            if len(opponent_cards) == len(my_cards):
+                opponent_score = self.score_detector.get_score(opponent_cards + board)
+                score_diff = my_score.cmp(opponent_score)
+                if score_diff < 0:
+                    defeats = 1
+                elif score_diff == 0:
+                    ties = 1
+                else:
+                    wins = 1
+
+            else:
+                for key in range(start_key, len(deck)):
+                    sub_wins, sub_ties, sub_defeats = evaluate(
+                        opponent_cards=opponent_cards + [deck[key]],
+                        start_key=key + 1
+                    )
+                    wins += sub_wins
+                    ties += sub_ties
+                    defeats += sub_defeats
+
+            return wins, ties, defeats
+        return evaluate([], 0)

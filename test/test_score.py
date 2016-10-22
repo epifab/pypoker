@@ -1,4 +1,5 @@
 import unittest
+import time
 from poker import HandEvaluator, Card, \
     TraditionalPokerScoreDetector, TraditionalPokerScore, \
     HoldemPokerScore, HoldemPokerScoreDetector
@@ -446,85 +447,84 @@ class HoldemPokerScoreTests(unittest.TestCase):
 
 
 class HandEvaluatorTests(unittest.TestCase):
+    def test_evaluate_base(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        result = evaluator.evaluate_base(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            [Card(rank, suit) for rank in range(2, 14) for suit in range(0, 4)]
+        )
+        self.assertEquals((1128, 0, 0), result)
+
     def test_evaluate_AA_no_board_no_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [],
-            0
+            look_ahead=0
         )
         # Number of combinations:
         # 50! / 2! (50 - 2)! = 1225
         # Only 1 tie is possible (the other pair of As)
-        self.assertEquals(0, defeats)
-        self.assertEquals(1, ties)
-        self.assertEquals(1224, wins)
+        self.assertEquals((1224, 1, 0), result)
 
     def test_evaluate_KK_no_board_no_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(13, 3), Card(13, 2)],
             [],
-            0
+            look_ahead=0
         )
         # Number of combinations:
-        # 50! / 2! (50 - 2)! = 1225
+        # C(50,2) = 1225
         # 6 defeats are possible (every AA combination)
         # Only 1 tie is possible (the other pair of Ks)
-        self.assertEquals(6, defeats)
-        self.assertEquals(1, ties)
-        self.assertEquals(1218, wins)
+        self.assertEquals((1218, 1, 6), result)
 
     def test_evaluate_AA_with_AA_board_no_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
-            0
+            look_ahead=0
         )
         # Number of combinations:
-        # 48! / 2! (48 - 2)! = 1128
+        # C(48,2) = 1128
         # No defeats and no ties are possible
-        self.assertEquals(0, defeats)
-        self.assertEquals(0, ties)
-        self.assertEquals(1128, wins)
+        self.assertEquals((1128, 0, 0), result)
 
-    def test_evaluate_AA_with_AAK_board_0_lookahead(self):
+    def test_evaluate_AA_with_AAK_board_no_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0), Card(13, 3)],
-            0
+            look_ahead=0
         )
         # Number of combinations:
         # C(47,2) = 1081
         # No defeats and no ties are possible
-        self.assertEquals(0, defeats)
-        self.assertEquals(0, ties)
-        self.assertEquals(1081, wins)
+        self.assertEquals((1081, 0, 0), result)
 
     def test_evaluate_AA_with_AA_board_1_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
-            1
+            look_ahead=1
         )
         # Number of combinations:
-        # 48 * C(47,2) = 51888
+        # C(48,1) * C(47,2) = 51888
         # No defeats and no ties are possible
-        self.assertEquals(0, defeats)
-        self.assertEquals(0, ties)
-        self.assertEquals(51888, wins)
+        self.assertEquals((51888, 0, 0), result)
 
     def test_evaluate_AA_with_AA_board_2_lookahead(self):
         # The calculation for 2 lookahead is too expensive
-        self.skipTest("Too slow")
+        # self.skipTest("Too slow")
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
-        wins, ties, defeats = evaluator.evaluate(
+        result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
-            2
+            look_ahead=2
         )
         # Number of combinations:
         # C(48,2) * C(46,2) = 1167480
@@ -540,9 +540,22 @@ class HandEvaluatorTests(unittest.TestCase):
         #   => Straight flush combinations: C(4,2) * C(2,2): 6
         # This is a C(4,2) * C(2,2) = 12
         # Since there are 2 possible royal flushes (either clubs or spades) it goes to 24
-        self.assertEquals(24, defeats)
-        self.assertEquals(0, ties)
-        self.assertEquals(1167456, wins)
+        self.assertEquals((1167456, 0, 24), result)
+
+    def test_hand_strength_AA_with_no_board_5_lookahead_and_timeout(self):
+        # The calculation for 5 lookahead might take forever.. some results are better than nothing tho
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        start = time.time()
+        strength = evaluator.hand_strength(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            look_ahead=5,
+            timeout=3   # Get me some results in 1 second
+        )
+        elapsed = time.time() - start
+
+        self.assertLessEqual(elapsed, 3 + 0.5)  # It might take slightly more time
+        self.assertGreaterEqual(strength, 0.7)
 
 
 if __name__ == '__main__':
