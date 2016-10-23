@@ -14,7 +14,7 @@ if __name__ == '__main__':
         redis=redis.from_url(redis_url),
         connection_channel="texas-holdem-poker:lobby",
         room_factory=GameRoomFactory(
-            room_size=5,
+            room_size=10,
             game_factory=HoldemPokerGameFactory(big_blind=40.0, small_blind=20, logger=logger)
         ),
         logger=logger

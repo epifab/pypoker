@@ -67,19 +67,9 @@ body {
     left: 0%;
 }
 
-#players .seat[data-key="0"] .bet-wrapper {
-    top: 125px;
-    left: 50px;
-}
-
 #players .seat[data-key="1"] {
     top: -100px;
     left: 20%;
-}
-
-#players .seat[data-key="1"] .bet-wrapper {
-    top: 125px;
-    left: 0px;
 }
 
 #players .seat[data-key="2"] {
@@ -87,19 +77,9 @@ body {
     left: 40%;
 }
 
-#players .seat[data-key="2"] .bet-wrapper {
-    top: 125px;
-    left: -10px;
-}
-
 #players .seat[data-key="3"] {
     top: -100px;
     left: 60%;
-}
-
-#players .seat[data-key="3"] .bet-wrapper {
-    top: 125px;
-    left: -25px;
 }
 
 #players .seat[data-key="4"] {
@@ -107,17 +87,12 @@ body {
     left: 80%;
 }
 
-#players .seat[data-key="4"] .bet-wrapper {
-    top: 125px;
-    right: 80px;
-}
-
-#players .seat[data-key="5"] {
+#players .seat[data-key="9"] {
     bottom: -50px;
     left: 0%;
 }
 
-#players .seat[data-key="6"] {
+#players .seat[data-key="8"] {
     bottom: -80px;
     left: 20%;
 }
@@ -127,14 +102,65 @@ body {
     left: 40%;
 }
 
-#players .seat[data-key="8"] {
+#players .seat[data-key="6"] {
     bottom: -80px;
     left: 60%;
 }
 
-#players .seat[data-key="9"] {
+#players .seat[data-key="5"] {
     bottom: -50px;
     left: 80%;
+}
+
+
+#players .seat[data-key="0"] .bet-wrapper {
+    top: 125px;
+    left: 50px;
+}
+
+#players .seat[data-key="1"] .bet-wrapper {
+    top: 125px;
+    left: 0px;
+}
+
+#players .seat[data-key="2"] .bet-wrapper {
+    top: 125px;
+    left: -10px;
+}
+
+#players .seat[data-key="3"] .bet-wrapper {
+    top: 125px;
+    left: -25px;
+}
+
+#players .seat[data-key="4"] .bet-wrapper {
+    top: 125px;
+    right: 80px;
+}
+
+#players .seat[data-key="9"] .bet-wrapper {
+    top: -30px;
+    left: 50px;
+}
+
+#players .seat[data-key="8"] .bet-wrapper {
+    top: -30px;
+    left: 0px;
+}
+
+#players .seat[data-key="7"] .bet-wrapper {
+    top: -30px;
+    left: -10px;
+}
+
+#players .seat[data-key="6"] .bet-wrapper {
+    top: -30px;
+    left: -25px;
+}
+
+#players .seat[data-key="5"] .bet-wrapper {
+    top: -30px;
+    right: 80px;
 }
 
 #players .player-info {
@@ -312,28 +338,32 @@ body {
     font-size: 12pt;
 }
 
-#table #game-status {
-    min-height: 100px;
-    margin-left: 110px;
+#game-status {
+
 }
 
-#table #game-status p {
+#game-status p {
     margin: 2px 0px;
+    font-size: 9pt;
+    background-color: #222;
+    padding: 3px;
+    overflow: hidden;
+    height: 30px;
 }
 
-#table #game-status p[data-key="1"] {
+#game-status p[data-key="1"] {
     opacity: 0.8;
 }
 
-#table #game-status p[data-key="2"] {
+#game-status p[data-key="2"] {
     opacity: 0.6;
 }
 
-#table #game-status p[data-key="3"] {
+#game-status p[data-key="3"] {
     opacity: 0.4;
 }
 
-#table #game-status p[data-key="4"] {
+#game-status p[data-key="4"] {
     opacity: 0.2;
 }
 
