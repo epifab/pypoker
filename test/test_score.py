@@ -5,6 +5,13 @@ from poker import HandEvaluator, Card, \
     HoldemPokerScore, HoldemPokerScoreDetector
 
 
+class CardTests(unittest.TestCase):
+    def _test_card(self):
+        card = Card(3, 2)
+        self.assertEquals(3, card.rank)
+        self.assertEquals(2, card.suit)
+
+
 class TraditionalPokerScoreDetectorTests(unittest.TestCase):
     def _test_detect(self, cards, expected_category, expected_cards):
         """Helper method"""
@@ -76,7 +83,7 @@ class TraditionalPokerScoreDetectorTests(unittest.TestCase):
     def test_detect_longer_sequence(self):
         expected_category = TraditionalPokerScore.TRIPS
         cards = [Card(7, 0), Card(7, 2), Card(8, 0), Card(7, 3), Card(8, 1), Card(8, 2), Card(14, 0)]
-        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(14, 0), Card(7, 3), Card(7, 2), Card(7, 0)]
+        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(14, 0), Card(7, 3)]
         self._test_detect(cards, expected_category, expected_cards)
 
     def test_detect_shorter_sequence(self):
@@ -102,7 +109,7 @@ class HoldemPokerScoreDetectorTests(unittest.TestCase):
 
     def test_detect_pair(self):
         expected_category = HoldemPokerScore.PAIR
-        cards = [Card(9, 0), Card(10, 1), Card(10, 2), Card(14, 0), Card(11, 1)]
+        cards = [Card(9, 0), Card(10, 1), Card(14, 0), Card(10, 2), Card(11, 1)]
         expected_cards = [Card(10, 2), Card(10, 1), Card(14, 0), Card(11, 1), Card(9, 0)]
         self._test_detect(cards, expected_category, expected_cards)
 
@@ -163,7 +170,7 @@ class HoldemPokerScoreDetectorTests(unittest.TestCase):
     def test_detect_longer_sequence(self):
         expected_category = HoldemPokerScore.TRIPS
         cards = [Card(7, 0), Card(7, 2), Card(8, 0), Card(7, 3), Card(8, 1), Card(8, 2), Card(14, 0)]
-        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(14, 0), Card(7, 3), Card(7, 2), Card(7, 0)]
+        expected_cards = [Card(8, 2), Card(8, 1), Card(8, 0), Card(14, 0), Card(7, 3)]
         self._test_detect(cards, expected_category, expected_cards)
 
     def test_detect_shorter_sequence(self):
@@ -179,8 +186,18 @@ class HoldemPokerScoreDetectorTests(unittest.TestCase):
             Card(2, 3), Card(3, 3), Card(4, 3), Card(5, 3), Card(7, 3),
         ]
         expected_cards = [
-            Card(8, 2), Card(8, 1), Card(8, 0), Card(9, 1), Card(9, 0),
-            Card(7, 3), Card(5, 3), Card(4, 3), Card(3, 3), Card(2, 3),
+            Card(8, 2), Card(8, 1), Card(8, 0), Card(9, 1), Card(9, 0)
+        ]
+        self._test_detect(cards, expected_category, expected_cards)
+
+    def test_pair_with_longer_sequence(self):
+        expected_category = HoldemPokerScore.PAIR
+        cards = [
+            Card(9, 0), Card(8, 0),
+            Card(2, 2), Card(3, 0), Card(4, 3), Card(13, 3), Card(8, 3)
+        ]
+        expected_cards = [
+            Card(8, 3), Card(8, 0), Card(13, 3), Card(9, 0), Card(4, 3)
         ]
         self._test_detect(cards, expected_category, expected_cards)
 
@@ -447,20 +464,42 @@ class HoldemPokerScoreTests(unittest.TestCase):
 
 
 class HandEvaluatorTests(unittest.TestCase):
-    def test_evaluate_base(self):
+    def test_evaluate_base_one_follower(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
         result = evaluator.evaluate_base(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
-            [Card(rank, suit) for rank in range(2, 14) for suit in range(0, 4)]
+            [Card(rank, suit) for rank in range(2, 14) for suit in range(0, 4)],
+            num_followers=1
         )
         self.assertEquals((1128, 0, 0), result)
+
+    def test_evaluate_base_two_followers(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        result = evaluator.evaluate_base(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            [Card(rank, suit) for rank in range(2, 14) for suit in range(0, 4)],
+            num_followers=2
+        )
+        self.assertEquals((635628, 0, 0), result)
+
+    def test_evaluate_base_nine_followers(self):
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        result = evaluator.evaluate_base(
+            [Card(14, 3), Card(14, 2)],
+            [Card(14, 1), Card(14, 0)],
+            [Card(rank, suit) for rank in range(2, 14) for suit in range(0, 4)],
+            num_followers=9
+        )
+        self.assertEquals((7890843961567986188000, 0, 0), result)
 
     def test_evaluate_AA_no_board_no_lookahead(self):
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
         result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [],
+            num_followers=1,
             look_ahead=0
         )
         # Number of combinations:
@@ -473,6 +512,7 @@ class HandEvaluatorTests(unittest.TestCase):
         result = evaluator.evaluate(
             [Card(13, 3), Card(13, 2)],
             [],
+            num_followers=1,
             look_ahead=0
         )
         # Number of combinations:
@@ -486,6 +526,7 @@ class HandEvaluatorTests(unittest.TestCase):
         result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
+            num_followers=1,
             look_ahead=0
         )
         # Number of combinations:
@@ -498,6 +539,7 @@ class HandEvaluatorTests(unittest.TestCase):
         result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0), Card(13, 3)],
+            num_followers=1,
             look_ahead=0
         )
         # Number of combinations:
@@ -510,6 +552,7 @@ class HandEvaluatorTests(unittest.TestCase):
         result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
+            num_followers=1,
             look_ahead=1
         )
         # Number of combinations:
@@ -519,11 +562,12 @@ class HandEvaluatorTests(unittest.TestCase):
 
     def test_evaluate_AA_with_AA_board_2_lookahead(self):
         # The calculation for 2 lookahead is too expensive
-        # self.skipTest("Too slow")
+        self.skipTest("Too slow")
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
         result = evaluator.evaluate(
             [Card(14, 3), Card(14, 2)],
             [Card(14, 1), Card(14, 0)],
+            num_followers=1,
             look_ahead=2
         )
         # Number of combinations:
@@ -546,16 +590,52 @@ class HandEvaluatorTests(unittest.TestCase):
         # The calculation for 5 lookahead might take forever.. some results are better than nothing tho
         evaluator = HandEvaluator(HoldemPokerScoreDetector())
         start = time.time()
-        strength = evaluator.hand_strength(
+        evaluator.hand_strength(
             [Card(14, 3), Card(14, 2)],
             [],
+            num_followers=1,
             look_ahead=5,
-            timeout=3   # Get me some results in 1 second
+            timeout=3   # Get me some results in 3 seconds
         )
         elapsed = time.time() - start
-
         self.assertLessEqual(elapsed, 3 + 0.5)  # It might take slightly more time
-        self.assertGreaterEqual(strength, 0.7)
+
+    def test_hand_strength_AA_with_different_followers(self):
+        # This test is irrelevant since the timeout does not guarantee correct results
+        self.skipTest("Unreliable")
+        evaluator = HandEvaluator(HoldemPokerScoreDetector())
+        strength_3_followers = evaluator.hand_strength(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            num_followers=3,
+            look_ahead=0,
+            timeout=10   # Get me some results in 3 seconds
+        )
+        strength_5_followers = evaluator.hand_strength(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            num_followers=5,
+            look_ahead=0,
+            timeout=10   # Get me some results in 3 seconds
+        )
+        strength_7_followers = evaluator.hand_strength(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            num_followers=7,
+            look_ahead=0,
+            timeout=10   # Get me some results in 3 seconds
+        )
+        strength_9_followers = evaluator.hand_strength(
+            [Card(14, 3), Card(14, 2)],
+            [],
+            num_followers=9,
+            look_ahead=0,
+            timeout=10   # Get me some results in 3 seconds
+        )
+
+        self.assertLess(strength_5_followers, strength_3_followers)  # It might take slightly more time
+        self.assertLess(strength_7_followers, strength_5_followers)  # It might take slightly more time
+        self.assertLess(strength_9_followers, strength_7_followers)  # It might take slightly more time
 
 
 if __name__ == '__main__':
