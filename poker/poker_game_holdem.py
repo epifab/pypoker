@@ -24,14 +24,16 @@ class HoldemPokerGameFactory(GameFactory):
 
 
 class HoldemPokerGameEventDispatcher(GameEventDispatcher):
-    def new_game_event(self, game_id, players, dealer_id):
+    def new_game_event(self, game_id, players, dealer_id, big_blind, small_blind):
         self.raise_event(
             "new-game",
             {
                 "game_id": game_id,
                 "game_type": "texas-holdem",
-                "player_ids": [player.id for player in players],
-                "dealer_id": dealer_id
+                "players": [player.dto() for player in players],
+                "dealer_id": dealer_id,
+                "big_blind": big_blind,
+                "small_blind": small_blind
             }
         )
 
@@ -153,7 +155,13 @@ class HoldemPokerGame(PokerGame):
         scores = self._create_scores()
         pots = self._create_pots()
 
-        self._event_dispatcher.new_game_event(self._id, self._game_players.active, dealer_id)
+        self._event_dispatcher.new_game_event(
+            game_id=self._id,
+            players=self._game_players.active,
+            dealer_id=dealer_id,
+            big_blind=self._big_blind,
+            small_blind=self._small_blind
+        )
 
         try:
             # Collecting small and big blinds

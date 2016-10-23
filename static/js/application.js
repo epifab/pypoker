@@ -105,8 +105,8 @@ PyPoker = {
 
             $('#game-wrapper').addClass(message.game_type);
 
-            for (playerIdKey in message.player_ids) {
-                playerId = message.player_ids[playerIdKey]
+            for (key in message.players) {
+                playerId = message.players[key].id
                 $player = $('#players .player[data-player-id=' + playerId + ']');
                 $cards = $('.cards', $player);
                 for (i = 0; i < PyPoker.Game.numCards; i++) {

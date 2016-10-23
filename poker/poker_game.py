@@ -495,7 +495,7 @@ class GameBetHandler:
                 raise MessageFormatError(attribute="bet", desc="Attribute is missing")
 
             try:
-                bet = float(message["bet"])
+                bet = round(float(message["bet"]))  # Strip decimals
             except ValueError:
                 raise MessageFormatError(attribute="bet", desc="'{}' is not a number".format(message.bet))
             else:
@@ -606,10 +606,10 @@ class PokerGame:
             raise EndGameException
 
     def _detect_winners(self, pots, scores):
-        for i, pot in enumerate(pots):
+        for i, pot in enumerate(reversed(pots)):
             winners = self._winners_detector.get_winners(pot.players, scores)
             try:
-                money_split = round(pot.money / len(winners), 2)
+                money_split = round(pot.money / len(winners))  # Strip decimals
             except ZeroDivisionError:
                 raise GameError("No players left")
             else:

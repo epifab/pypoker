@@ -36,7 +36,7 @@ class TraditionalPokerGameEventDispatcher(GameEventDispatcher):
             {
                 "game_id": game_id,
                 "game_type": "traditional",
-                "player_ids": [player.id for player in players],
+                "players": [player.dto() for player in players],
                 "dealer_id": dealer_id,
                 "blind_bets": blind_bets,
             }
