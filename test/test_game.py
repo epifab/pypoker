@@ -1,5 +1,5 @@
 import unittest
-from poker import Player
+from poker import Player, HoldemPokerScoreDetector, Card
 from poker.poker_game import *
 
 
@@ -361,6 +361,60 @@ class GameWinnersDetectorTest(unittest.TestCase):
         players.fold("player-4")
         winners = winner_detector.get_winners([player1, player2, player3, player4], GameScoresMock())
         self.assertListEqual([], winners)
+
+
+class GameHoldemWinnerDetectorIntegrationTest(unittest.TestCase):
+    def test_get_winners(self):
+        player1 = Player("player-1", "Player One", 800.0)
+        player2 = Player("player-2", "Player Two", 600.0)
+        player3 = Player("player-3", "Player Three", 1200.0)
+        player4 = Player("player-4", "Player Four", 900.0)
+        player5 = Player("player-5", "Player Four", 3000.0)
+
+        game_players = GamePlayers([player1, player2, player3, player4, player5])
+
+        game_scores = GameScores(HoldemPokerScoreDetector())
+
+        game_scores.add_shared_cards([Card(6, 3), Card(14, 0), Card(8, 3), Card(9, 2), Card(4, 0)])
+        game_scores.assign_cards("player-1", [Card(14, 1), Card(6, 2)])
+        game_scores.assign_cards("player-2", [Card(14, 2), Card(8, 0)])
+        game_scores.assign_cards("player-3", [Card(4, 1), Card(3, 2)])
+        game_scores.assign_cards("player-4", [Card(3, 1), Card(4, 2)])
+        game_scores.assign_cards("player-5", [Card(13, 1), Card(4, 3)])
+
+        game_pots = GamePots(game_players)
+
+        # Bet round here
+        player1.take_money(800.0)
+        player2.take_money(600.0)
+        player3.take_money(1200.0)
+        player4.take_money(900.0)
+        player5.take_money(900.0)
+        game_players.fold("player-5")
+
+        game_pots.add_bets({
+            "player-1": 800.0,
+            "player-2": 600.0,
+            "player-3": 1200.0,
+            "player-4": 900.0,
+            "player-5": 900.0
+        })
+
+        self.assertEquals(4, len(game_pots))
+
+        winner_detector = GameWinnersDetector(game_players)
+
+        winners = winner_detector.get_winners(game_pots[0].players, game_scores)
+        self.assertListEqual([player2], winners)
+
+        winners = winner_detector.get_winners(game_pots[1].players, game_scores)
+        self.assertListEqual([player1], winners)
+
+        winners = winner_detector.get_winners(game_pots[2].players, game_scores)
+        self.assertListEqual([player3, player4], winners)
+
+        winners = winner_detector.get_winners(game_pots[3].players, game_scores)
+        self.assertListEqual([player3], winners)
 
 
 class GameBetRounderTest(unittest.TestCase):
