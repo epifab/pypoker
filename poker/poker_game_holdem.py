@@ -5,19 +5,25 @@ import uuid
 
 
 class HoldemPokerGameFactory(GameFactory):
-    def __init__(self, big_blind, small_blind, logger):
+    def __init__(self, big_blind, small_blind, logger, game_subscribers=None):
         self._big_blind = big_blind
         self._small_blind = small_blind
         self._logger = logger
+        self._game_subscribers = [] if game_subscribers is None else game_subscribers
 
     def create_game(self, players):
         game_id = str(uuid.uuid4())
+
+        event_dispatcher = HoldemPokerGameEventDispatcher(game_id=game_id, logger=self._logger)
+        for subscriber in self._game_subscribers:
+            event_dispatcher.subscribe(subscriber)
+
         return HoldemPokerGame(
             self._big_blind,
             self._small_blind,
             id=game_id,
             game_players=GamePlayers(players),
-            event_dispatcher=HoldemPokerGameEventDispatcher(game_id=game_id, logger=self._logger),
+            event_dispatcher=event_dispatcher,
             deck_factory=DeckFactory(2),
             score_detector=HoldemPokerScoreDetector()
         )
@@ -72,9 +78,6 @@ class HoldemPokerGame(PokerGame):
         self._event_dispatcher.shared_cards_event(new_shared_cards)
         # Adds the new shared cards
         scores.add_shared_cards(new_shared_cards)
-        # Broadcasts players their up-to-date score
-        for player in self._game_players.active:
-            self._send_player_score(player, scores)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Blinds

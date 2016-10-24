@@ -1,4 +1,4 @@
-from . import GameEventListener, GameError
+from . import GameSubscriber, GameError
 import threading
 
 
@@ -115,7 +115,7 @@ class GameRoomFactory:
         return GameRoom(id=id, game_factory=self._game_factory, room_size=self._room_size, logger=logger)
 
 
-class GameRoom(GameEventListener):
+class GameRoom(GameSubscriber):
     def __init__(self, id, game_factory, room_size, logger):
         self._id = id
         self._game_factory = game_factory
@@ -161,7 +161,7 @@ class GameRoom(GameEventListener):
         self._lock.acquire()
         try:
             # Broadcast the event to the room
-            event_message = {"message_type": "game-update", "event": event}
+            event_message = {"message_type": "game-update"}
             event_message.update(event_data)
 
             if "target" in event_data:

@@ -16,7 +16,7 @@ class GameFactory:
         raise NotImplemented
 
 
-class GameEventListener:
+class GameSubscriber:
     def game_event(self, event, event_data):
         raise NotImplemented
 
@@ -34,6 +34,7 @@ class GameEventDispatcher:
         self._subscribers.remove(subscriber)
 
     def raise_event(self, event, event_data):
+        event_data["event"] = event
         event_data["game_id"] = self._game_id
         self._logger.debug(
             "\n" +
@@ -617,11 +618,11 @@ class PokerGame:
                     winner.add_money(money_split)
 
                 self._event_dispatcher.winner_designation_event(
-                    self._game_players.active,
-                    pot,
-                    winners,
-                    money_split,
-                    pots[(i + 1):]
+                    players=self._game_players.active,
+                    pot=pot,
+                    winners=winners,
+                    money_split=money_split,
+                    upcoming_pots=pots[(i + 1):]
                 )
 
                 gevent.sleep(self.WAIT_AFTER_WINNER_DESIGNATION)

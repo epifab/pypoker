@@ -1,4 +1,4 @@
-from . import GameRoom, FullGameRoomException
+from . import FullGameRoomException
 import gevent
 import logging
 import threading
