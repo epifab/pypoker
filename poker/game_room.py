@@ -1,5 +1,6 @@
 from . import GameSubscriber, GameError
 import threading
+import gevent
 
 
 class FullGameRoomException(Exception):
@@ -181,10 +182,15 @@ class GameRoom(GameSubscriber):
         finally:
             self._lock.release()
 
-    def ping_all_players(self):
-        for player in self._room_players.players:
+    def remove_inactive_players(self):
+        def ping_player(player):
             if not player.ping():
                 self.leave(player.id)
+
+        gevent.joinall([
+            gevent.spawn(ping_player, player)
+            for player in self._room_players.players
+        ])
 
     def activate(self):
         self.active = True
@@ -193,7 +199,7 @@ class GameRoom(GameSubscriber):
             dealer_key = -1
             while True:
                 try:
-                    self.ping_all_players()
+                    self.remove_inactive_players()
 
                     players = self._room_players.players
                     if len(players) < 2:

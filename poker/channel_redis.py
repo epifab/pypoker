@@ -1,4 +1,5 @@
-from . import Channel, MessageFormatError, MessageTimeout
+from . import Channel, MessageFormatError, MessageTimeout, ChannelError
+from redis import exceptions
 import gevent
 import json
 import signal
@@ -73,22 +74,28 @@ class MessageQueue:
     def push(self, message):
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
-        self._redis.lpush(self._queue_name, msg_encoded)
-        self._redis.expire(self._queue_name, self._expire)
+        try:
+            self._redis.lpush(self._queue_name, msg_encoded)
+            self._redis.expire(self._queue_name, self._expire)
+        except exceptions.RedisError as e:
+            raise ChannelError(e.args[0])
 
     def pop(self, timeout_epoch=None):
         while timeout_epoch is None or time.time() < timeout_epoch:
-            response = self._redis.rpop(self._queue_name)
-            if response is not None:
-                try:
-                    # Deserialize and return the message
-                    return json.loads(response)
-                except ValueError:
-                    # Invalid json
-                    raise MessageFormatError(desc="Unable to decode the JSON message")
-            else:
-                # Context switching
-                gevent.sleep(0.01)
+            try:
+                response = self._redis.rpop(self._queue_name)
+                if response is not None:
+                    try:
+                        # Deserialize and return the message
+                        return json.loads(response)
+                    except ValueError:
+                        # Invalid json
+                        raise MessageFormatError(desc="Unable to decode the JSON message")
+                else:
+                    # Context switching
+                    gevent.sleep(0.01)
+            except exceptions.RedisError as ex:
+                raise ChannelError(ex.args[0])
         raise MessageTimeout("Timed out")
 
 

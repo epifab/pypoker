@@ -3,6 +3,8 @@ import time
 
 
 class PlayerClientConnector:
+    CONNECTION_TIMEOUT = 30
+
     def __init__(self, redis, connection_channel, logger):
         self._redis = redis
         self._connection_queue = MessageQueue(redis, connection_channel)
@@ -13,6 +15,7 @@ class PlayerClientConnector:
         self._connection_queue.push(
             {
                 "message_type": "connect",
+                "timeout_epoch": time.time() + PlayerClientConnector.CONNECTION_TIMEOUT,
                 "player": {
                     "id": player.id,
                     "name": player.name,
@@ -29,7 +32,7 @@ class PlayerClientConnector:
         )
 
         # Reading connection response
-        connection_message = server_channel.recv_message(time.time() + 30)  # 5 seconds
+        connection_message = server_channel.recv_message(time.time() + PlayerClientConnector.CONNECTION_TIMEOUT)
         MessageFormatError.validate_message_type(connection_message, "connect")
         self._logger.info("{}: connected to server {}".format(player, connection_message["server_id"]))
         return PlayerClient(player, connection_message, server_channel)
