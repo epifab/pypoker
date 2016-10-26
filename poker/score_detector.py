@@ -441,7 +441,7 @@ class HandEvaluator:
         # ties: 6
         # defeats: 5
 
-        # To tie, I need to have exactly the same score of every other player, otherwise I either win or loose
+        # To tie, I need to have exactly the same score of at least one other player, and defeating every other
         # There are C(6,4) = 15 tie combinations
         # To win, I need to defeat every other player otherwise I either loose or tie
         # There are C(5,4) = 5 win combinations
@@ -453,20 +453,22 @@ class HandEvaluator:
         # this means there are C(10, 4) possible combinations for me to win against everyone
 
         if wins < num_followers:
-            win_combinations = 0
+            win_combs = 0
         else:
-            win_combinations = factorial(wins) / factorial(num_followers) / factorial(wins - num_followers)
+            win_combs = factorial(wins) / factorial(num_followers) / factorial(wins - num_followers)
 
-        if ties < num_followers:
-            tie_combinations = 0
+        if ties + wins < num_followers:
+            tie_combs = 0
         else:
-            tie_combinations = factorial(ties) / factorial(num_followers) / factorial(ties - num_followers)
+            tie_combs = factorial(ties + wins) / factorial(num_followers) / factorial(ties + wins - num_followers)
+
+        tie_combs -= win_combs
 
         all_cases = wins + ties + defeats
         all_combinations = factorial(all_cases) / factorial(num_followers) / factorial(all_cases - num_followers)
-        defeat_combinations = all_combinations - win_combinations - tie_combinations
+        defeat_combs = all_combinations - win_combs - tie_combs
 
-        return win_combinations, tie_combinations, defeat_combinations
+        return win_combs, tie_combs, defeat_combs
 
     # def evaluate_base(self, my_cards, board, deck):
     #     my_score = self.score_detector.get_score(my_cards + board)

@@ -201,6 +201,17 @@ class HoldemPokerScoreDetectorTests(unittest.TestCase):
         ]
         self._test_detect(cards, expected_category, expected_cards)
 
+    def test_detect_and_cmp_integration(self):
+        board = [Card(14, 3), Card(14, 2), Card(14, 1), Card(14, 0), Card(13, 0)]
+        player1 = [Card(12, 3), Card(9, 2)]
+        player2 = [Card(11, 3), Card(7, 2)]
+
+        sd = HoldemPokerScoreDetector()
+        score1 = sd.get_score(player1 + board)
+        score2 = sd.get_score(player2 + board)
+        self.assertEquals(0, score1.cmp(score2))
+        self.assertEquals(0, score2.cmp(score1))
+
 
 class TraditionalPokerScoreTests(unittest.TestCase):
     def test_get_cards(self):

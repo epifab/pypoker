@@ -411,7 +411,7 @@ class GameHoldemWinnerDetectorIntegrationTest(unittest.TestCase):
         self.assertListEqual([player1], winners)
 
         winners = winner_detector.get_winners(game_pots[2].players, game_scores)
-        self.assertListEqual([player3, player4], winners)
+        self.assertListEqual([player4, player3], winners)
 
         winners = winner_detector.get_winners(game_pots[3].players, game_scores)
         self.assertListEqual([player3], winners)
