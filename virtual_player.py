@@ -117,7 +117,7 @@ class HoldemPlayerClient:
 
                 elif message["message_type"] == "room-update":
                     for player in message["players"].values():
-                        if not room_players.has_key(player["id"]):
+                        if player["id"] not in room_players:
                             room_players[player["id"]] = Player(
                                 id=player["id"],
                                 name=player["name"],
@@ -131,8 +131,8 @@ class HoldemPlayerClient:
                     if message["event"] == "new-game":
                         game_state = HoldemGameState(
                             players=GamePlayers([
-                                room_players[player_id]
-                                for player_id in message["player_ids"]
+                                room_players[player["id"]]
+                                for player in message["players"]
                             ]),
                             scores=GameScores(HoldemPokerScoreDetector()),
                             pot=0.0,
@@ -412,12 +412,12 @@ if __name__ == '__main__':
         logger = logging.getLogger("player-{}".format(player_id))
         logger.setLevel(logging.INFO)
         logger.addHandler(logging.handlers.WatchedFileHandler(
-            filename="logs/bet-strategy-virtual-player-{}.log".format(i),
+            filename="logs/bet-strategy-virtual-player-{}.log".format(player_id),
             mode='a'
         ))
 
         player = Player(
-            id="hal-".format(str(uuid.uuid4())),
+            id="hal-{}".format(str(uuid.uuid4())),
             name=get_random_name(),
             money=1000.0
         )
@@ -430,7 +430,4 @@ if __name__ == '__main__':
             logger=logger
         )
 
-        try:
-            virtual_player.play()
-        except:
-            logger.exception("Something terrible happened while playing")
+        virtual_player.play()

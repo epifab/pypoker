@@ -441,12 +441,12 @@ class HandEvaluator:
         # ties: 6
         # defeats: 5
 
-        # To tie, I need to have exactly the same score of at least one other player, and defeating every other
-        # There are C(6,4) = 15 tie combinations
         # To win, I need to defeat every other player otherwise I either loose or tie
-        # There are C(5,4) = 5 win combinations
+        # C(5, 4) = 5
+        # To tie, I need to have exactly the same score of at least one other player, and defeating every other
+        # C(6 + 5, 4) - wins = 10
         # With any other combination I loose
-        # C(5 + 6 + 5) - wins - ties
+        # C(5 + 6 + 5, 4) - wins - ties
 
         # To win a hand, I need to win against every other player
         # If I win against 6 possible hands and there are 4 players
@@ -457,6 +457,7 @@ class HandEvaluator:
         else:
             win_combs = factorial(wins) / factorial(num_followers) / factorial(wins - num_followers)
 
+        # @todo: this seems wrong. it seems we'd need to subtract defeats combinations from here double check this logic
         if ties + wins < num_followers:
             tie_combs = 0
         else:
