@@ -263,7 +263,7 @@ class RandomBetStrategy:
     def bet(self, me, game_state, bets, min_bet, max_bet):
         decision = random.choice(self._bet_cases)
 
-        gevent.sleep(5)
+        # gevent.sleep(5)
 
         if decision == "call" or (decision == "fold" and not min_bet):
             return min_bet
@@ -348,7 +348,7 @@ class SmartBetStrategy:
         # Between 0 and 1: 0: not great to call, 1: very valuable
         pot_size = game_pot / game_state.big_blind
 
-        if hand_strength < 0.10:
+        if hand_strength < 0.20:
             # Mostly fold
             if call_rate > 0.85:
                 weights = [0.65, 0.30, 0.05]
@@ -356,7 +356,7 @@ class SmartBetStrategy:
                 weights = [0.80, 0.15, 0.05]
             else:
                 weights = [0.95, 0.00, 0.05]
-        elif hand_strength < 0.20:
+        elif hand_strength < 0.40:
             # Mostly fold/call
             if call_rate > 0.85:
                 weights = [0.45, 0.50, 0.05]
@@ -364,7 +364,7 @@ class SmartBetStrategy:
                 weights = [0.60, 0.35, 0.05]
             else:
                 weights = [0.75, 0.20, 0.05]
-        elif hand_strength < 0.35:
+        elif hand_strength < 0.60:
             # Mostly call
             if call_rate > 0.85:
                 weights = [0.00, 0.70, 0.30]
@@ -372,7 +372,7 @@ class SmartBetStrategy:
                 weights = [0.15, 0.65, 0.20]
             else:
                 weights = [0.40, 0.55, 0.05]
-        elif hand_strength < 0.50:
+        elif hand_strength < 0.80:
             weights = [0.00, 0.45, 0.55]
         else:
             weights = [0.00, 0.25, 0.75]
