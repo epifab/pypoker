@@ -13,8 +13,8 @@ if __name__ == '__main__':
     redis_url = os.environ["REDIS_URL"]
     redis = redis.from_url(redis_url)
 
-    mongo_url = os.environ["MONGODB_URL"]
-    mongo_db = pymongo.MongoClient(mongo_url).get_default_database()
+    # mongo_url = os.environ["MONGODB_URL"]
+    # mongo_db = pymongo.MongoClient(mongo_url).get_default_database()
 
     server = GameServerRedis(
         redis=redis,
