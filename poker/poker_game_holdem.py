@@ -1,7 +1,10 @@
-from . import DeckFactory, HoldemPokerScoreDetector
-from poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher
-import gevent
 import uuid
+
+import gevent
+
+from .deck import DeckFactory
+from .poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher
+from .score_detector import HoldemPokerScoreDetector
 
 
 class HoldemPokerGameFactory(GameFactory):
@@ -177,28 +180,28 @@ class HoldemPokerGame(PokerGame):
             self._assign_cards(2, dealer_id, deck, scores)
 
             # Pre-flop bet round
-            bet_rounds.next()
+            bet_rounds.__next__()
 
             # Flop
             self._add_shared_cards(deck.pop_cards(3), scores)
             gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # Flop bet round
-            bet_rounds.next()
+            bet_rounds.__next__()
 
             # Turn
             self._add_shared_cards(deck.pop_cards(1), scores)
             gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # Turn bet round
-            bet_rounds.next()
+            bet_rounds.__next__()
 
             # River
             self._add_shared_cards(deck.pop_cards(1), scores)
             gevent.sleep(self.WAIT_AFTER_FLOP_TURN_RIVER)
 
             # River bet round
-            if bet_rounds.next() and self._game_players.count_active() > 1:
+            if bet_rounds.__next__() and self._game_players.count_active() > 1:
                 # There are still active players in the match and no showdown yet
                 self._showdown(scores)
 

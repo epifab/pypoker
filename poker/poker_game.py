@@ -1,6 +1,8 @@
-from . import ChannelError, MessageTimeout, MessageFormatError
-import gevent
 import time
+
+import gevent
+
+from .channel import ChannelError, MessageTimeout, MessageFormatError
 
 
 class GameError(Exception):
@@ -181,7 +183,6 @@ class GamePlayers:
             player_id = self._player_ids[next_item]
             if player_id not in self._folder_ids:
                 yield self._players[player_id]
-        raise StopIteration
 
     # def rounder(self, start_player_id):
     #     def decorator(action):
@@ -239,7 +240,7 @@ class GamePlayers:
         return len(self._player_ids) - len(self._folder_ids)
 
     def count_active_with_money(self):
-        return len(filter(lambda player: player.money > 0, self.active))
+        return len([player for player in self.active if player.money > 0])
 
     @property
     def all(self):
@@ -294,14 +295,14 @@ class GamePots:
 
     def add_bets(self, bets):
         for player in self._game_players.all:
-            self._bets[player.id] += bets[player.id] if bets.has_key(player.id) else 0.0
+            self._bets[player.id] += bets[player.id] if player.id in bets else 0.0
 
         bets = dict(self._bets)
 
         # List of players sorted by their bets
         players = sorted(
             self._game_players.all,
-            cmp=lambda player1, player2: cmp(bets[player1.id], bets[player2.id])
+            key=lambda player: bets[player.id]
         )
 
         self._pots = []
@@ -414,7 +415,7 @@ class GameBetRounder:
         dealer = players_round[0]
 
         for k, player in enumerate(players_round):
-            if not bets.has_key(player.id):
+            if player.id not in bets:
                 bets[player.id] = 0.0
             if bets[player.id] < 0.0 or (k > 0 and bets[player.id] < bets[players_round[k - 1].id]):
                 # Ensuring the bets dictionary makes sense

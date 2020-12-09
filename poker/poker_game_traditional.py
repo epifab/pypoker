@@ -1,8 +1,12 @@
-from . import ChannelError, MessageFormatError, MessageTimeout, DeckFactory, TraditionalPokerScoreDetector
-from poker_game import PokerGame, GameFactory, EndGameException, GameError, GamePlayers, GameEventDispatcher
-import gevent
 import time
 import uuid
+
+import gevent
+
+from .channel import ChannelError, MessageFormatError, MessageTimeout
+from .deck import DeckFactory
+from .poker_game import PokerGame, GameFactory, EndGameException, GameError, GamePlayers, GameEventDispatcher
+from .score_detector import TraditionalPokerScoreDetector
 
 
 class DeadHandException(Exception):

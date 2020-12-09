@@ -1,6 +1,9 @@
 import unittest
-from poker import Player, HoldemPokerScoreDetector, Card
+
+from poker.card import Card
+from poker.player import Player
 from poker.poker_game import *
+from poker.score_detector import HoldemPokerScoreDetector
 
 
 class GamePlayersTest(unittest.TestCase):
@@ -15,29 +18,29 @@ class GamePlayersTest(unittest.TestCase):
     def test_round(self):
         game_players = self._create_game_players()
         round = game_players.round("player-2")
-        self.assertEqual("player-2", round.next().id)
-        self.assertEqual("player-3", round.next().id)
-        self.assertEqual("player-4", round.next().id)
-        self.assertEqual("player-1", round.next().id)
-        self.assertRaises(StopIteration, round.next)
+        self.assertEqual("player-2", round.__next__().id)
+        self.assertEqual("player-3", round.__next__().id)
+        self.assertEqual("player-4", round.__next__().id)
+        self.assertEqual("player-1", round.__next__().id)
+        self.assertRaises(StopIteration, round.__next__)
 
     def test_round_with_fold(self):
         game_players = self._create_game_players()
         game_players.fold("player-4")
         round = game_players.round("player-2")
-        self.assertEqual("player-2", round.next().id)
-        self.assertEqual("player-3", round.next().id)
-        self.assertEqual("player-1", round.next().id)
-        self.assertRaises(StopIteration, round.next)
+        self.assertEqual("player-2", round.__next__().id)
+        self.assertEqual("player-3", round.__next__().id)
+        self.assertEqual("player-1", round.__next__().id)
+        self.assertRaises(StopIteration, round.__next__)
 
     def test_round_with_no_dealer(self):
         game_players = self._create_game_players()
         game_players.fold("player-2")
         round = game_players.round("player-2")
-        self.assertEqual("player-3", round.next().id)
-        self.assertEqual("player-4", round.next().id)
-        self.assertEqual("player-1", round.next().id)
-        self.assertRaises(StopIteration, round.next)
+        self.assertEqual("player-3", round.__next__().id)
+        self.assertEqual("player-4", round.__next__().id)
+        self.assertEqual("player-1", round.__next__().id)
+        self.assertRaises(StopIteration, round.__next__)
 
     def test_round_with_no_players(self):
         game_players = self._create_game_players()
@@ -46,7 +49,7 @@ class GamePlayersTest(unittest.TestCase):
         game_players.fold("player-3")
         game_players.fold("player-4")
         round = game_players.round("player-2")
-        self.assertRaises(StopIteration, round.next)
+        self.assertRaises(StopIteration, round.__next__)
 
     def test_get_next(self):
         game_players = self._create_game_players()
@@ -323,7 +326,12 @@ class GameWinnersDetectorTest(unittest.TestCase):
                 self.value = value
 
             def cmp(self, other):
-                return cmp(self.value, other.value)
+                if self.value < other.value:
+                    return -1
+                elif self.value > other.value:
+                    return 1
+                else:
+                    return 0
 
         class GameScoresMock:
             def player_score(self, player_id):

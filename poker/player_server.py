@@ -1,6 +1,8 @@
-from . import Player, MessageFormatError, ChannelError, MessageTimeout
 import logging
 import time
+
+from .channel import MessageFormatError, ChannelError, MessageTimeout
+from .player import Player
 
 
 class PlayerServer(Player):

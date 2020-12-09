@@ -1,5 +1,7 @@
-from . import ChannelRedis, MessageQueue, MessageFormatError
 import time
+
+from .channel import MessageFormatError
+from .channel_redis import ChannelRedis, MessageQueue
 
 
 class PlayerClientConnector:

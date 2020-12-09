@@ -1,8 +1,10 @@
-from . import FullGameRoomException
-import gevent
 import logging
 import threading
 from uuid import uuid4
+
+import gevent
+
+from .game_room import FullGameRoomException
 
 
 class GameServer:

@@ -1,12 +1,4 @@
-import ctypes
 import collections
-from math import factorial
-import gevent
-import random
-import time
-from poker import Card
-from multiprocessing import Process, Queue, Manager, Value, Lock
-from Queue import Empty
 
 
 class Cards:
@@ -146,7 +138,7 @@ class Score:
         raise NotImplemented
 
     def cmp(self, other):
-        return cmp(self.strength, other.strength)
+        raise NotImplemented
 
     def dto(self):
         return {
@@ -196,7 +188,12 @@ class TraditionalPokerScore(Score):
             elif TraditionalPokerScore._straight_is_min(cards1) and TraditionalPokerScore._straight_is_max(cards2):
                 return 1
 
-        return cmp(self.strength, other.strength)
+        if self.strength < other.strength:
+            return -1
+        elif self.strength > other.strength:
+            return 1
+        else:
+            return 0
 
     @staticmethod
     def _straight_is_min(straight_sequence):
@@ -230,7 +227,12 @@ class HoldemPokerScore(Score):
         return strength
 
     def cmp(self, other):
-        return cmp(self.strength, other.strength)
+        if self.strength < other.strength:
+            return -1
+        elif self.strength > other.strength:
+            return 1
+        else:
+            return 0
 
 
 class ScoreDetector:

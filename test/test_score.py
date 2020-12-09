@@ -1,8 +1,8 @@
 import unittest
-import time
-from poker import HandEvaluator, Card, \
-    TraditionalPokerScoreDetector, TraditionalPokerScore, \
-    HoldemPokerScore, HoldemPokerScoreDetector
+
+from poker.card import Card
+from poker.score_detector import TraditionalPokerScoreDetector, TraditionalPokerScore, HoldemPokerScore, \
+    HoldemPokerScoreDetector
 
 
 class CardTests(unittest.TestCase):

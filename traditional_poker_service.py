@@ -1,7 +1,10 @@
-from poker import GameServerRedis, GameRoomFactory, TraditionalPokerGameFactory
 import logging
 import redis
 import os
+
+from poker.game_server_redis import GameServerRedis
+from poker.game_room import GameRoomFactory
+from poker.poker_game_traditional import TraditionalPokerGameFactory
 
 
 if __name__ == '__main__':

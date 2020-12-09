@@ -1,5 +1,6 @@
 import random
-from . import Card
+
+from .card import Card
 
 
 class DeckFactory:

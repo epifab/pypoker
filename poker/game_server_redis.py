@@ -1,6 +1,8 @@
-from . import GameServer, PlayerServer, \
-    MessageQueue, ChannelRedis, ChannelError, MessageFormatError, MessageTimeout
 import time
+
+from .channel_redis import MessageQueue, ChannelRedis, ChannelError, MessageFormatError, MessageTimeout
+from .game_server import GameServer
+from .player_server import PlayerServer
 
 
 class GameServerRedis(GameServer):

@@ -1,7 +1,9 @@
-import unittest
-import mock
-from poker import Player, GameServer
 import time
+import unittest
+from unittest import mock
+
+from poker.game_server import GameServer
+from poker.player import Player
 
 
 class GameServerTest(unittest.TestCase):
@@ -27,7 +29,6 @@ class GameServerTest(unittest.TestCase):
                     name="Player {}".format(i),
                     money=1000.0
                 )
-            raise StopIteration
 
     def test_500_players_connection(self):
         time_start = time.time()

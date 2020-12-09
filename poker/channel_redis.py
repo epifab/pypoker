@@ -1,9 +1,11 @@
-from . import Channel, MessageFormatError, MessageTimeout, ChannelError
-from redis import exceptions
-import gevent
 import json
 import signal
 import time
+
+import gevent
+from redis import exceptions
+
+from .channel import Channel, MessageFormatError, MessageTimeout, ChannelError
 
 
 class RedisListener:

@@ -1,6 +1,8 @@
-from . import GameSubscriber, GameError
 import threading
+
 import gevent
+
+from .poker_game import GameSubscriber, GameError
 
 
 class FullGameRoomException(Exception):
@@ -49,7 +51,7 @@ class GameRoomPlayers:
     def add_player(self, player):
         self._lock.acquire()
         try:
-            if self._players.has_key(player.id):
+            if player.id in self._players:
                 raise DuplicateRoomPlayerException
 
             try:

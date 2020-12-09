@@ -1,12 +1,16 @@
-import gevent
-from flask import Flask, render_template, redirect, session, request, url_for
-from flask_sockets import Sockets
-import random
-import redis
-import uuid
 import os
-from poker import ChannelWebSocket, PlayerClientConnector, Player, ChannelError, MessageFormatError, MessageTimeout
+import random
+import uuid
 
+import gevent
+import redis
+from flask import Flask, render_template, redirect, session, url_for
+from flask_sockets import Sockets
+
+from poker.channel import ChannelError, MessageFormatError, MessageTimeout
+from poker.channel_websocket import ChannelWebSocket
+from poker.player import Player
+from poker.player_client import PlayerClientConnector
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "!!_-pyp0k3r-_!!"

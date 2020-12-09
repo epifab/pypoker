@@ -1,7 +1,8 @@
-from . import Channel, ChannelError, MessageFormatError, MessageTimeout
 import json
 import signal
 import time
+
+from .channel import Channel, ChannelError, MessageFormatError, MessageTimeout
 
 
 class ChannelWebSocket(Channel):
@@ -15,12 +16,8 @@ class ChannelWebSocket(Channel):
         if self._ws.closed:
             raise ChannelError("Unable to send data to the remote host (not connected)")
 
-        # Encode the message
-        msg_serialized = json.dumps(message)
-        msg_encoded = msg_serialized.encode("utf-8")
-
         try:
-            self._ws.send(msg_encoded)
+            self._ws.send(json.dumps(message))
         except:
             raise ChannelError("Unable to send data to the remote host")
 
