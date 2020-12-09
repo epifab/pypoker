@@ -11,7 +11,7 @@ greenlet==0.4.15
 gunicorn==19.9.0
 idna==2.8
 itsdangerous==0.24
-Jinja2==2.10
+Jinja2==2.11.1
 MarkupSafe==1.1.0
 mock==2.0.0
 oauthlib==2.0.0

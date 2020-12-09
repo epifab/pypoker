@@ -18,7 +18,7 @@ class GameServerRedis(GameServer):
             raise MessageFormatError(attribute="timeout_epoch", desc="Invalid session id")
 
         if timeout_epoch < time.time():
-            return MessageTimeout("Connection timeout")
+            raise MessageTimeout("Connection timeout")
 
         try:
             session_id = str(message["session_id"])

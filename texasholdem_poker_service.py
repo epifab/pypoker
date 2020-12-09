@@ -1,6 +1,4 @@
 from poker import GameServerRedis, GameRoomFactory, HoldemPokerGameFactory
-from poker.game_persistence import MongoGameSubscriber
-import pymongo
 import logging
 import redis
 import os

@@ -1,7 +1,6 @@
 import gevent
 from flask import Flask, render_template, redirect, session, request, url_for
 from flask_sockets import Sockets
-from flask_oauthlib.client import OAuth, OAuthException
 import random
 import redis
 import uuid
@@ -14,22 +13,9 @@ app.config["SECRET_KEY"] = "!!_-pyp0k3r-_!!"
 app.debug = True
 
 sockets = Sockets(app)
-oauth = OAuth(app)
 
 redis_url = os.environ["REDIS_URL"]
 redis = redis.from_url(redis_url)
-
-facebook = oauth.remote_app(
-    "facebook",
-    consumer_key=os.environ["FACEBOOK_APP_ID"],
-    consumer_secret=os.environ["FACEBOOK_APP_SECRET"],
-    request_token_params={"scope": "email"},
-    base_url="https://graph.facebook.com",
-    request_token_url=None,
-    access_token_url="/oauth/access_token",
-    access_token_method="GET",
-    authorize_url="https://www.facebook.com/dialog/oauth"
-)
 
 
 @app.route("/")
@@ -50,45 +36,6 @@ def test_login():
     session["player-name"] = get_random_name()
     session["player-money"] = 1000
     return redirect(url_for("index"))
-
-
-@app.route("/facebook-login")
-def login():
-    callback = url_for(
-        "facebook_authorized",
-        next=request.args.get("next") or request.referrer or None,
-        _external=True
-    )
-    return facebook.authorize(callback=callback)
-
-
-@app.route("/facebook-login/authorized")
-def facebook_authorized():
-    response = facebook.authorized_response()
-
-    if response is None:
-        return "Access denied: reason={} error={}".format(
-            request.args["error_reason"],
-            request.args["error_description"]
-        )
-
-    if isinstance(response, OAuthException):
-        return "Access denied: {}".format(response.message)
-
-    session["oauth-token"] = (response["access_token"], "")
-
-    user = facebook.get("/me?fields=name,email")
-
-    session["player-id"] = user.data["id"]
-    session["player-name"] = user.data["name"]
-    session["player-money"] = 1000
-
-    return redirect(url_for("index"))
-
-
-@facebook.tokengetter
-def get_facebook_oauth_token():
-    return session.get("oauth-token")
 
 
 @sockets.route("/poker/texas-holdem")

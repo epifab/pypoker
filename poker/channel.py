@@ -30,7 +30,7 @@ class MessageFormatError(Exception):
             raise MessageFormatError(attribute="message_type", expected=expected, found=message["message_type"])
 
 
-class Channel():
+class Channel:
     def recv_message(self, timeout_epoch=None):
         raise NotImplementedError
 

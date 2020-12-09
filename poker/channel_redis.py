@@ -6,7 +6,7 @@ import signal
 import time
 
 
-class RedisListener():
+class RedisListener:
     def __init__(self, redis, channel):
         self._pubsub = redis.pubsub()
         self._pubsub.subscribe(channel)
