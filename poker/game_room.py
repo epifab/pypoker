@@ -2,7 +2,7 @@ import threading
 
 import gevent
 
-from .poker_game import GameSubscriber, GameError
+from .poker_game import GameSubscriber, GameError, GameFactory
 
 
 class FullGameRoomException(Exception):
@@ -109,25 +109,17 @@ class GameRoomEventHandler:
             player.try_send_message(message)
 
 
-class GameRoomFactory:
-    def __init__(self, room_size, game_factory):
-        self._room_size = room_size
-        self._game_factory = game_factory
-
-    def create_room(self, id, logger):
-        return GameRoom(id=id, game_factory=self._game_factory, room_size=self._room_size, logger=logger)
-
-
 class GameRoom(GameSubscriber):
-    def __init__(self, id, game_factory, room_size, logger):
-        self._id = id
+    def __init__(self, id: str, private: bool, game_factory: GameFactory, room_size: int, logger):
+        self.id = id
+        self.private = private
+        self.active = False
         self._game_factory = game_factory
         self._room_players = GameRoomPlayers(room_size)
-        self._room_event_handler = GameRoomEventHandler(self._room_players, self._id, logger)
+        self._room_event_handler = GameRoomEventHandler(self._room_players, self.id, logger)
         self._event_messages = []
         self._logger = logger
         self._lock = threading.Lock()
-        self.active = False
 
     def join(self, player):
         self._lock.acquire()
@@ -197,7 +189,7 @@ class GameRoom(GameSubscriber):
     def activate(self):
         self.active = True
         try:
-            self._logger.info("Activating room {}...".format(self._id))
+            self._logger.info("Activating room {}...".format(self.id))
             dealer_key = -1
             while True:
                 try:
@@ -217,5 +209,14 @@ class GameRoom(GameSubscriber):
                 except GameError:
                     break
         finally:
-            self._logger.info("Deactivating room {}...".format(self._id))
+            self._logger.info("Deactivating room {}...".format(self.id))
             self.active = False
+
+
+class GameRoomFactory:
+    def __init__(self, room_size: int, game_factory: GameFactory):
+        self._room_size = room_size
+        self._game_factory = game_factory
+
+    def create_room(self, id: str, private: bool, logger) -> GameRoom:
+        return GameRoom(id=id, private=private, game_factory=self._game_factory, room_size=self._room_size, logger=logger)

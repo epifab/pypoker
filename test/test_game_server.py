@@ -1,8 +1,9 @@
 import time
 import unittest
+from typing import Generator
 from unittest import mock
 
-from poker.game_server import GameServer
+from poker.game_server import GameServer, ConnectedPlayer
 from poker.player import Player
 
 
@@ -22,12 +23,14 @@ class GameServerTest(unittest.TestCase):
             pass
 
     class GameServerStub(GameServer):
-        def new_players(self):
+        def new_players(self) -> Generator[ConnectedPlayer, None, None]:
             for i in range(500):
-                yield GameServerTest.PlayerServerMock(
-                    id="player-{}".format(i),
-                    name="Player {}".format(i),
-                    money=1000.0
+                yield ConnectedPlayer(
+                    GameServerTest.PlayerServerMock(
+                        id="player-{}".format(i),
+                        name="Player {}".format(i),
+                        money=1000.0
+                    )
                 )
 
     def test_500_players_connection(self):

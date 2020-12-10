@@ -1,10 +1,9 @@
 import os
-import random
 import uuid
 
 import gevent
 import redis
-from flask import Flask, render_template, redirect, session, url_for
+from flask import Flask, render_template, redirect, session, url_for, request
 from flask_sockets import Sockets
 
 from poker.channel import ChannelError, MessageFormatError, MessageTimeout
@@ -34,11 +33,14 @@ def index():
                            player_money=session["player-money"])
 
 
-@app.route("/test-login")
-def test_login():
+@app.route("/join", methods=["POST"])
+def join():
+    name = request.form["name"]
+    room_id = request.form["room-id"]
     session["player-id"] = str(uuid.uuid4())
-    session["player-name"] = get_random_name()
+    session["player-name"] = name
     session["player-money"] = 1000
+    session["room-id"] = room_id if room_id else None
     return redirect(url_for("index"))
 
 
@@ -65,6 +67,7 @@ def poker_game(ws, connection_channel):
     player_id = session["player-id"]
     player_name = session["player-name"]
     player_money = session["player-money"]
+    room_id = session["room-id"]
 
     player_connector = PlayerClientConnector(redis, connection_channel, app.logger)
 
@@ -75,7 +78,8 @@ def poker_game(ws, connection_channel):
                 name=player_name,
                 money=player_money
             ),
-            session_id=session_id
+            session_id=session_id,
+            room_id=room_id
         )
 
     except (ChannelError, MessageFormatError, MessageTimeout) as e:
@@ -131,51 +135,3 @@ def poker_game(ws, connection_channel):
             server_channel.close()
 
         app.logger.info("player {} connection closed".format(player_id))
-
-
-def get_random_name():
-    # Poker champions: https://en.wikipedia.org/wiki/List_of_World_Series_of_Poker_Main_Event_champions
-    names = [
-        "Johnny Moss",
-        "Thomas Preston",
-        "Walter Pearson",
-        "Brian Roberts",
-        "Doyle Brunson",
-        "Bobby Baldwin",
-        "Hal Fowler",
-        "Stu Ungar",
-        "Jack Straus",
-        "Tom McEvoy",
-        "Jack Keller",
-        "Bill Smith",
-        "Barry Johnston",
-        "Johnny Chan",
-        "Phil Hellmuth",
-        "Mansour Matloubi",
-        "Brad Daugherty",
-        "Hamid Dastmalchi",
-        "Jim Bechtel",
-        "Russ Hamilton",
-        "Dan Harrington",
-        "Huck Seed",
-        "Stu Ungar",
-        "Scotty Nguyen",
-        "Noel Furlong",
-        "Chris Ferguson",
-        "Carlos Mortensen",
-        "Robert Varkonyi",
-        "Chris Moneymaker",
-        "Greg Raymer",
-        "Joe Hachem",
-        "Jamie Gold",
-        "Jerry Yang",
-        "Peter Eastgate",
-        "Joe Cada",
-        "Jonathan Duhamel",
-        "Pius Heinz",
-        "Greg Merson",
-        "Ryan Riess",
-        "Martin Jacobson",
-        "Joe McKeehen",
-    ]
-    return random.choice(names)

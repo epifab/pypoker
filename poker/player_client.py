@@ -12,7 +12,7 @@ class PlayerClientConnector:
         self._connection_queue = MessageQueue(redis, connection_channel)
         self._logger = logger
 
-    def connect(self, player, session_id):
+    def connect(self, player, session_id, room_id):
         # Requesting new connection
         self._connection_queue.push(
             {
@@ -23,6 +23,7 @@ class PlayerClientConnector:
                     "name": player.name,
                     "money": player.money
                 },
+                "room_id": room_id,
                 "session_id": session_id
             }
         )

@@ -1,7 +1,8 @@
 import time
+from typing import Generator
 
 from .channel_redis import MessageQueue, ChannelRedis, ChannelError, MessageFormatError, MessageTimeout
-from .game_server import GameServer
+from .game_server import GameServer, ConnectedPlayer
 from .player_server import PlayerServer
 
 
@@ -11,10 +12,10 @@ class GameServerRedis(GameServer):
         self._redis = redis
         self._connection_queue = MessageQueue(redis, connection_channel)
 
-    def _connect_player(self, message):
+    def _connect_player(self, message) -> ConnectedPlayer:
         try:
             timeout_epoch = int(message["timeout_epoch"])
-        except IndexError:
+        except KeyError:
             raise MessageFormatError(attribute="timeout_epoch", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="timeout_epoch", desc="Invalid session id")
@@ -24,32 +25,39 @@ class GameServerRedis(GameServer):
 
         try:
             session_id = str(message["session_id"])
-        except IndexError:
+        except KeyError:
             raise MessageFormatError(attribute="session", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="session", desc="Invalid session id")
 
         try:
             player_id = str(message["player"]["id"])
-        except IndexError:
+        except KeyError:
             raise MessageFormatError(attribute="player.id", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="player.id", desc="Invalid player id")
 
         try:
             player_name = str(message["player"]["name"])
-        except IndexError:
+        except KeyError:
             raise MessageFormatError(attribute="player.name", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="player.name", desc="Invalid player name")
 
         try:
             player_money = float(message["player"]["money"])
-        except IndexError:
+        except KeyError:
             raise MessageFormatError(attribute="player.money", desc="Missing attribute")
         except ValueError:
             raise MessageFormatError(attribute="player.money",
                                      desc="'{}' is not a number".format(message["player"]["money"]))
+
+        try:
+            game_room_id = str(message["room_id"])
+        except KeyError:
+            game_room_id = None
+        except ValueError:
+            raise MessageFormatError(attribute="room_id", desc="Invalid room id")
 
         player = PlayerServer(
             channel=ChannelRedis(
@@ -70,9 +78,9 @@ class GameServerRedis(GameServer):
             "player": player.dto()
         })
 
-        return player
+        return ConnectedPlayer(player=player, room_id=game_room_id)
 
-    def new_players(self):
+    def new_players(self) -> Generator[ConnectedPlayer, None, None]:
         while True:
             try:
                 yield self._connect_player(self._connection_queue.pop())
