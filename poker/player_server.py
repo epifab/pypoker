@@ -1,15 +1,16 @@
 import logging
 import time
+from typing import Any, Optional
 
-from .channel import MessageFormatError, ChannelError, MessageTimeout
+from .channel import MessageFormatError, ChannelError, MessageTimeout, Channel
 from .player import Player
 
 
 class PlayerServer(Player):
-    def __init__(self, channel, logger, *args, **kwargs):
+    def __init__(self, channel: Channel, logger, *args, **kwargs):
         Player.__init__(self, *args, **kwargs)
-        self._channel = channel
-        self._connected = True
+        self._channel: Channel = channel
+        self._connected: bool = True
         self._logger = logger if logger else logging
 
     def disconnect(self):
@@ -20,11 +21,11 @@ class PlayerServer(Player):
             self._connected = False
 
     @property
-    def channel(self):
+    def channel(self) -> Channel:
         return self._channel
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         return self._connected
 
     def update_channel(self, new_player):
@@ -32,7 +33,7 @@ class PlayerServer(Player):
         self._channel = new_player.channel
         self._connected = new_player.connected
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             self.send_message({"message_type": "ping"})
             message = self.recv_message(timeout_epoch=time.time() + 2)
@@ -43,17 +44,17 @@ class PlayerServer(Player):
             self.disconnect()
             return False
 
-    def try_send_message(self, message):
+    def try_send_message(self, message: Any) -> bool:
         try:
             self.send_message(message)
             return True
         except ChannelError:
             return False
 
-    def send_message(self, message):
+    def send_message(self, message: Any):
         return self._channel.send_message(message)
 
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None) -> Any:
         message = self._channel.recv_message(timeout_epoch)
         if "message_type" in message and message["message_type"] == "disconnect":
             raise ChannelError("Client disconnected")

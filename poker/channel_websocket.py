@@ -1,18 +1,21 @@
 import json
 import signal
 import time
+from typing import Optional, Any
+
+from geventwebsocket.websocket import WebSocket
 
 from .channel import Channel, ChannelError, MessageFormatError, MessageTimeout
 
 
 class ChannelWebSocket(Channel):
-    def __init__(self, ws):
-        self._ws = ws
+    def __init__(self, ws: WebSocket):
+        self._ws: WebSocket = ws
 
     def close(self):
         self._ws.close()
 
-    def send_message(self, message):
+    def send_message(self, message: Any):
         if self._ws.closed:
             raise ChannelError("Unable to send data to the remote host (not connected)")
 
@@ -21,7 +24,7 @@ class ChannelWebSocket(Channel):
         except:
             raise ChannelError("Unable to send data to the remote host")
 
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None) -> Any:
         def timeout_handler(signum, frame):
             raise MessageTimeout("Timed out")
 

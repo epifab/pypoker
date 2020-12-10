@@ -5,6 +5,7 @@ import gevent
 import redis
 from flask import Flask, render_template, redirect, session, url_for, request
 from flask_sockets import Sockets
+from geventwebsocket.websocket import WebSocket
 
 from poker.channel import ChannelError, MessageFormatError, MessageTimeout
 from poker.channel_websocket import ChannelWebSocket
@@ -45,16 +46,16 @@ def join():
 
 
 @sockets.route("/poker/texas-holdem")
-def texasholdem_poker_game(ws):
+def texasholdem_poker_game(ws: WebSocket):
     return poker_game(ws, "texas-holdem-poker:lobby")
 
 
 @sockets.route("/poker/traditional")
-def traditional_poker_game(ws):
+def traditional_poker_game(ws: WebSocket):
     return poker_game(ws, "traditional-poker:lobby")
 
 
-def poker_game(ws, connection_channel):
+def poker_game(ws: WebSocket, connection_channel: str):
     client_channel = ChannelWebSocket(ws)
 
     if "player-id" not in session:

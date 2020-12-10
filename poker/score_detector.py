@@ -1,13 +1,16 @@
 import collections
+from typing import List, Dict, Optional
+
+from .card import Card
 
 
 class Cards:
-    def __init__(self, cards, lowest_rank=2):
+    def __init__(self, cards: List[Card], lowest_rank=2):
         # Sort the list of cards in a descending order
         self._sorted = sorted(cards, key=int, reverse=True)
-        self._lowest_rank = lowest_rank
+        self._lowest_rank: int = lowest_rank
 
-    def _group_by_ranks(self):
+    def _group_by_ranks(self) -> Dict[int, List[Card]]:
         # Group cards by their ranks.
         # Returns a dictionary keyed by rank and valued by list of cards with the same rank.
         # Each list is sorted by card values in a descending order.
@@ -16,7 +19,7 @@ class Cards:
             ranks[card.rank].append(card)
         return ranks
 
-    def _x_sorted_list(self, x):
+    def _x_sorted_list(self, x) -> List[List[Card]]:
         """
         If x = 2 returns a list of pairs, if 3 a list of trips, ...
         The list is sorted by sublist ranks.
@@ -52,7 +55,7 @@ class Cards:
             return straight
         return None
 
-    def _merge_with_cards(self, score_cards):
+    def _merge_with_cards(self, score_cards: List[Card]):
         return score_cards + [card for card in self._sorted if card not in score_cards]
 
     def quads(self):
@@ -62,7 +65,7 @@ class Cards:
         except IndexError:
             return None
 
-    def full_house(self):
+    def full_house(self) -> Optional[List[Card]]:
         trips_list = self._x_sorted_list(3)
         pair_list = self._x_sorted_list(2)
         try:
@@ -70,31 +73,31 @@ class Cards:
         except IndexError:
             return None
 
-    def trips(self):
+    def trips(self) -> Optional[List[Card]]:
         trips_list = self._x_sorted_list(3)
         try:
             return self._merge_with_cards(trips_list[0])[0:5]
         except IndexError:
             return None
 
-    def two_pair(self):
+    def two_pair(self) -> Optional[List[Card]]:
         pair_list = self._x_sorted_list(2)
         try:
             return self._merge_with_cards(pair_list[0] + pair_list[1])[0:5]
         except IndexError:
             return None
 
-    def pair(self):
+    def pair(self) -> Optional[List[Card]]:
         pair_list = self._x_sorted_list(2)
         try:
             return self._merge_with_cards(pair_list[0])[0:5]
         except IndexError:
             return None
 
-    def straight(self):
+    def straight(self) -> Optional[List[Card]]:
         return self._get_straight(self._sorted)
 
-    def flush(self):
+    def flush(self) -> Optional[List[Card]]:
         suits = collections.defaultdict(list)
         for card in self._sorted:
             suits[card.suit].append(card)
@@ -103,7 +106,7 @@ class Cards:
                 return suits[card.suit]
         return None
 
-    def straight_flush(self):
+    def straight_flush(self) -> Optional[List[Card]]:
         suits = collections.defaultdict(list)
         for card in self._sorted:
             suits[card.suit].append(card)
@@ -114,27 +117,27 @@ class Cards:
                     return straight
         return None
 
-    def no_pair(self):
+    def no_pair(self) -> List[Card]:
         return self._sorted[0:5]
 
 
 class Score:
-    def __init__(self, category, cards):
-        self._category = category
-        self._cards = cards
+    def __init__(self, category: int, cards: List[Card]):
+        self._category: int = category
+        self._cards: List[Card] = cards
         assert(len(cards) <= 5)
 
     @property
-    def category(self):
+    def category(self) -> int:
         """Gets the category for this score."""
         return self._category
 
     @property
-    def cards(self):
+    def cards(self) -> List[Card]:
         return self._cards
 
     @property
-    def strength(self):
+    def strength(self) -> int:
         raise NotImplemented
 
     def cmp(self, other):
@@ -159,7 +162,7 @@ class TraditionalPokerScore(Score):
     STRAIGHT_FLUSH = 8
 
     @property
-    def strength(self):
+    def strength(self) -> int:
         strength = self.category
         for offset in range(5):
             strength <<= 4
@@ -196,11 +199,11 @@ class TraditionalPokerScore(Score):
             return 0
 
     @staticmethod
-    def _straight_is_min(straight_sequence):
+    def _straight_is_min(straight_sequence) -> bool:
         return straight_sequence[4].rank == 14
 
     @staticmethod
-    def _straight_is_max(straight_sequence):
+    def _straight_is_max(straight_sequence) -> bool:
         return straight_sequence[0].rank == 14
 
 
@@ -236,7 +239,7 @@ class HoldemPokerScore(Score):
 
 
 class ScoreDetector:
-    def get_score(self, cards):
+    def get_score(self, cards: List[Card]):
         raise NotImplemented
 
 

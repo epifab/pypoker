@@ -72,27 +72,6 @@ class GamePlayersTest(unittest.TestCase):
         game_players.fold("player-4")
         self.assertIsNone(game_players.get_next("player-2"))
 
-    def test_get_previous(self):
-        game_players = self._create_game_players()
-        self.assertEqual("player-1", game_players.get_previous("player-2").id)
-
-    def test_get_previous_with_no_previous(self):
-        game_players = self._create_game_players()
-        game_players.fold("player-1")
-        self.assertEqual("player-4", game_players.get_previous("player-2").id)
-
-    def test_get_previous_with_no_dealer_raises_exception(self):
-        game_players = self._create_game_players()
-        game_players.fold("player-2")
-        self.assertRaises(ValueError, game_players.get_previous, "player-2")
-
-    def test_get_previous_with_only_dealer_throws_exception(self):
-        game_players = self._create_game_players()
-        game_players.fold("player-1")
-        game_players.fold("player-3")
-        game_players.fold("player-4")
-        self.assertIsNone(game_players.get_previous("player-2"))
-
     def test_is_active_with_fold(self):
         game_players = self._create_game_players()
         self.assertTrue(game_players.is_active("player-2"))

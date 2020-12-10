@@ -1,15 +1,18 @@
 import time
 from typing import Generator
 
+from redis import Redis
+
+from .game_room import GameRoomFactory
 from .channel_redis import MessageQueue, ChannelRedis, ChannelError, MessageFormatError, MessageTimeout
 from .game_server import GameServer, ConnectedPlayer
 from .player_server import PlayerServer
 
 
 class GameServerRedis(GameServer):
-    def __init__(self, redis, connection_channel, room_factory, logger=None):
+    def __init__(self, redis: Redis, connection_channel: str, room_factory: GameRoomFactory, logger=None):
         GameServer.__init__(self, room_factory, logger)
-        self._redis = redis
+        self._redis: Redis = redis
         self._connection_queue = MessageQueue(redis, connection_channel)
 
     def _connect_player(self, message) -> ConnectedPlayer:

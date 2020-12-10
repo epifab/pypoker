@@ -1,7 +1,9 @@
 import threading
+from typing import Dict, List, Optional
 
 import gevent
 
+from .player_server import PlayerServer
 from .poker_game import GameSubscriber, GameError, GameFactory
 
 
@@ -18,13 +20,13 @@ class UnknownRoomPlayerException(Exception):
 
 
 class GameRoomPlayers:
-    def __init__(self, room_size):
-        self._seats = [None] * room_size
-        self._players = {}
+    def __init__(self, room_size: int):
+        self._seats: List[Optional[str]] = [None] * room_size
+        self._players: Dict[str, PlayerServer] = {}
         self._lock = threading.Lock()
 
     @property
-    def players(self):
+    def players(self) -> List[PlayerServer]:
         self._lock.acquire()
         try:
             return [self._players[player_id] for player_id in self._seats if player_id is not None]
@@ -32,14 +34,14 @@ class GameRoomPlayers:
             self._lock.release()
 
     @property
-    def seats(self):
+    def seats(self) -> List[Optional[str]]:
         self._lock.acquire()
         try:
             return list(self._seats)
         finally:
             self._lock.release()
 
-    def get_player(self, player_id):
+    def get_player(self, player_id: str) -> PlayerServer:
         self._lock.acquire()
         try:
             return self._players[player_id]
@@ -48,7 +50,7 @@ class GameRoomPlayers:
         finally:
             self._lock.release()
 
-    def add_player(self, player):
+    def add_player(self, player: PlayerServer):
         self._lock.acquire()
         try:
             if player.id in self._players:
@@ -64,7 +66,7 @@ class GameRoomPlayers:
         finally:
             self._lock.release()
 
-    def remove_player(self, player_id):
+    def remove_player(self, player_id: str):
         self._lock.acquire()
         try:
             seat = self._seats.index(player_id)
@@ -78,9 +80,9 @@ class GameRoomPlayers:
 
 
 class GameRoomEventHandler:
-    def __init__(self, room_players, room_id, logger):
-        self._room_players = room_players
-        self._room_id = room_id
+    def __init__(self, room_players: GameRoomPlayers, room_id: str, logger):
+        self._room_players: GameRoomPlayers = room_players
+        self._room_id: str = room_id
         self._logger = logger
 
     def room_event(self, event, player_id):
@@ -215,8 +217,8 @@ class GameRoom(GameSubscriber):
 
 class GameRoomFactory:
     def __init__(self, room_size: int, game_factory: GameFactory):
-        self._room_size = room_size
-        self._game_factory = game_factory
+        self._room_size: int = room_size
+        self._game_factory: GameFactory = game_factory
 
     def create_room(self, id: str, private: bool, logger) -> GameRoom:
         return GameRoom(id=id, private=private, game_factory=self._game_factory, room_size=self._room_size, logger=logger)

@@ -1,3 +1,6 @@
+from typing import Optional, Any
+
+
 class ChannelError(Exception):
     pass
 
@@ -31,10 +34,10 @@ class MessageFormatError(Exception):
 
 
 class Channel:
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None) -> Any:
         raise NotImplementedError
 
-    def send_message(self, message):
+    def send_message(self, message: Any):
         raise NotImplementedError
 
     def close(self):

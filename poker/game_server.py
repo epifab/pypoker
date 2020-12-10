@@ -1,27 +1,27 @@
 import logging
 import threading
-from typing import List, Generator
+from typing import List, Generator, Dict
 from uuid import uuid4
 
 import gevent
 
-from .player import Player
-from .game_room import FullGameRoomException, GameRoom
+from .player_server import PlayerServer
+from .game_room import FullGameRoomException, GameRoom, GameRoomFactory
 
 
 class ConnectedPlayer:
-    def __init__(self, player: Player, room_id: str = None):
-        self.player = player
-        self.room_id = room_id
+    def __init__(self, player: PlayerServer, room_id: str = None):
+        self.player: PlayerServer = player
+        self.room_id: str = room_id
 
 
 class GameServer:
-    def __init__(self, room_factory, logger=None):
-        self._id = str(uuid4())
+    def __init__(self, room_factory: GameRoomFactory, logger=None):
+        self._id: str = str(uuid4())
         self._rooms: List[GameRoom] = []
-        self._players = {}
+        self._players: Dict[str, PlayerServer] = {}
         self._lobby_lock = threading.Lock()
-        self._room_factory = room_factory
+        self._room_factory: GameRoomFactory = room_factory
         self._logger = logger if logger else logging
 
     def __str__(self):
@@ -38,7 +38,7 @@ class GameServer:
             self._rooms.append(room)
             return room
 
-    def _join_private_room(self, player: Player, room_id: str) -> GameRoom:
+    def _join_private_room(self, player: PlayerServer, room_id: str) -> GameRoom:
         self._lobby_lock.acquire()
         try:
             room = self.__get_room(room_id)
@@ -47,7 +47,7 @@ class GameServer:
         finally:
             self._lobby_lock.release()
 
-    def _join_any_public_room(self, player: Player) -> GameRoom:
+    def _join_any_public_room(self, player: PlayerServer) -> GameRoom:
         self._lobby_lock.acquire()
         try:
             # Adding player to the first non-full public room

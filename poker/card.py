@@ -21,19 +21,19 @@ class Card:
         0: u"\u2660",  # Spades
     }
 
-    def __init__(self, rank, suit):
+    def __init__(self, rank: int, suit: int):
         if rank not in Card.RANKS:
             raise ValueError("Invalid card rank")
         if suit not in Card.SUITS:
             raise ValueError("Invalid card suit")
-        self._value = (rank << 2) + suit
+        self._value: int = (rank << 2) + suit
 
     @property
-    def rank(self):
+    def rank(self) -> int:
         return self._value >> 2
 
     @property
-    def suit(self):
+    def suit(self) -> int:
         return self._value & 3
 
     def __lt__(self, other):

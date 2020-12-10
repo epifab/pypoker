@@ -1,20 +1,22 @@
 import uuid
+from typing import Optional, List
 
 import gevent
 
 from .deck import DeckFactory
-from .poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher
+from .player import Player
+from .poker_game import PokerGame, GameFactory, GameError, EndGameException, GamePlayers, GameEventDispatcher, GameSubscriber
 from .score_detector import HoldemPokerScoreDetector
 
 
 class HoldemPokerGameFactory(GameFactory):
-    def __init__(self, big_blind, small_blind, logger, game_subscribers=None):
-        self._big_blind = big_blind
-        self._small_blind = small_blind
+    def __init__(self, big_blind: float, small_blind: float, logger, game_subscribers: Optional[List[GameSubscriber]] = None):
+        self._big_blind: float = big_blind
+        self._small_blind: float = small_blind
         self._logger = logger
-        self._game_subscribers = [] if game_subscribers is None else game_subscribers
+        self._game_subscribers: List[GameSubscriber] = [] if game_subscribers is None else game_subscribers
 
-    def create_game(self, players):
+    def create_game(self, players: List[Player]):
         game_id = str(uuid.uuid4())
 
         event_dispatcher = HoldemPokerGameEventDispatcher(game_id=game_id, logger=self._logger)

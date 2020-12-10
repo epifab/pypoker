@@ -1,22 +1,23 @@
 import json
 import signal
 import time
+from typing import Optional, Any
 
 import gevent
-from redis import exceptions
+from redis import exceptions, Redis
 
 from .channel import Channel, MessageFormatError, MessageTimeout, ChannelError
 
 
 class RedisListener:
-    def __init__(self, redis, channel):
+    def __init__(self, redis: Redis, channel: str):
         self._pubsub = redis.pubsub()
         self._pubsub.subscribe(channel)
 
     def close(self):
         self._pubsub.unsubscribe()
 
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None):
         def timeout_handler(signum, frame):
             raise MessageTimeout("Timed out")
 
@@ -36,8 +37,8 @@ class RedisListener:
                 signal.alarm(0)
 
 
-class RedisPublisher():
-    def __init__(self, redis, channel):
+class RedisPublisher:
+    def __init__(self, redis: Redis, channel: str):
         self._redis = redis
         self._channel = channel
 
@@ -49,14 +50,14 @@ class RedisPublisher():
 
 
 class RedisPubSub(Channel):
-    def __init__(self, redis, channel_in, channel_out):
+    def __init__(self, redis: Redis, channel_in: str, channel_out: str):
         self._listener = RedisListener(redis, channel_in)
         self._publisher = RedisPublisher(redis, channel_out)
 
     def close(self):
         self._listener.close()
 
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None):
         return self._listener.recv_message(timeout_epoch)
 
     def send_message(self, message):
@@ -64,16 +65,16 @@ class RedisPubSub(Channel):
 
 
 class MessageQueue:
-    def __init__(self, redis, queue_name, expire=300):
-        self._redis = redis
-        self._queue_name = queue_name
-        self._expire = expire
+    def __init__(self, redis: Redis, queue_name: str, expire: int = 300):
+        self._redis: Redis = redis
+        self._queue_name: str = queue_name
+        self._expire: int = expire
 
     @property
     def name(self):
         return self._queue_name
 
-    def push(self, message):
+    def push(self, message: Any):
         msg_serialized = json.dumps(message)
         msg_encoded = msg_serialized.encode("utf-8")
         try:
@@ -82,7 +83,7 @@ class MessageQueue:
         except exceptions.RedisError as e:
             raise ChannelError(e.args[0])
 
-    def pop(self, timeout_epoch=None):
+    def pop(self, timeout_epoch: Optional[float] = None) -> Any:
         while timeout_epoch is None or time.time() < timeout_epoch:
             try:
                 response = self._redis.rpop(self._queue_name)
@@ -102,12 +103,12 @@ class MessageQueue:
 
 
 class ChannelRedis(Channel):
-    def __init__(self, redis, channel_in, channel_out):
+    def __init__(self, redis: Redis, channel_in: str, channel_out: str):
         self._queue_in = MessageQueue(redis, channel_in)
         self._queue_out = MessageQueue(redis, channel_out)
 
-    def send_message(self, message):
+    def send_message(self, message: Any):
         self._queue_out.push(message)
 
-    def recv_message(self, timeout_epoch=None):
+    def recv_message(self, timeout_epoch: Optional[float] = None) -> Any:
         return self._queue_in.pop(timeout_epoch)

@@ -1,10 +1,13 @@
 import time
 import uuid
+from typing import List
 
 import gevent
 
 from .channel import ChannelError, MessageFormatError, MessageTimeout
 from .deck import DeckFactory
+from .player import Player
+from .player_server import PlayerServer
 from .poker_game import PokerGame, GameFactory, EndGameException, GameError, GamePlayers, GameEventDispatcher
 from .score_detector import TraditionalPokerScoreDetector
 
@@ -18,7 +21,7 @@ class TraditionalPokerGameFactory(GameFactory):
         self._blind = blind
         self._logger = logger
 
-    def create_game(self, players):
+    def create_game(self, players: List[PlayerServer]):
         # In a traditional poker game, the lowest rank is 9 with 2 players, 8 with three, 7 with four, 6 with five
         lowest_rank = 11 - len(players)
         game_id = str(uuid.uuid4())
@@ -34,7 +37,7 @@ class TraditionalPokerGameFactory(GameFactory):
 
 
 class TraditionalPokerGameEventDispatcher(GameEventDispatcher):
-    def new_game_event(self, game_id, players, dealer_id, blind_bets):
+    def new_game_event(self, game_id: str, players: List[Player], dealer_id: str, blind_bets):
         self.raise_event(
             "new-game",
             {
